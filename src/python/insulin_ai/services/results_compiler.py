@@ -147,8 +147,12 @@ def compile_results(
     narrative = ""
     if generate_narrative:
         narrative = _build_narrative(
-            scorecards, all_safety, all_refs, next_steps,
+            scorecards,
+            all_safety,
+            all_refs,
+            next_steps,
             retro_result.request.biologic_target,
+            retro_result=retro_result,
         )
 
     return CompiledReport(
@@ -212,6 +216,7 @@ def _build_narrative(
     refs: List[str],
     next_steps: List[str],
     biologic: str,
+    retro_result: Optional[RetrosynthesisResult] = None,
 ) -> str:
     """Build a structured text narrative from the compiled data.
 
@@ -249,5 +254,22 @@ def _build_narrative(
         lines.append("### Literature References")
         for ref in refs[:10]:
             lines.append(f"- {ref}")
+        lines.append("")
+
+    if retro_result is not None:
+        from insulin_ai.retrosynthesis.retro_report import format_plan_result_markdown
+
+        meta = retro_result.metadata or {}
+        lines.append("### Route detail (from plan)")
+        lines.append(f"- route_provenance: `{meta.get('route_provenance', 'none')}`")
+        lines.append(f"- retro_stages_completed: {meta.get('retro_stages_completed', [])}")
+        if meta.get("reporting_honesty"):
+            lines.append(f"- {meta['reporting_honesty']}")
+        lines.append("")
+        wrapper = {
+            "target": retro_result.request.target,
+            "result": retro_result.model_dump(),
+        }
+        lines.append(format_plan_result_markdown(wrapper))
 
     return "\n".join(lines)

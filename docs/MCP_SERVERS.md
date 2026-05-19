@@ -41,6 +41,23 @@ After **`save_discovery_state`**, if `discovery_world.json` already exists, the 
 
 Chat is not mirrored into `runs/` automatically; agents must call `save_session_transcript` or `import_chat_transcript_file` to archive each run. See [DEPENDENCIES.md](DEPENDENCIES.md) for reporting libs and [OpenCode_PLATFORM.md](OpenCode_PLATFORM.md) for OpenCode specifics.
 
+### Retrosynthesis (agent-backed, no extra API key)
+
+| Tool | Purpose |
+|------|---------|
+| **`prepare_retrosynthesis`** | Resolve PSMILES → material name, download PDFs to `run_dir`, return `extraction_schema`. Requires `run_dir`. |
+| **`submit_retro_extractions`** | Agent writes `llm_res.json` into session workspace (JSON: paper → reaction text). |
+| **`plan_retrosynthesis`** | Build polymer KG routes from session extractions; AiZynthFinder for monomers. Check `metadata.route_provenance`. |
+| **`assemble_retrosynthesis_report`** | Build `retrosynthesis/RETROSYNTHESIS_REPORT.md` from `plan_*.json` for SUMMARY_REPORT § Retrosynthesis. |
+
+| Component | Extra API key? |
+|-----------|----------------|
+| OpenCode agent (extraction) | No (already configured) |
+| RetroSynAgent internal OpenAI | Optional (`RETRO_USE_INTERNAL_LLM=1` + `extern/RetroSynthesisAgent/.env`) |
+| AiZynthFinder | No (one-time model download via `scripts/setup_aizynthfinder.sh`) |
+
+Default MCP env: `RETRO_LLM_BACKEND=skip`, `INSULIN_AI_AIZYNTH_CONFIG=./data/aizynthfinder/config.yml`.
+
 ---
 
 ## `openmm_evaluate_psmiles` input format

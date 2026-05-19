@@ -91,6 +91,10 @@ class RetrosynthesisRequest(BaseModel):
         description="Optional absolute path to biologic PDB for OpenMM matrix context",
     )
     constraints: Optional[RetrosynthesisConstraints] = None
+    session_dir: Optional[str] = Field(
+        default=None,
+        description="Session directory for persistent retro workspace and cached extractions",
+    )
 
 
 class RetrosynthesisConstraints(BaseModel):
@@ -99,6 +103,14 @@ class RetrosynthesisConstraints(BaseModel):
     banned_reagents: List[str] = Field(default_factory=list)
     require_purchasable_monomers: bool = False
     max_routes: int = 5
+    enrich_monomers_with_aizynth: bool = Field(
+        default=True,
+        description=(
+            "When AiZynthFinder models are ready, plan small-molecule synthesis routes "
+            "for leaf monomers (e.g. lactide from purchasable blocks), not only when "
+            "monomers are flagged non-purchasable."
+        ),
+    )
 
 
 class RetrosynthesisResult(BaseModel):

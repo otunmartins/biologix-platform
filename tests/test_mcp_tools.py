@@ -80,6 +80,109 @@ class TestNewMCPTools:
         parsed = json.loads(result)
         assert parsed["request"]["biologic_target"] == "adalimumab"
 
+    def test_prepare_retrosynthesis_requires_run_dir(self):
+        result = self.server.prepare_retrosynthesis(target="PEG", run_dir="")
+        parsed = json.loads(result)
+        assert "error" in parsed
+
+    def test_submit_and_plan_chain(self, tmp_path):
+        prep = self.server.prepare_retrosynthesis(
+            target="[*]CC([*])C(=O)O",
+            run_dir=str(tmp_path),
+            max_pdfs=0,
+        )
+        prep_data = json.loads(prep)
+        assert prep_data.get("material_name") == "poly(acrylic acid)"
+
+        extractions = json.dumps(
+            {
+                "test_paper": (
+                    "Reaction 001:\n"
+                    "Reactants: acrylic acid\n"
+                    "Products: poly(acrylic acid)\n"
+                    "Conditions: RAFT, 70°C"
+                ),
+            }
+        )
+        sub = self.server.submit_retro_extractions(
+            run_dir=str(tmp_path),
+            material_name="poly(acrylic acid)",
+            extractions=extractions,
+        )
+        sub_data = json.loads(sub)
+        assert sub_data.get("ok") is True
+
+        plan = self.server.plan_retrosynthesis(
+            target="[*]CC([*])C(=O)O",
+            run_dir=str(tmp_path),
+            max_routes=2,
+        )
+        plan_data = json.loads(plan)
+        assert "polymer_routes" in plan_data
+        assert plan_data["metadata"].get("session_extractions_present") is True
+
+    def test_assemble_retrosynthesis_report(self, tmp_path):
+        sub = self.server.submit_retro_extractions(
+            run_dir=str(tmp_path),
+            target="[*]CC([*])C(=O)O",
+            material_name="poly(acrylic acid)",
+            extractions=json.dumps(
+                {
+                    "t": (
+                        "Reaction 001:\n"
+                        "Reactants: acrylic acid\n"
+                        "Products: poly(acrylic acid)\n"
+                        "Conditions: RAFT"
+                    ),
+                }
+            ),
+        )
+        assert json.loads(sub).get("ok") is True
+        self.server.plan_retrosynthesis(
+            target="[*]CC([*])C(=O)O",
+            run_dir=str(tmp_path),
+            max_routes=1,
+        )
+        out = self.server.assemble_retrosynthesis_report(
+            run_dir=str(tmp_path),
+            targets="[*]CC([*])C(=O)O",
+        )
+        data = json.loads(out)
+        assert data.get("ok") is True
+        assert Path(data["markdown_path"]).is_file()
+
+    def test_compile_results_uses_session_dir(self, tmp_path):
+        self.server.submit_retro_extractions(
+            run_dir=str(tmp_path),
+            target="[*]CC([*])C(=O)O",
+            material_name="poly(acrylic acid)",
+            extractions=json.dumps(
+                {
+                    "t": (
+                        "Reaction 001:\n"
+                        "Reactants: acrylic acid\n"
+                        "Products: poly(acrylic acid)\n"
+                        "Conditions: RAFT"
+                    ),
+                }
+            ),
+        )
+        self.server.plan_retrosynthesis(
+            target="[*]CC([*])C(=O)O",
+            run_dir=str(tmp_path),
+            max_routes=1,
+        )
+        comp = json.loads(
+            self.server.compile_results(
+                target="[*]CC([*])C(=O)O",
+                run_dir=str(tmp_path),
+                run_admet=False,
+                use_cached_plan=True,
+            )
+        )
+        assert comp.get("narrative") or comp.get("scorecards") is not None
+        assert "template" in str(comp.get("raw_data", {}).get("retro_metadata", {}))
+
     def test_check_monomer_admet_returns_json(self):
         result = self.server.check_monomer_admet(smiles="CCO")
         parsed = json.loads(result)
@@ -236,7 +339,10 @@ class TestExistingToolsPreserved:
         "resolve_biologic_target",
         "start_biologics_session",
         "run_biologics_discovery",
+        "prepare_retrosynthesis",
+        "submit_retro_extractions",
         "plan_retrosynthesis",
+        "assemble_retrosynthesis_report",
         "check_monomer_admet",
         "check_monomers_batch",
         "compile_results",

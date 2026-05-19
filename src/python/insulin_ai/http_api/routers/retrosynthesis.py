@@ -32,6 +32,20 @@ class RetrosynthesisPlanRequest(BaseModel):
     allowed_mechanisms: Optional[List[str]] = None
     banned_reagents: List[str] = Field(default_factory=list)
     biologic_pdb_path: str = ""
+    session_dir: str = Field(default="", description="Session folder for retro workspace")
+
+
+class PrepareRetrosynthesisRequest(BaseModel):
+    target: str
+    biologic_target: str = "insulin"
+    session_dir: str = Field(..., description="Session folder path")
+    max_pdfs: int = Field(default=5, ge=1, le=20)
+
+
+class SubmitRetroExtractionsRequest(BaseModel):
+    session_dir: str
+    material_name: str
+    extractions: dict = Field(..., description="paper_name -> reaction text")
 
 
 class CompileRequest(BaseModel):
@@ -84,6 +98,7 @@ def retrosynthesis_plan(req: RetrosynthesisPlanRequest):
         target=req.target,
         biologic_target=req.biologic_target,
         biologic_pdb_path=req.biologic_pdb_path,
+        session_dir=req.session_dir or None,
         constraints=RetrosynthesisConstraints(
             max_routes=req.max_routes,
             allowed_mechanisms=mechanisms,
@@ -141,6 +156,52 @@ def retrosynthesis_compile(req: CompileRequest):
         return compile_results(retro_result, tox_results=tox_results)
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Compile failed: {exc}")
+
+
+@router.post(
+    "/api/retrosynthesis/prepare",
+    summary="Prepare retrosynthesis workspace (download PDFs)",
+)
+def retrosynthesis_prepare(req: PrepareRetrosynthesisRequest):
+    from pathlib import Path
+
+    from insulin_ai.services.retrosynthesis_service import prepare_retrosynthesis_workspace
+
+    session = Path(req.session_dir).expanduser().resolve()
+    if not session.is_dir():
+        raise HTTPException(status_code=400, detail=f"session_dir not found: {session}")
+    try:
+        return prepare_retrosynthesis_workspace(
+            target=req.target,
+            session_dir=session,
+            max_pdfs=req.max_pdfs,
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@router.post(
+    "/api/retrosynthesis/submit-extractions",
+    summary="Submit agent-produced reaction extractions",
+)
+def retrosynthesis_submit(req: SubmitRetroExtractionsRequest):
+    from pathlib import Path
+
+    from insulin_ai.retrosynthesis.retro_adapter import normalize_extractions, write_llm_res
+
+    session = Path(req.session_dir).expanduser().resolve()
+    if not session.is_dir():
+        raise HTTPException(status_code=400, detail=f"session_dir not found: {session}")
+    try:
+        data = normalize_extractions(req.extractions)
+        llm_path = write_llm_res(session, req.material_name, data)
+        return {
+            "ok": True,
+            "llm_res_path": str(llm_path),
+            "paper_count": len(data),
+        }
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
 
 
 @router.get(

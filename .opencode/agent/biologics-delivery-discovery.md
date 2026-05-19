@@ -54,20 +54,37 @@ After the onboarding gate and session setup:
 3. **`screen_candidate_library(psmiles_list, biologic_target, run_admet=true, run_compliance=true, run_dir=<session>)`** — Single-call batch: validate + ADMET + compliance for all candidates. Returns a ranked JSON array; each item has `psmiles` and `library_disposition` ("pass"/"warning"/"fail").
 4. **`openmm_evaluate_psmiles(psmiles_list=<passing_psmiles>, run_dir=<session>, response_format="concise")`** — OpenMM matrix energy screening. **IMPORTANT: `psmiles_list` is required.** Build it by extracting the `psmiles` field from Step 3's results where `library_disposition` is "pass" (or "warning" if no "pass" candidates). Pass as a comma-separated string, e.g. `"[*]OCC[*],[*]CC(O)[*]"`. Never call `openmm_evaluate_psmiles` without `psmiles_list`. Skip entirely with "no OpenMM" user scope or when no candidates passed Step 3.
 
-**Phase 3 — Retrosynthesis + safety (default-on):**
+**Phase 3 — Retrosynthesis + safety (default-on, every top-K pass candidate):**
 
-5. **`plan_retrosynthesis(target, biologic_target, run_dir=<session>)`** — Polymer synthesis routes + monomers for top K candidates (K≥1 default; K=2–3 where budget allows).
-6. **`check_monomers_batch(smiles_list, run_dir=<session>)`** — ADMET screen all unique monomer SMILES from routes.
-7. **`check_excipient_compliance(psmiles, jurisdiction="FDA,EMA", run_dir=<session>)`** — Regulatory precedent, GRAS, immunogenicity SMARTS per candidate.
-8. **`compile_results(target, biologic_target, run_dir=<session>)`** — Ranked report with routes, ADMET, compliance, and composite score.
+Run this **full loop per candidate** (all library `pass` / top-K PSMILES, including PVA). Never skip `plan_retrosynthesis` for a candidate you discuss in the report.
+
+For **each** candidate `target` (PSMILES):
+
+1. **`prepare_retrosynthesis(target, biologic_target, run_dir=<session>)`** — save `material_name` from the response (not raw PSMILES).
+2. **Extract reactions** from `pdf_paths`, session literature notes, or chemistry knowledge — then **immediately** call **`submit_retro_extractions`** in the **same turn**. Do **not** narrate `extraction_schema`, list "Known/Literature" bullets, or batch multiple polymers before submitting; **one target per loop**. Each paper entry must include `Products:` containing `material_name` (lowercase OK), e.g. `Products: trehalose glycopolymer`. Best-effort JSON is fine; re-submit only if `validation.root_product_found` is false.
+3. **`submit_retro_extractions(run_dir=<session>, target=<psmiles>, material_name=<from prepare>, extractions=<JSON>)`** — check `validation.root_product_found`; if false, fix `Products:` lines and re-submit (do not stall re-drafting in chat).
+4. **`plan_retrosynthesis(target, biologic_target, run_dir=<session>)`** — **required**; creates `retrosynthesis/plan_*.json`.
+5. **`compile_results(target, biologic_target, run_dir=<session>, use_cached_plan=true)`** — uses session workspace and cached plan.
+6. **`check_monomers_batch(smiles_list, run_dir=<session>)`** — all unique monomer SMILES from `plan` JSON.
+7. **`check_excipient_compliance(psmiles, ...)`** — per candidate.
+8. **`save_pipeline_stage(candidate_psmiles=..., stage="retro", disposition=..., detail=route_provenance + aizynth counts, run_dir=<session>)`**
+
+**Retrosynthesis honesty (mandatory in reports):**
+
+- Never write "RetroSynAgent KG tree" unless `route_provenance` is `session_agent_llm` or `retro_agent_llm`.
+- Never write "AiZynthFinder ran" unless `aizynth_monomers_attempted > 0`.
+- Never describe retrosynthesis for a candidate with no `retrosynthesis/plan_*.json` artifact.
+- Quote `metadata.reporting_honesty` when present. `retro_internal_llm_configured: false` is **expected** (OpenCode is the extractor).
 
 **Phase 4 — Persist + report:**
 
-9. **`save_funnel_context(stage="post_retro", checkpoint_data=<top_K_json>, run_dir=<session>)`** — Named checkpoint so session is resumable.
-10. **`save_discovery_state(iteration=N, feedback_json=..., run_dir=<session>)`** — Full candidate list with energies and outcomes.
-11. **`patch_discovery_world`** — literature_entries, simulation_entries, hypotheses, retrosynthesis_entries.
-12. **Write `SUMMARY_REPORT.md`** (see Report style below) + **`compile_discovery_markdown_to_pdf`**.
-13. **`import_chat_transcript_file`** or **`save_session_transcript`** — mandatory transcript archive into the session folder.
+9. **`save_funnel_context(stage="post_retro", ...)`**
+10. **`save_discovery_state(iteration=N, ...)`**
+11. **`patch_discovery_world`**
+12. **`assemble_retrosynthesis_report(run_dir=<session>, targets=<comma-separated top-K PSMILES>)`** — **before** writing SUMMARY.
+13. **Write `SUMMARY_REPORT.md`** — paste tool markdown **verbatim** as **§3.4 Retrosynthesis** (or equivalent Results subsection). Add interpretation only in Discussion.
+14. **`compile_discovery_markdown_to_pdf`**
+15. **`import_chat_transcript_file`** or **`save_session_transcript`**
 
 ## Per-candidate audit (use throughout)
 
@@ -87,7 +104,9 @@ Early-stopping conditions (same as materials-discovery): energy threshold crosse
 
 ## Report style
 
-Write `SUMMARY_REPORT.md` as a research paper (Abstract, Methods, Results, Discussion, Conclusions, References). Reference `docs/SUMMARY_REPORT_STYLE.md` for full formatting rules. Per-candidate output should include: PSMILES, synthesis route summary, top monomers + ADMET flags, compliance status, interaction energy (if OpenMM ran), composite score, and recommended next steps.
+Write `SUMMARY_REPORT.md` as a research paper (Abstract, Methods, Results, Discussion, Conclusions, References). Reference `docs/SUMMARY_REPORT_STYLE.md` for full formatting rules.
+
+**Retrosynthesis section:** Must come from `assemble_retrosynthesis_report` output (tables for polymer steps, monomer AiZynth building blocks, provenance). Do not replace tool tables with one-line chemistry summaries.
 
 ## MCP tools
 
@@ -95,7 +114,7 @@ Write `SUMMARY_REPORT.md` as a research paper (Abstract, Methods, Results, Discu
 
 **Composite profiling:** `get_candidate_profile` (single-call dossier), `screen_candidate_library` (batch)
 
-**Retrosynthesis + safety:** `plan_retrosynthesis`, `check_monomer_admet`, `check_monomers_batch`, `compile_results`, `check_excipient_compliance`
+**Retrosynthesis + safety:** `prepare_retrosynthesis`, `submit_retro_extractions`, `plan_retrosynthesis`, `assemble_retrosynthesis_report`, `compile_results`, `check_monomer_admet`, `check_monomers_batch`, `check_excipient_compliance`
 
 **Screening:** `openmm_evaluate_psmiles`, `validate_psmiles`, `generate_psmiles_from_name`, `mutate_psmiles`
 
@@ -113,7 +132,8 @@ Write `SUMMARY_REPORT.md` as a research paper (Abstract, Methods, Results, Discu
 
 ## Prerequisites
 
-- **RetroSynthesisAgent** submodule installed for `plan_retrosynthesis` routes. See `scripts/install_submodules.sh`.
+- **RetroSynthesisAgent** submodule for polymer KG routes (`scripts/install_submodules.sh`). No separate OpenAI key required when using `prepare_retrosynthesis` → agent extraction → `submit_retro_extractions` → `plan_retrosynthesis`.
+- **AiZynthFinder** models: `bash scripts/setup_aizynthfinder.sh` (one-time ~800MB download).
 - **ADMET-AI** submodule for full ADMET predictions.
 - **OpenMM + Packmol** for `openmm_evaluate_psmiles` (optional but recommended).
 - `data/4F1C.pdb` bundled for insulin; other biologics fetched from RCSB via `resolve_biologic_target`.

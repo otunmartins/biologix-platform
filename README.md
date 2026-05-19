@@ -129,7 +129,7 @@ You should see energies printed. If this fails, Packmol or OpenMM may be missing
 
 The `experimental` branch adds:
 
-- **`plan_retrosynthesis`** — Two-engine retrosynthesis: RetroSynthesisAgent for polymer routes, AiZynthFinder for monomer routes to purchasable building blocks.
+- **`prepare_retrosynthesis`** / **`submit_retro_extractions`** / **`plan_retrosynthesis`** — Agent-backed polymer retrosynthesis (OpenCode LLM extracts literature; no separate OpenAI key). AiZynthFinder enriches monomer routes. Run `bash scripts/setup_aizynthfinder.sh` once for monomer planning models.
 - **`check_monomer_admet`** — SMARTS structural alerts + ADMET-AI predictions (hERG, hepatotoxicity, mutagenicity) on residual monomers.
 - **`compile_results`** — Full pipeline: retrosynthesis + ADMET + composite ranking + narrative report.
 - **FastAPI** — `POST /retrosynthesis/plan`, `POST /admet/screen`, `POST /pipeline/compile` at `http://localhost:8000/docs`.

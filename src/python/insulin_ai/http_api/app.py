@@ -98,20 +98,27 @@ class HealthResponse(BaseModel):
     version: str = "0.4.0"
     retrosynthesis_agent_available: bool
     aizynthfinder_available: bool
+    aizynthfinder_models_ready: bool
+    retro_internal_llm_configured: bool
     admet_available: bool
 
 
 @app.get("/health", response_model=HealthResponse, tags=["Health"])
 def health():
     """Liveness check with feature availability flags."""
+    from insulin_ai.retrosynthesis.aizynth_config import models_ready
     from insulin_ai.services.retrosynthesis_service import (
+        _internal_llm_configured,
         _is_aizynthfinder_available,
         _is_retrosynthesisagent_available,
     )
     from insulin_ai.services.toxicity_service import _is_admet_available
 
+    aizynth_pkg = _is_aizynthfinder_available()
     return HealthResponse(
         retrosynthesis_agent_available=_is_retrosynthesisagent_available(),
-        aizynthfinder_available=_is_aizynthfinder_available(),
+        aizynthfinder_available=aizynth_pkg,
+        aizynthfinder_models_ready=models_ready() if aizynth_pkg else False,
+        retro_internal_llm_configured=_internal_llm_configured(),
         admet_available=_is_admet_available(),
     )

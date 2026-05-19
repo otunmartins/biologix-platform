@@ -21,7 +21,10 @@ class TestRetrosynthesisService:
         request = RetrosynthesisRequest(
             target="PEG",
             biologic_target="insulin",
-            constraints=RetrosynthesisConstraints(max_routes=2),
+            constraints=RetrosynthesisConstraints(
+                max_routes=2,
+                enrich_monomers_with_aizynth=False,
+            ),
         )
         result = plan_retrosynthesis(request)
         assert isinstance(result, RetrosynthesisResult)
@@ -41,10 +44,68 @@ class TestRetrosynthesisService:
     def test_plan_metadata_reports_availability(self):
         from insulin_ai.services.retrosynthesis_service import plan_retrosynthesis
 
-        request = RetrosynthesisRequest(target="test_polymer")
+        request = RetrosynthesisRequest(
+            target="test_polymer",
+            constraints=RetrosynthesisConstraints(enrich_monomers_with_aizynth=False),
+        )
         result = plan_retrosynthesis(request)
         assert "retrosynthesis_agent_available" in result.metadata
         assert "aizynthfinder_available" in result.metadata
+        assert "route_provenance" in result.metadata
+        assert "aizynthfinder_models_ready" in result.metadata
+
+    def test_plan_unknown_target_no_fake_route(self):
+        from insulin_ai.services.retrosynthesis_service import plan_retrosynthesis
+
+        request = RetrosynthesisRequest(target="some_unknown_polymer_xyz_12345")
+        result = plan_retrosynthesis(request)
+        assert result.metadata.get("route_provenance") in ("none", "template")
+        if result.metadata.get("route_provenance") == "none":
+            assert len(result.polymer_routes) == 0
+            assert result.metadata.get("requires_agent_extractions") is True
+
+    def test_plan_peg_uses_template_when_no_agent(self):
+        from insulin_ai.services.retrosynthesis_service import plan_retrosynthesis
+
+        request = RetrosynthesisRequest(target="PEG", constraints=RetrosynthesisConstraints(max_routes=1))
+        result = plan_retrosynthesis(request)
+        assert len(result.polymer_routes) >= 1
+        assert result.metadata.get("route_provenance") in ("template", "retro_agent_llm", "session_agent_llm")
+
+    def test_plan_with_session_extractions_uses_template_or_routes(self, tmp_path):
+        import json
+
+        from insulin_ai.retrosynthesis.retro_adapter import write_llm_res
+        from insulin_ai.services.retrosynthesis_service import plan_retrosynthesis
+
+        extractions = {
+            "test_paper": (
+                "Reaction 001:\n"
+                "Reactants: acrylic acid\n"
+                "Products: poly(acrylic acid)\n"
+                "Conditions: RAFT, 70°C"
+            ),
+        }
+        write_llm_res(tmp_path, "poly(acrylic acid)", extractions)
+
+        request = RetrosynthesisRequest(
+            target="[*]CC([*])C(=O)O",
+            biologic_target="insulin",
+            session_dir=str(tmp_path),
+            constraints=RetrosynthesisConstraints(
+                max_routes=3,
+                enrich_monomers_with_aizynth=False,
+            ),
+        )
+        result = plan_retrosynthesis(request)
+        assert result.metadata.get("session_extractions_present") is True
+        # RetroSynAgent may or may not be installed; template fallback still valid
+        assert result.metadata.get("route_provenance") in (
+            "session_agent_llm",
+            "retro_agent_llm",
+            "template",
+            "none",
+        )
 
 
 class TestToxicityService:

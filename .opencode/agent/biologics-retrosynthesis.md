@@ -45,9 +45,9 @@ After the onboarding gate:
 
 1. **`resolve_biologic_target`** — Confirm PDB path; fixes OpenMM protein for **`openmm_evaluate_psmiles`** via server env.
 2. **`start_biologics_session`** — If not already active for this campaign (once per session).
-3. **`plan_retrosynthesis(target, biologic_target, run_dir=<session>)`** — Polymer routes + monomers; persisted under `runs/<id>/retrosynthesis/`.
-4. **`check_monomer_admet`** or **`check_monomers_batch`** — On unique monomer SMILES from routes.
-5. **`compile_results`(..., `run_dir=<session>)`** — Ranked report + narrative; updates `discovery_world.json` **`retrosynthesis_entries`**.
+3. **Retrosynthesis (per polymer target)** — For each candidate: **`prepare_retrosynthesis`** → extract reactions (Products must include polymer name) → **`submit_retro_extractions`** (check `validation.root_product_found`) → **`plan_retrosynthesis`** → **`compile_results`** with `run_dir` and `use_cached_plan=true`. Honesty rules: see **biologics-delivery-discovery.md** Retrosynthesis honesty.
+4. **`check_monomer_admet`** or **`check_monomers_batch`** — On unique monomer SMILES from plan JSON.
+5. **`assemble_retrosynthesis_report(run_dir, targets=...)`** before writing SUMMARY; paste markdown verbatim into § Retrosynthesis.
 6. **Optional design** — If the user had no polymer target: `mine_literature` with biologic in query, `generate_psmiles_from_name` / `generate_candidates`, then repeat steps 3–5 per candidate (batch small N).
 7. **Optional OpenMM** — **`openmm_evaluate_psmiles(psmiles_list, run_dir=<session>)`** on top 1–3 PSMILES **after** session env includes resolved PDB (**`start_biologics_session`** sets `INSULIN_AI_TARGET_PROTEIN_PDB`).
 8. **`save_discovery_state`** + **`patch_discovery_world`** — Same discipline as materials-discovery: literature rows, simulation rows, hypotheses, `retrosynthesis_entries` already partially filled by tools when using `run_dir`.
@@ -72,13 +72,14 @@ Use MCP **`run_biologics_discovery`** for **scripted** unattended runs (subproce
 
 **Biologics / session:** `resolve_biologic_target`, `start_biologics_session`, `run_biologics_discovery`
 
-**Retrosynthesis & safety:** `plan_retrosynthesis`, `check_monomer_admet`, `check_monomers_batch`, `compile_results` — pass **`run_dir`** (session path) whenever available for persistence.
+**Retrosynthesis & safety:** `prepare_retrosynthesis`, `submit_retro_extractions`, `plan_retrosynthesis`, `assemble_retrosynthesis_report`, `compile_results`, `check_monomer_admet`, `check_monomers_batch` — pass **`run_dir`** whenever available.
 
 **Shared with materials-discovery:** `mine_literature`, `validate_psmiles`, `openmm_evaluate_psmiles`, `generate_psmiles_from_name`, `mutate_psmiles`, `save_discovery_state`, `load_discovery_state`, `patch_discovery_world`, `discovery_world_planning_context`, `get_discovery_world_state`, transcript tools.
 
 ## Prerequisites
 
-- **RetroSynthesisAgent** submodule + API keys for its LLM path (see repo README / `scripts/install_submodules.sh`).
+- **RetroSynthesisAgent** submodule (`scripts/install_submodules.sh`). Agent-backed path uses OpenCode extractions; internal OpenAI optional (`RETRO_USE_INTERNAL_LLM=1`).
+- **AiZynthFinder** models: `bash scripts/setup_aizynthfinder.sh`.
 - **ADMET-AI:** submodule + `pip install -e extern/admet_ai` for predictions.
 - **OpenMM + Packmol** for `openmm_evaluate_psmiles` (optional branch).
 

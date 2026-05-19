@@ -126,7 +126,8 @@ mcp = FastMCP(
     "biologics-ai",
     instructions=(
         "Biologics stabilisation: resolve_biologic_target, start_biologics_session, run_biologics_discovery; "
-        "plan_retrosynthesis, check_monomer_admet, check_monomers_batch, compile_results (optional run_dir for session); "
+        "prepare_retrosynthesis, submit_retro_extractions, plan_retrosynthesis, assemble_retrosynthesis_report, "
+        "check_monomer_admet, check_monomers_batch, compile_results (optional run_dir for session); "
         "ADMET and literature; PSMILES tools; OpenMM openmm_evaluate_psmiles; discovery world; transcripts. "
         "Arbitrary biologics via biologic_target and INSULIN_AI_TARGET_PROTEIN_PDB after start_biologics_session."
     ),
@@ -1607,6 +1608,82 @@ def write_discovery_summary_report(
 # ---------------------------------------------------------------------------
 
 @mcp.tool()
+def prepare_retrosynthesis(
+    target: str,
+    biologic_target: str = "insulin",
+    run_dir: str = "",
+    max_pdfs: int = 5,
+) -> str:
+    """Download literature PDFs and prepare workspace for agent-backed retrosynthesis.
+
+    Returns material_name, pdf_paths, and extraction_schema for the OpenCode agent to
+    fill via submit_retro_extractions before calling plan_retrosynthesis.
+    """
+    from insulin_ai.services.retrosynthesis_service import prepare_retrosynthesis_workspace
+
+    session = _optional_session_dir(run_dir)
+    if session is None:
+        return json.dumps(
+            {
+                "error": "run_dir is required for prepare_retrosynthesis",
+                "hint": "Pass run_dir to your session folder (e.g. runs/my-campaign)",
+            },
+            indent=2,
+        )
+    out = prepare_retrosynthesis_workspace(
+        target=target,
+        session_dir=session,
+        max_pdfs=max_pdfs,
+    )
+    out["biologic_target"] = biologic_target
+    return json.dumps(out, indent=2, default=str)
+
+
+@mcp.tool()
+def submit_retro_extractions(
+    run_dir: str,
+    material_name: str,
+    extractions: str,
+    target: str = "",
+) -> str:
+    """Submit agent-produced reaction extractions for retrosynthesis tree building.
+
+    ``extractions`` is a JSON object: paper_name -> reaction text (RetroSynAgent format).
+    Pass ``target`` (PSMILES) when ``material_name`` may be ambiguous; names are canonicalized.
+    """
+    from insulin_ai.retrosynthesis.retro_adapter import (
+        normalize_extractions,
+        resolve_material_name,
+        validate_extractions_for_tree,
+        write_llm_res,
+    )
+
+    session = _optional_session_dir(run_dir)
+    if session is None:
+        return json.dumps({"error": "run_dir is required"})
+    try:
+        canonical = resolve_material_name(target or material_name)
+        data = normalize_extractions(extractions)
+        llm_path, used_connector = write_llm_res(session, canonical, data)
+        validation = validate_extractions_for_tree(
+            data, canonical, used_connector=used_connector
+        )
+        return json.dumps(
+            {
+                "ok": True,
+                "material_name": canonical,
+                "llm_res_path": str(llm_path),
+                "paper_count": len(data),
+                "validation": validation,
+                "next_step": f"Call plan_retrosynthesis(target={target or material_name!r}, run_dir={run_dir!r})",
+            },
+            indent=2,
+        )
+    except Exception as exc:
+        return json.dumps({"ok": False, "error": str(exc)}, indent=2)
+
+
+@mcp.tool()
 def plan_retrosynthesis(
     target: str,
     biologic_target: str = "insulin",
@@ -1618,11 +1695,14 @@ def plan_retrosynthesis(
 ) -> str:
     """Plan retrosynthetic routes for a target polymer excipient.
 
-    Uses RetroSynthesisAgent for macromolecular polymer routes (literature + LLM + knowledge graph)
-    and AiZynthFinder for small-molecule monomer routes to purchasable building blocks.
+    **Agent-backed path (default, no RetroSyn OpenAI key):** prepare_retrosynthesis →
+    agent extracts reactions → submit_retro_extractions → plan_retrosynthesis (with run_dir).
 
-    When ``run_dir`` is set (session folder), writes ``retrosynthesis/plan_*.json`` and updates
-    ``discovery_world.json`` ``retrosynthesis_entries``.
+    **Engines:** RetroSynthesisAgent KG tree from session extractions; AiZynthFinder enriches
+    leaf monomers when models are installed (``data/aizynthfinder/``). Curated templates are
+    used only when no KG routes exist.
+
+    When ``run_dir`` is set, uses session workspace and writes ``retrosynthesis/plan_*.json``.
 
     Args:
         target: polymer as PSMILES, SMILES, or common name (e.g. 'Polyimide', '[*]OCC[*]')
@@ -1654,10 +1734,12 @@ def plan_retrosynthesis(
 
     pdb_effective = (biologic_pdb_path or "").strip() or os.environ.get("INSULIN_AI_TARGET_PROTEIN_PDB", "").strip()
 
+    session = _optional_session_dir(run_dir)
     request = RetrosynthesisRequest(
         target=target,
         biologic_target=biologic_target,
         biologic_pdb_path=pdb_effective or None,
+        session_dir=str(session) if session is not None else None,
         constraints=RetrosynthesisConstraints(
             max_routes=max_routes,
             allowed_mechanisms=mechanisms,
@@ -1667,7 +1749,6 @@ def plan_retrosynthesis(
 
     result = _plan(request)
     out = result.model_dump()
-    session = _optional_session_dir(run_dir)
     if session is not None:
         try:
             art = _persist_retrosynthesis_plan(session, target, biologic_target, out)
@@ -1739,6 +1820,7 @@ def compile_results(
     run_admet: bool = True,
     run_dir: str = "",
     biologic_pdb_path: str = "",
+    use_cached_plan: bool = True,
 ) -> str:
     """Run full pipeline and compile results: retrosynthesis + ADMET screening + ranking.
 
@@ -1768,14 +1850,22 @@ def compile_results(
 
     pdb_effective = (biologic_pdb_path or "").strip() or os.environ.get("INSULIN_AI_TARGET_PROTEIN_PDB", "").strip()
 
+    session = _optional_session_dir(run_dir)
     request = RetrosynthesisRequest(
         target=target,
         biologic_target=biologic_target,
         biologic_pdb_path=pdb_effective or None,
+        session_dir=str(session) if session is not None else None,
         constraints=RetrosynthesisConstraints(max_routes=max_routes),
     )
 
-    retro_result = _plan(request)
+    retro_result = None
+    if session is not None and use_cached_plan:
+        from insulin_ai.services.retrosynthesis_service import load_cached_plan_result
+
+        retro_result = load_cached_plan_result(session, target)
+    if retro_result is None:
+        retro_result = _plan(request)
 
     tox_results = {}
     if run_admet:
@@ -1788,7 +1878,6 @@ def compile_results(
 
     report = _compile(retro_result, tox_results=tox_results)
     rep_dict = report.model_dump()
-    session = _optional_session_dir(run_dir)
     if session is not None:
         try:
             art = _persist_compiled_report(session, target, biologic_target, rep_dict)
@@ -1796,6 +1885,67 @@ def compile_results(
         except Exception as exc:
             rep_dict["session_persist_warning"] = str(exc)
     return json.dumps(rep_dict, indent=2, default=str)
+
+
+@mcp.tool()
+def assemble_retrosynthesis_report(
+    run_dir: str,
+    targets: str = "",
+    include_compile_narrative: bool = False,
+    biologic_target: str = "insulin",
+) -> str:
+    """Build markdown retrosynthesis section from session plan_*.json artifacts.
+
+    Writes ``retrosynthesis/RETROSYNTHESIS_REPORT.md``. Use output verbatim in
+    SUMMARY_REPORT § Retrosynthesis. ``targets``: comma-separated PSMILES/names; empty = all plans.
+    """
+    from insulin_ai.retrosynthesis.retro_report import (
+        assemble_session_retrosynthesis_markdown,
+        parse_targets_csv,
+    )
+
+    session = _optional_session_dir(run_dir)
+    if session is None:
+        return json.dumps({"error": "run_dir is required"})
+    target_list = parse_targets_csv(targets)
+    md = assemble_session_retrosynthesis_markdown(session, target_list)
+    out_path = session / "retrosynthesis" / "RETROSYNTHESIS_REPORT.md"
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    out_path.write_text(md, encoding="utf-8")
+
+    provenance_summary = []
+    if include_compile_narrative and target_list:
+        extra = []
+        for t in target_list:
+            try:
+                comp = json.loads(
+                    compile_results(
+                        target=t,
+                        biologic_target=biologic_target,
+                        run_dir=run_dir,
+                        run_admet=False,
+                        use_cached_plan=True,
+                    )
+                )
+                if comp.get("narrative"):
+                    extra.append(f"### Compile narrative: {t}\n\n{comp['narrative']}")
+            except Exception as exc:
+                extra.append(f"### Compile failed for {t}: {exc}")
+        if extra:
+            md = md + "\n\n" + "\n\n".join(extra)
+            out_path.write_text(md, encoding="utf-8")
+
+    return json.dumps(
+        {
+            "ok": True,
+            "markdown_path": str(out_path),
+            "markdown": md,
+            "polymer_count": md.count("### "),
+            "provenance_summary": provenance_summary,
+        },
+        indent=2,
+        default=str,
+    )
 
 
 # ---------------------------------------------------------------------------

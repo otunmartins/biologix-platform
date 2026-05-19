@@ -68,6 +68,7 @@ chat_memory/
 *.toc
 cycle_results/
 iterative_results/
+results/
 discovery_state/
 runs/
 *.log

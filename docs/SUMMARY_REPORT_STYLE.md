@@ -10,12 +10,25 @@ Use sections appropriate to a short paper, for example:
 2. **Abstract** — purpose, methods (literature, PSMILES, OpenMM screening), main findings, one sentence on limitations (≤250 words unless the user asks otherwise).
 3. **Introduction** — delivery context (fridge-free insulin patch), gap, objective of this discovery run.
 4. **Methods** — queries, validation, evaluation protocol (merged minimize, interaction energy), mutation strategy. Cite software and databases by version where known.
-5. **Results** — tables of candidates, energies or scores, rankings; reference figures under `structures/` (see below).
+5. **Results** — tables of candidates, energies or scores, rankings; reference figures under `structures/` (see below). For biologics campaigns, include a dedicated **Retrosynthesis** subsection (see below).
 6. **Discussion** — mechanisms, trade-offs, comparison to literature **with full citations**.
 7. **Conclusions** — concise, testable next steps.
 8. **References** — numbered list, formatted consistently (see below).
 
 Adapt section names if the journal or lab template requires it; keep the same level of rigor.
+
+## Retrosynthesis (required for biologics campaigns)
+
+Before writing this section, call MCP **`assemble_retrosynthesis_report(run_dir, targets=...)`** and include the returned markdown **verbatim** (e.g. as §3.4 Retrosynthesis). Do not invent routes.
+
+Each top candidate must have a matching `retrosynthesis/plan_*.json` artifact. Per candidate, the section must include:
+
+- `route_provenance` and `retro_stages_completed`
+- Table of polymer `steps` (reactants, product, conditions, literature source)
+- Per monomer: AiZynth `synthesis_route` steps and `building_blocks` when present
+- Explicit honesty when provenance is `template` or `none` (not a literature KG tree)
+
+Interpretation and comparison to literature belong in **Discussion**, not as a substitute for the tool-generated tables.
 
 ## Figures (monomer + minimized complex)
 

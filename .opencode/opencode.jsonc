@@ -9,7 +9,9 @@
       "type": "local",
       "command": ["bash", "scripts/run_mcp_server.sh"],
       "environment": {
-        "PAPER_DIRECTORY": "./papers"
+        "PAPER_DIRECTORY": "./papers",
+        "RETRO_LLM_BACKEND": "skip",
+        "INSULIN_AI_AIZYNTH_CONFIG": "./data/aizynthfinder/config.yml"
       },
       "enabled": true
     },
