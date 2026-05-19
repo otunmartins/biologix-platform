@@ -1,0 +1,19 @@
+Project Duration: (roughly) 4 weeks
+
+Total Budget: $700
+
+Milestone 1: LLM Literature Mining System ($100)
+Week 1
+Develop and deploy the LLM-based literature mining pipeline. This includes setting up prompt engineering templates, building a structured database of candidate materials. Deliverables include the functional LLM system, populated material database, and documentation of the methodology.
+
+Milestone 2: Generative Model Integration & Candidate Generation ($150)
+Week 2
+Research and integrate GNN and diffusion model capabilities to generate novel material variants based on the literature-identified base structures. Deliverables include 20+ novel material candidates with clear structural rationale and the integrated generative pipeline.
+
+Milestone 3: UMA-ASE MD Simulation Pipeline ($250)
+Week 3
+Implement the complete molecular dynamics simulation infrastructure using Meta FAIR's UMA force field integrated with ASE to evaluate critical material properties. Deliverables include the functional MD pipeline, simulation results with performance rankings, and validation studies.
+
+Milestone 4: Complete Active Learning Framework & Feedback Integration ($200)
+Week 4
+Integrate all components into a complete active learning system with dynamic LLM feedback loops that evolve based on MD simulation insights. This phase demonstrates 2-3 complete learning cycles showing iterative improvement in material candidate quality, establishes the prompt evolution system, and produces final material recommendations. Deliverables include the fully integrated framework, performance optimization results, and comprehensive documentation.

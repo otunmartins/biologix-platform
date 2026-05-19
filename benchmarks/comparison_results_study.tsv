@@ -1,0 +1,21 @@
+method	n_evaluations	best_discovery_score	best_interaction_energy_kj_mol	n_high_performers_found	n_unique_psmiles_evaluated	wall_time_s	algorithm	n_timesteps_trained	avg_episode_reward	avg_targets_per_episode	avg_steps_to_first_target	avg_episode_length	seed_psmiles	n_proposals	target_energy_kj	notes
+ibm_rl_dqn	125	39.6991	-1244.4422	14	14	1029.2	dqn	200	4.6	5.0	1.0	5.8	[*]OCC[*]	8	-5.0	live_openmm,smoke_short_md
+ibm_rl_dqn	125	40.0318	-1065.1801	14	14	952.9	dqn	200	4.6	5.0	1.0	5.8	[*]OCC[*]	8	-5.0	live_openmm
+ibm_rl_dqn	124	39.1366	-1098.5194	14	14	644.5	dqn	200	4.48	4.96	1.0	5.92	[*]OCC[*]	8	-5.0	live_openmm
+ibm_rl_dqn	124	39.5327	-1056.2573	14	14	635.3	dqn	200	4.36	4.96	1.0	6.16	[*]OCC[*]	8	-5.0	live_openmm
+ibm_rl_dqn	0	0.0		0	0	75.5	dqn	160	-7.0	0.0		8.0	[*]OCC[*]	8	-5.0	live_openmm
+ibm_rl_dqn	100	39.8856	-1253.4633	14	14	462.4	dqn	160	4.575	5.0	1.0	5.85	[*]OCC[*]	8	-5.0	live_openmm
+ibm_rl_dqn	98	39.8809	-1296.175	14	14	461.9	dqn	160	4.4	4.9	1.0	5.9	[*]OCC[*]	8	-5.0	live_openmm
+ibm_rl_dqn	99	39.7482	-1238.1418	14	14	465.9	dqn	160	4.4	4.95	1.0	6.05	[*]OCC[*]	8	-5.0	live_openmm
+ibm_rl_dqn	100	40.6122	-1412.0533	14	14	445.9	dqn	160	4.575	5.0	1.0	5.85	[*]OCC[*]	8	-5.0	live_openmm
+ibm_rl_dqn	98	39.5023	-1279.9261	14	14	449.6	dqn	160	4.4	4.9	1.0	5.9	[*]OCC[*]	8	-5.0	live_openmm
+ibm_rl_dqn	99	38.8366	-1342.6886	14	14	444.6	dqn	160	4.4	4.95	1.0	6.05	[*]OCC[*]	8	-5.0	live_openmm
+ibm_rl_ppo	100	39.5074	-1260.759	14	14	456.0	ppo	160	4.9	5.0	1.0	5.2	[*]OCC[*]	8	-5.0	live_openmm
+ibm_rl_ppo	100	40.0707	-1525.0817	14	14	457.7	ppo	160	4.55	5.0	1.0	5.9	[*]OCC[*]	8	-5.0	live_openmm
+ibm_rl_ppo	100	39.3909	-1156.1371	14	14	475.8	ppo	160	4.975	5.0	1.0	5.05	[*]OCC[*]	8	-5.0	live_openmm
+optuna_tpe	143	20.3608	-1901.9832	5	26	6806.5	tpe						[*]OCC[*]	8		live_openmm,n_trials=20,random_seed=42
+optuna_tpe	145	20.161	-1812.78	5	26	6577.1	tpe						[*]COC[*]	8		live_openmm,n_trials=20,random_seed=123
+optuna_tpe	143	18.9646	-1730.3632	5	27	7097.1	tpe						[*]COC[*]	8		live_openmm,n_trials=20,random_seed=456
+ibm_rl_dqn	100	39.831	-1399.773	14	14	500.2	dqn	160	4.575	5.0	1.0	5.85	[*]OCC[*]	8	-5.0	live_openmm,ablation_target_energy_kj=-5.0
+ibm_rl_dqn	120	25.87	-1358.8227	7	14	485.6	dqn	160	1.8184999999999998	2.85	2.0	8.0	[*]OCC[*]	8	-500.0	live_openmm,ablation_target_energy_kj=-500.0
+ibm_rl_dqn	121	14.1708	-1412.3081	1	14	492.9	dqn	160	-0.5810000000000002	0.45	4.0	8.0	[*]OCC[*]	8	-1000.0	live_openmm,ablation_target_energy_kj=-1000.0

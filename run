@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+# Launch OpenCode in this project (MCP + agents). Usage: ./run
+# Requires: ./install first (installs OpenCode)
+
+cd "$(dirname "$0")"
+if command -v insulin-ai >/dev/null 2>&1; then
+  exec insulin-ai .
+elif command -v opencode >/dev/null 2>&1; then
+  exec opencode .
+else
+  echo "Run ./install first to install OpenCode, then:"
+  echo "  opencode ."
+  echo "Configure your agent (Cursor, Claude Code, etc.) to run: bash scripts/run_mcp_server.sh"
+  exit 1
+fi

@@ -1,0 +1,32 @@
+{
+  "algorithm": "dqn",
+  "mode": "train_and_test",
+  "seed_psmiles": "[*]OCC[*]",
+  "n_proposals": 4,
+  "target_energy_kj": -5.0,
+  "n_timesteps": 25,
+  "n_episodes": 1,
+  "evaluation": "live_openmm",
+  "cache_path": null,
+  "train_completed": true,
+  "avg_episode_reward": 2.0,
+  "avg_targets_per_episode": 2.0,
+  "avg_episode_length": 2.0,
+  "avg_steps_to_first_target": 1.0,
+  "best_discovery_score": 11.3994,
+  "best_interaction_energy_kj_mol": -562.6682,
+  "n_high_performers_found": 2,
+  "n_unique_psmiles_evaluated": 2,
+  "n_evaluations": 2,
+  "all_target_psmiles": [
+    "[*]OC([*])=O",
+    "[*]C[*]"
+  ],
+  "energy_stats": {
+    "mean": -344.9711,
+    "min": -562.6682,
+    "max": -127.274,
+    "n": 2
+  },
+  "wall_time_s": 354.8
+}

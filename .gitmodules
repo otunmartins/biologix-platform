@@ -1,0 +1,9 @@
+[submodule "extern/RetroSynthesisAgent"]
+	path = extern/RetroSynthesisAgent
+	url = https://github.com/muhammadhasyim/RetroSynthesisAgent
+[submodule "extern/aizynthfinder"]
+	path = extern/aizynthfinder
+	url = https://github.com/MolecularAI/aizynthfinder.git
+[submodule "extern/admet_ai"]
+	path = extern/admet_ai
+	url = https://github.com/swansonk14/admet_ai.git

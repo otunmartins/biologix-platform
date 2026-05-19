@@ -1,0 +1,33 @@
+% Extra packages for this manuscript. fairmeta.cls already loads geometry, graphicx,
+% hyperref, natbib, booktabs, bm, microtype, caption, xcolor, etc.
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{tabularx}
+\usepackage{url}
+\usepackage{listings}
+\usepackage{tikz}
+\usetikzlibrary{positioning}
+\usepackage{algpseudocode}
+\usepackage{chemformula}
+\usepackage[version=4]{mhchem}
+
+\definecolor{deepblue}{RGB}{0,0,120}
+\definecolor{midgreen}{RGB}{0,120,0}
+\definecolor{darkred}{RGB}{120,0,0}
+\definecolor{codecolor}{RGB}{240,240,240}
+
+\lstset{
+  backgroundcolor=\color{codecolor},
+  basicstyle=\footnotesize\ttfamily,
+  breaklines=true,
+  captionpos=b,
+  keepspaces=true,
+  columns=flexible,
+  tabsize=2,
+  frame=single,
+  numbers=left,
+  numberstyle=\tiny\color{gray},
+  keywordstyle=\color{blue},
+  commentstyle=\color{darkred},
+  stringstyle=\color{midgreen}
+}

@@ -1,0 +1,81 @@
+# LaTeX Compilation Artifacts and Intermediate Files
+
+# Temporary and output directories (legacy compile helpers)
+temp/
+output/
+
+# Standard LaTeX intermediate files
+*.aux
+*.log
+*.bbl
+*.blg
+*.toc
+*.lof
+*.lot
+*.fls
+*.fdb_latexmk
+*.synctex.gz
+*.synctex
+*.pdfsync
+*.out
+*.nav
+*.snm
+*.vrb
+*.figlist
+*.makefile
+*.figlist.bak
+*.makefile.bak
+*.dvi
+*.ps
+*.eps
+*.brf
+*.mtc*
+*.slf*
+*.slt*
+*.stc*
+
+# RevTeX specific files
+*.Notes.bib
+*.end
+*.eledsec*
+*.upa
+*.upb
+
+# Additional intermediate files
+*.run.xml
+*.bcf
+*.idx
+*.ilg
+*.ind
+*.lol
+*.thm
+*.ent
+*.fff
+*.ttt
+*.auxlock
+*.backup
+
+# Built manuscript (regenerate with ./compile_main.sh)
+main.pdf
+
+# Backup files
+*~
+*.bak
+*.backup
+
+# OS specific files
+.DS_Store
+Thumbs.db
+
+# Editor specific files
+*.swp
+*.swo
+*~
+.vscode/
+.idea/
+
+# Archive files
+*.tar
+*.tar.gz
+*.zip
+*.rar 

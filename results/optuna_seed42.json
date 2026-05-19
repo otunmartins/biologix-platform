@@ -1,0 +1,1041 @@
+{
+  "method": "optuna_tpe",
+  "seed_canonical": "[*]COC[*]",
+  "n_trials": 20,
+  "library_size_per_trial": 8,
+  "random_seed": 42,
+  "best_value": 31.43865922924587,
+  "best_trial": {
+    "number": 17,
+    "value": 31.43865922924587,
+    "params": {
+      "mutator_seed": 899155,
+      "feedback_fraction": 0.5
+    },
+    "user_attrs": {
+      "discovery_score": 31.43865922924587,
+      "n_candidates_evaluated": 8
+    }
+  },
+  "study_summary": {
+    "n_completed": 20
+  },
+  "n_evaluations": 143,
+  "best_discovery_score": 20.3608,
+  "best_interaction_energy_kj_mol": -1901.9832,
+  "n_high_performers_found": 5,
+  "n_unique_psmiles_evaluated": 26,
+  "wall_time_s": 6806.5,
+  "evaluation": "live_openmm",
+  "evaluation_trace": [
+    {
+      "trial": 0,
+      "interaction_energy_kj_mol": -439.94196277300216,
+      "psmiles": "[*]NC([*])=O",
+      "phase": "optuna"
+    },
+    {
+      "trial": 0,
+      "interaction_energy_kj_mol": -426.9834965467526,
+      "psmiles": "[*]NC([*])=O",
+      "phase": "optuna"
+    },
+    {
+      "trial": 0,
+      "interaction_energy_kj_mol": -235.86944147886,
+      "psmiles": "[*]C([*])=S",
+      "phase": "optuna"
+    },
+    {
+      "trial": 0,
+      "interaction_energy_kj_mol": -317.0291445706721,
+      "psmiles": "[*]CS[*]",
+      "phase": "optuna"
+    },
+    {
+      "trial": 0,
+      "interaction_energy_kj_mol": -1683.4791168577103,
+      "psmiles": "[*]NC(=O)NC([*])=O",
+      "phase": "optuna"
+    },
+    {
+      "trial": 0,
+      "interaction_energy_kj_mol": -1171.493154520782,
+      "psmiles": "[*]OOC(=O)C([*])=O",
+      "phase": "optuna"
+    },
+    {
+      "trial": 0,
+      "interaction_energy_kj_mol": -99.10498329149493,
+      "psmiles": "[*]C[*]",
+      "phase": "optuna"
+    },
+    {
+      "trial": 1,
+      "interaction_energy_kj_mol": -162.54769595884136,
+      "psmiles": "[*]C([*])(F)F",
+      "phase": "optuna"
+    },
+    {
+      "trial": 1,
+      "interaction_energy_kj_mol": -260.2354847098891,
+      "psmiles": "[*]CS[*]",
+      "phase": "optuna"
+    },
+    {
+      "trial": 1,
+      "interaction_energy_kj_mol": -743.8866643336623,
+      "psmiles": "[*]COC[*]",
+      "phase": "optuna"
+    },
+    {
+      "trial": 1,
+      "interaction_energy_kj_mol": -276.56268094699647,
+      "psmiles": "[*]C([*])=S",
+      "phase": "optuna"
+    },
+    {
+      "trial": 1,
+      "interaction_energy_kj_mol": -1277.7769233328727,
+      "psmiles": "[*]NC(C)C([*])=O",
+      "phase": "optuna"
+    },
+    {
+      "trial": 1,
+      "interaction_energy_kj_mol": -424.1452765656195,
+      "psmiles": "[*]CC([*])C",
+      "phase": "optuna"
+    },
+    {
+      "trial": 1,
+      "interaction_energy_kj_mol": -496.9361386375531,
+      "psmiles": "[*]NC([*])=O",
+      "phase": "optuna"
+    },
+    {
+      "trial": 1,
+      "interaction_energy_kj_mol": -1587.4646558142376,
+      "psmiles": "[*]NC(=O)NC([*])=O",
+      "phase": "optuna"
+    },
+    {
+      "trial": 2,
+      "interaction_energy_kj_mol": -437.3816933044509,
+      "psmiles": "[*]NC([*])=O",
+      "phase": "optuna"
+    },
+    {
+      "trial": 2,
+      "interaction_energy_kj_mol": -389.11308932362954,
+      "psmiles": "[*]CC([*])C",
+      "phase": "optuna"
+    },
+    {
+      "trial": 2,
+      "interaction_energy_kj_mol": -1193.7427880336909,
+      "psmiles": "[*]CCC(=O)C([*])=O",
+      "phase": "optuna"
+    },
+    {
+      "trial": 2,
+      "interaction_energy_kj_mol": -264.01257474332897,
+      "psmiles": "[*]CS[*]",
+      "phase": "optuna"
+    },
+    {
+      "trial": 2,
+      "interaction_energy_kj_mol": -897.5228477915371,
+      "psmiles": "[*]NC(C)C([*])=O",
+      "phase": "optuna"
+    },
+    {
+      "trial": 2,
+      "interaction_energy_kj_mol": -646.9364872105325,
+      "psmiles": "[*]COC[*]",
+      "phase": "optuna"
+    },
+    {
+      "trial": 2,
+      "interaction_energy_kj_mol": -172.96716300699336,
+      "psmiles": "[*]C([*])(F)F",
+      "phase": "optuna"
+    },
+    {
+      "trial": 2,
+      "interaction_energy_kj_mol": -1295.558839157955,
+      "psmiles": "[*]OC(=O)OC([*])=O",
+      "phase": "optuna"
+    },
+    {
+      "trial": 3,
+      "interaction_energy_kj_mol": -977.2282165782744,
+      "psmiles": "[*]NC(C)C([*])=O",
+      "phase": "optuna"
+    },
+    {
+      "trial": 3,
+      "interaction_energy_kj_mol": -610.463141260987,
+      "psmiles": "[*]CC([*])O",
+      "phase": "optuna"
+    },
+    {
+      "trial": 3,
+      "interaction_energy_kj_mol": -727.1865041994715,
+      "psmiles": "[*]c1ccc([*])cc1",
+      "phase": "optuna"
+    },
+    {
+      "trial": 3,
+      "interaction_energy_kj_mol": -544.3434164573991,
+      "psmiles": "[*]OC([*])=O",
+      "phase": "optuna"
+    },
+    {
+      "trial": 3,
+      "interaction_energy_kj_mol": -1185.861891532646,
+      "psmiles": "[*]OC(=O)OC([*])=O",
+      "phase": "optuna"
+    },
+    {
+      "trial": 3,
+      "interaction_energy_kj_mol": -441.0832433839241,
+      "psmiles": "[*]C(F)(F)C([*])(F)F",
+      "phase": "optuna"
+    },
+    {
+      "trial": 4,
+      "interaction_energy_kj_mol": -377.0164586647952,
+      "psmiles": "[*]NC([*])=O",
+      "phase": "optuna"
+    },
+    {
+      "trial": 4,
+      "interaction_energy_kj_mol": -658.0190212709931,
+      "psmiles": "[*]CC([*])=O",
+      "phase": "optuna"
+    },
+    {
+      "trial": 4,
+      "interaction_energy_kj_mol": -235.93872304763624,
+      "psmiles": "[*]C([*])=S",
+      "phase": "optuna"
+    },
+    {
+      "trial": 4,
+      "interaction_energy_kj_mol": -881.9155883778221,
+      "psmiles": "[*]CCOC([*])=O",
+      "phase": "optuna"
+    },
+    {
+      "trial": 4,
+      "interaction_energy_kj_mol": -1364.2175471021728,
+      "psmiles": "[*]OOC(=O)C([*])=O",
+      "phase": "optuna"
+    },
+    {
+      "trial": 4,
+      "interaction_energy_kj_mol": -581.7015429747776,
+      "psmiles": "[*]C(=S)C([*])=S",
+      "phase": "optuna"
+    },
+    {
+      "trial": 4,
+      "interaction_energy_kj_mol": -1460.1459503959413,
+      "psmiles": "[*]CCC(O)C([*])O",
+      "phase": "optuna"
+    },
+    {
+      "trial": 5,
+      "interaction_energy_kj_mol": -506.72153392165455,
+      "psmiles": "[*]CC([*])O",
+      "phase": "optuna"
+    },
+    {
+      "trial": 5,
+      "interaction_energy_kj_mol": -979.4942252558903,
+      "psmiles": "[*]NC(C)C([*])=O",
+      "phase": "optuna"
+    },
+    {
+      "trial": 5,
+      "interaction_energy_kj_mol": -592.8280444565935,
+      "psmiles": "[*]COC[*]",
+      "phase": "optuna"
+    },
+    {
+      "trial": 5,
+      "interaction_energy_kj_mol": -422.9507548725669,
+      "psmiles": "[*]OC([*])=O",
+      "phase": "optuna"
+    },
+    {
+      "trial": 5,
+      "interaction_energy_kj_mol": -900.9313388580849,
+      "psmiles": "[*]CCOC([*])=O",
+      "phase": "optuna"
+    },
+    {
+      "trial": 5,
+      "interaction_energy_kj_mol": -111.34198040331825,
+      "psmiles": "[*]C[*]",
+      "phase": "optuna"
+    },
+    {
+      "trial": 5,
+      "interaction_energy_kj_mol": -154.82622895017994,
+      "psmiles": "[*]C([*])(F)F",
+      "phase": "optuna"
+    },
+    {
+      "trial": 5,
+      "interaction_energy_kj_mol": -305.9761974225544,
+      "psmiles": "[*]CS[*]",
+      "phase": "optuna"
+    },
+    {
+      "trial": 6,
+      "interaction_energy_kj_mol": -280.0854757522575,
+      "psmiles": "[*]CC([*])C",
+      "phase": "optuna"
+    },
+    {
+      "trial": 6,
+      "interaction_energy_kj_mol": -957.9845525211931,
+      "psmiles": "[*]CCOC([*])=O",
+      "phase": "optuna"
+    },
+    {
+      "trial": 6,
+      "interaction_energy_kj_mol": -117.26681553716787,
+      "psmiles": "[*]C[*]",
+      "phase": "optuna"
+    },
+    {
+      "trial": 6,
+      "interaction_energy_kj_mol": -662.6607411366858,
+      "psmiles": "[*]CC([*])=O",
+      "phase": "optuna"
+    },
+    {
+      "trial": 6,
+      "interaction_energy_kj_mol": -1102.3863673631931,
+      "psmiles": "[*]CCC(O)C([*])O",
+      "phase": "optuna"
+    },
+    {
+      "trial": 6,
+      "interaction_energy_kj_mol": -1140.0163433687612,
+      "psmiles": "[*]CCOOCC[*]",
+      "phase": "optuna"
+    },
+    {
+      "trial": 6,
+      "interaction_energy_kj_mol": -470.18194807195687,
+      "psmiles": "[*]C(F)(F)C([*])(F)F",
+      "phase": "optuna"
+    },
+    {
+      "trial": 6,
+      "interaction_energy_kj_mol": -713.6877813260216,
+      "psmiles": "[*]COC[*]",
+      "phase": "optuna"
+    },
+    {
+      "trial": 7,
+      "interaction_energy_kj_mol": -405.77785734565987,
+      "psmiles": "[*]NC([*])=O",
+      "phase": "optuna"
+    },
+    {
+      "trial": 7,
+      "interaction_energy_kj_mol": -198.95981939916845,
+      "psmiles": "[*]C([*])=S",
+      "phase": "optuna"
+    },
+    {
+      "trial": 7,
+      "interaction_energy_kj_mol": -98.81310671353867,
+      "psmiles": "[*]C[*]",
+      "phase": "optuna"
+    },
+    {
+      "trial": 7,
+      "interaction_energy_kj_mol": -628.6712334110925,
+      "psmiles": "[*]CC([*])=O",
+      "phase": "optuna"
+    },
+    {
+      "trial": 7,
+      "interaction_energy_kj_mol": -442.64397125000687,
+      "psmiles": "[*]OC([*])=O",
+      "phase": "optuna"
+    },
+    {
+      "trial": 8,
+      "interaction_energy_kj_mol": -426.4424267355844,
+      "psmiles": "[*]CC([*])C",
+      "phase": "optuna"
+    },
+    {
+      "trial": 8,
+      "interaction_energy_kj_mol": -283.657330502838,
+      "psmiles": "[*]C([*])=S",
+      "phase": "optuna"
+    },
+    {
+      "trial": 8,
+      "interaction_energy_kj_mol": -1281.382795480422,
+      "psmiles": "[*]CCC(=O)C([*])=O",
+      "phase": "optuna"
+    },
+    {
+      "trial": 8,
+      "interaction_energy_kj_mol": -1179.3902745081796,
+      "psmiles": "[*]NC(C)C([*])=O",
+      "phase": "optuna"
+    },
+    {
+      "trial": 8,
+      "interaction_energy_kj_mol": -430.8505208824281,
+      "psmiles": "[*]NC([*])=O",
+      "phase": "optuna"
+    },
+    {
+      "trial": 8,
+      "interaction_energy_kj_mol": -114.69813500948214,
+      "psmiles": "[*]C[*]",
+      "phase": "optuna"
+    },
+    {
+      "trial": 8,
+      "interaction_energy_kj_mol": -1163.934361798354,
+      "psmiles": "[*]CCC(=O)C([*])=O",
+      "phase": "optuna"
+    },
+    {
+      "trial": 9,
+      "interaction_energy_kj_mol": -1543.9661941837985,
+      "psmiles": "[*]CCC(=O)C([*])=O",
+      "phase": "optuna"
+    },
+    {
+      "trial": 9,
+      "interaction_energy_kj_mol": -667.2121309896866,
+      "psmiles": "[*]COC[*]",
+      "phase": "optuna"
+    },
+    {
+      "trial": 9,
+      "interaction_energy_kj_mol": -622.7314931984438,
+      "psmiles": "[*]COC[*]",
+      "phase": "optuna"
+    },
+    {
+      "trial": 9,
+      "interaction_energy_kj_mol": -718.348711826402,
+      "psmiles": "[*]NC(C)C([*])=O",
+      "phase": "optuna"
+    },
+    {
+      "trial": 9,
+      "interaction_energy_kj_mol": -274.83934851305776,
+      "psmiles": "[*]C([*])=S",
+      "phase": "optuna"
+    },
+    {
+      "trial": 9,
+      "interaction_energy_kj_mol": -1197.262689787989,
+      "psmiles": "[*]NNC(=O)C([*])=O",
+      "phase": "optuna"
+    },
+    {
+      "trial": 9,
+      "interaction_energy_kj_mol": -102.91010311990135,
+      "psmiles": "[*]C[*]",
+      "phase": "optuna"
+    },
+    {
+      "trial": 10,
+      "interaction_energy_kj_mol": -1345.4140784555275,
+      "psmiles": "[*]CCC(=O)C([*])=O",
+      "phase": "optuna"
+    },
+    {
+      "trial": 10,
+      "interaction_energy_kj_mol": -603.470200157697,
+      "psmiles": "[*]CC([*])O",
+      "phase": "optuna"
+    },
+    {
+      "trial": 10,
+      "interaction_energy_kj_mol": -464.1518998599713,
+      "psmiles": "[*]NC([*])=O",
+      "phase": "optuna"
+    },
+    {
+      "trial": 10,
+      "interaction_energy_kj_mol": -408.9176574819003,
+      "psmiles": "[*]CC([*])C",
+      "phase": "optuna"
+    },
+    {
+      "trial": 10,
+      "interaction_energy_kj_mol": -557.8702138935546,
+      "psmiles": "[*]C(=S)C([*])=S",
+      "phase": "optuna"
+    },
+    {
+      "trial": 10,
+      "interaction_energy_kj_mol": -1286.3151001434962,
+      "psmiles": "[*]NNC(=O)C([*])=O",
+      "phase": "optuna"
+    },
+    {
+      "trial": 10,
+      "interaction_energy_kj_mol": -1390.7440421737228,
+      "psmiles": "[*]NC(=O)NC([*])=O",
+      "phase": "optuna"
+    },
+    {
+      "trial": 10,
+      "interaction_energy_kj_mol": -1159.4075567831715,
+      "psmiles": "[*]OC(=O)OC([*])=O",
+      "phase": "optuna"
+    },
+    {
+      "trial": 11,
+      "interaction_energy_kj_mol": -567.7073693465154,
+      "psmiles": "[*]CC([*])O",
+      "phase": "optuna"
+    },
+    {
+      "trial": 11,
+      "interaction_energy_kj_mol": -260.53604500778306,
+      "psmiles": "[*]C([*])=S",
+      "phase": "optuna"
+    },
+    {
+      "trial": 11,
+      "interaction_energy_kj_mol": -426.77965570492233,
+      "psmiles": "[*]NC([*])=O",
+      "phase": "optuna"
+    },
+    {
+      "trial": 11,
+      "interaction_energy_kj_mol": -100.57277517616217,
+      "psmiles": "[*]C[*]",
+      "phase": "optuna"
+    },
+    {
+      "trial": 11,
+      "interaction_energy_kj_mol": -1233.813715382208,
+      "psmiles": "[*]OC(=O)OC([*])=O",
+      "phase": "optuna"
+    },
+    {
+      "trial": 11,
+      "interaction_energy_kj_mol": -444.63560381668503,
+      "psmiles": "[*]C(F)(F)C([*])(F)F",
+      "phase": "optuna"
+    },
+    {
+      "trial": 12,
+      "interaction_energy_kj_mol": -957.5417387064444,
+      "psmiles": "[*]CCOC([*])=O",
+      "phase": "optuna"
+    },
+    {
+      "trial": 12,
+      "interaction_energy_kj_mol": -408.44672239894135,
+      "psmiles": "[*]NC([*])=O",
+      "phase": "optuna"
+    },
+    {
+      "trial": 12,
+      "interaction_energy_kj_mol": -652.5926256608409,
+      "psmiles": "[*]c1ccc([*])cc1",
+      "phase": "optuna"
+    },
+    {
+      "trial": 12,
+      "interaction_energy_kj_mol": -399.226973572986,
+      "psmiles": "[*]NC([*])=O",
+      "phase": "optuna"
+    },
+    {
+      "trial": 12,
+      "interaction_energy_kj_mol": -1132.5450160293894,
+      "psmiles": "[*]CCOOCC[*]",
+      "phase": "optuna"
+    },
+    {
+      "trial": 12,
+      "interaction_energy_kj_mol": -525.808361457734,
+      "psmiles": "[*]C(=S)C([*])=S",
+      "phase": "optuna"
+    },
+    {
+      "trial": 12,
+      "interaction_energy_kj_mol": -1163.2162914402943,
+      "psmiles": "[*]NNC(=O)C([*])=O",
+      "phase": "optuna"
+    },
+    {
+      "trial": 12,
+      "interaction_energy_kj_mol": -1215.6790735944123,
+      "psmiles": "[*]OC(=O)OC([*])=O",
+      "phase": "optuna"
+    },
+    {
+      "trial": 13,
+      "interaction_energy_kj_mol": -683.636137686728,
+      "psmiles": "[*]OC([*])=O",
+      "phase": "optuna"
+    },
+    {
+      "trial": 13,
+      "interaction_energy_kj_mol": -532.6710315639921,
+      "psmiles": "[*]CC([*])O",
+      "phase": "optuna"
+    },
+    {
+      "trial": 13,
+      "interaction_energy_kj_mol": -775.453074526049,
+      "psmiles": "[*]COC[*]",
+      "phase": "optuna"
+    },
+    {
+      "trial": 13,
+      "interaction_energy_kj_mol": -401.4121301463747,
+      "psmiles": "[*]NC([*])=O",
+      "phase": "optuna"
+    },
+    {
+      "trial": 13,
+      "interaction_energy_kj_mol": -933.9020220705352,
+      "psmiles": "[*]NNC(=O)C([*])=O",
+      "phase": "optuna"
+    },
+    {
+      "trial": 13,
+      "interaction_energy_kj_mol": -1015.1118746861466,
+      "psmiles": "[*]CCC(O)C([*])O",
+      "phase": "optuna"
+    },
+    {
+      "trial": 13,
+      "interaction_energy_kj_mol": -1386.1371867685593,
+      "psmiles": "[*]CCC(=O)C([*])=O",
+      "phase": "optuna"
+    },
+    {
+      "trial": 14,
+      "interaction_energy_kj_mol": -373.4275697899502,
+      "psmiles": "[*]NC([*])=O",
+      "phase": "optuna"
+    },
+    {
+      "trial": 14,
+      "interaction_energy_kj_mol": -275.9778622131535,
+      "psmiles": "[*]C([*])=S",
+      "phase": "optuna"
+    },
+    {
+      "trial": 14,
+      "interaction_energy_kj_mol": -529.7190746117267,
+      "psmiles": "[*]OC([*])=O",
+      "phase": "optuna"
+    },
+    {
+      "trial": 14,
+      "interaction_energy_kj_mol": -782.5022990468569,
+      "psmiles": "[*]CC([*])=O",
+      "phase": "optuna"
+    },
+    {
+      "trial": 14,
+      "interaction_energy_kj_mol": -1457.7098356959996,
+      "psmiles": "[*]CC(O)CC([*])O",
+      "phase": "optuna"
+    },
+    {
+      "trial": 14,
+      "interaction_energy_kj_mol": -309.0018661060785,
+      "psmiles": "[*]CS[*]",
+      "phase": "optuna"
+    },
+    {
+      "trial": 14,
+      "interaction_energy_kj_mol": -119.90473033622777,
+      "psmiles": "[*]C[*]",
+      "phase": "optuna"
+    },
+    {
+      "trial": 15,
+      "interaction_energy_kj_mol": -792.8656724847533,
+      "psmiles": "[*]CCOC([*])=O",
+      "phase": "optuna"
+    },
+    {
+      "trial": 15,
+      "interaction_energy_kj_mol": -421.06754265655763,
+      "psmiles": "[*]NC([*])=O",
+      "phase": "optuna"
+    },
+    {
+      "trial": 15,
+      "interaction_energy_kj_mol": -599.9663369477712,
+      "psmiles": "[*]CC([*])=O",
+      "phase": "optuna"
+    },
+    {
+      "trial": 15,
+      "interaction_energy_kj_mol": -465.18793036833085,
+      "psmiles": "[*]CC([*])O",
+      "phase": "optuna"
+    },
+    {
+      "trial": 15,
+      "interaction_energy_kj_mol": -714.7081825786445,
+      "psmiles": "[*]CSSC[*]",
+      "phase": "optuna"
+    },
+    {
+      "trial": 15,
+      "interaction_energy_kj_mol": -94.63883679966011,
+      "psmiles": "[*]C[*]",
+      "phase": "optuna"
+    },
+    {
+      "trial": 15,
+      "interaction_energy_kj_mol": -666.4688586256525,
+      "psmiles": "[*]CCC(C)C([*])C",
+      "phase": "optuna"
+    },
+    {
+      "trial": 16,
+      "interaction_energy_kj_mol": -1030.8003329075655,
+      "psmiles": "[*]CCOC([*])=O",
+      "phase": "optuna"
+    },
+    {
+      "trial": 16,
+      "interaction_energy_kj_mol": -366.47825771089083,
+      "psmiles": "[*]CC([*])C",
+      "phase": "optuna"
+    },
+    {
+      "trial": 16,
+      "interaction_energy_kj_mol": -781.4071228088796,
+      "psmiles": "[*]COC[*]",
+      "phase": "optuna"
+    },
+    {
+      "trial": 16,
+      "interaction_energy_kj_mol": -688.2649263283238,
+      "psmiles": "[*]CC([*])O",
+      "phase": "optuna"
+    },
+    {
+      "trial": 16,
+      "interaction_energy_kj_mol": -1239.5697231174745,
+      "psmiles": "[*]OOC(=O)C([*])=O",
+      "phase": "optuna"
+    },
+    {
+      "trial": 16,
+      "interaction_energy_kj_mol": -1208.9843776110865,
+      "psmiles": "[*]NC(=O)NC([*])=O",
+      "phase": "optuna"
+    },
+    {
+      "trial": 17,
+      "interaction_energy_kj_mol": -954.883082719658,
+      "psmiles": "[*]NC(C)C([*])=O",
+      "phase": "optuna"
+    },
+    {
+      "trial": 17,
+      "interaction_energy_kj_mol": -1066.3850785190662,
+      "psmiles": "[*]CCOC([*])=O",
+      "phase": "optuna"
+    },
+    {
+      "trial": 17,
+      "interaction_energy_kj_mol": -1485.6716157041083,
+      "psmiles": "[*]CCC(=O)C([*])=O",
+      "phase": "optuna"
+    },
+    {
+      "trial": 17,
+      "interaction_energy_kj_mol": -719.8203020638966,
+      "psmiles": "[*]c1ccc([*])cc1",
+      "phase": "optuna"
+    },
+    {
+      "trial": 17,
+      "interaction_energy_kj_mol": -594.6476469275872,
+      "psmiles": "[*]C(=S)C([*])=S",
+      "phase": "optuna"
+    },
+    {
+      "trial": 17,
+      "interaction_energy_kj_mol": -1176.3597525475598,
+      "psmiles": "[*]OC(=O)OC([*])=O",
+      "phase": "optuna"
+    },
+    {
+      "trial": 17,
+      "interaction_energy_kj_mol": -1680.7632517541788,
+      "psmiles": "[*]CC(=O)CC([*])=O",
+      "phase": "optuna"
+    },
+    {
+      "trial": 18,
+      "interaction_energy_kj_mol": -282.71076172064454,
+      "psmiles": "[*]C([*])=S",
+      "phase": "optuna"
+    },
+    {
+      "trial": 18,
+      "interaction_energy_kj_mol": -243.4432692754568,
+      "psmiles": "[*]C([*])=S",
+      "phase": "optuna"
+    },
+    {
+      "trial": 18,
+      "interaction_energy_kj_mol": -172.93886223104346,
+      "psmiles": "[*]C([*])(F)F",
+      "phase": "optuna"
+    },
+    {
+      "trial": 18,
+      "interaction_energy_kj_mol": -445.717977474902,
+      "psmiles": "[*]NC([*])=O",
+      "phase": "optuna"
+    },
+    {
+      "trial": 18,
+      "interaction_energy_kj_mol": -571.8025423729396,
+      "psmiles": "[*]CC([*])O",
+      "phase": "optuna"
+    },
+    {
+      "trial": 18,
+      "interaction_energy_kj_mol": -100.43526374001863,
+      "psmiles": "[*]C[*]",
+      "phase": "optuna"
+    },
+    {
+      "trial": 18,
+      "interaction_energy_kj_mol": -984.3328136428609,
+      "psmiles": "[*]CCOC([*])=O",
+      "phase": "optuna"
+    },
+    {
+      "trial": 18,
+      "interaction_energy_kj_mol": -615.7687496325852,
+      "psmiles": "[*]CSSC[*]",
+      "phase": "optuna"
+    },
+    {
+      "trial": 19,
+      "interaction_energy_kj_mol": -287.43723443479803,
+      "psmiles": "[*]CS[*]",
+      "phase": "optuna"
+    },
+    {
+      "trial": 19,
+      "interaction_energy_kj_mol": -796.4310596706782,
+      "psmiles": "[*]CC([*])=O",
+      "phase": "optuna"
+    },
+    {
+      "trial": 19,
+      "interaction_energy_kj_mol": -399.3099778931137,
+      "psmiles": "[*]NC([*])=O",
+      "phase": "optuna"
+    },
+    {
+      "trial": 19,
+      "interaction_energy_kj_mol": -618.2305882018209,
+      "psmiles": "[*]c1ccc([*])cc1",
+      "phase": "optuna"
+    },
+    {
+      "trial": 19,
+      "interaction_energy_kj_mol": -82.39791133853561,
+      "psmiles": "[*]C[*]",
+      "phase": "optuna"
+    },
+    {
+      "trial": 19,
+      "interaction_energy_kj_mol": -653.390891666786,
+      "psmiles": "[*]CCC(C)C([*])C",
+      "phase": "optuna"
+    },
+    {
+      "trial": 19,
+      "interaction_energy_kj_mol": -1901.9831732731545,
+      "psmiles": "[*]NNC(=O)C([*])=O",
+      "phase": "optuna"
+    },
+    {
+      "trial": 19,
+      "interaction_energy_kj_mol": -118.72248434035231,
+      "psmiles": "[*]C[*]",
+      "phase": "optuna"
+    }
+  ],
+  "running_best_interaction_energy_kj_mol": [
+    -439.94196277300216,
+    -439.94196277300216,
+    -439.94196277300216,
+    -439.94196277300216,
+    -1683.4791168577103,
+    -1683.4791168577103,
+    -1683.4791168577103,
+    -1683.4791168577103,
+    -1683.4791168577103,
+    -1683.4791168577103,
+    -1683.4791168577103,
+    -1683.4791168577103,
+    -1683.4791168577103,
+    -1683.4791168577103,
+    -1683.4791168577103,
+    -1683.4791168577103,
+    -1683.4791168577103,
+    -1683.4791168577103,
+    -1683.4791168577103,
+    -1683.4791168577103,
+    -1683.4791168577103,
+    -1683.4791168577103,
+    -1683.4791168577103,
+    -1683.4791168577103,
+    -1683.4791168577103,
+    -1683.4791168577103,
+    -1683.4791168577103,
+    -1683.4791168577103,
+    -1683.4791168577103,
+    -1683.4791168577103,
+    -1683.4791168577103,
+    -1683.4791168577103,
+    -1683.4791168577103,
+    -1683.4791168577103,
+    -1683.4791168577103,
+    -1683.4791168577103,
+    -1683.4791168577103,
+    -1683.4791168577103,
+    -1683.4791168577103,
+    -1683.4791168577103,
+    -1683.4791168577103,
+    -1683.4791168577103,
+    -1683.4791168577103,
+    -1683.4791168577103,
+    -1683.4791168577103,
+    -1683.4791168577103,
+    -1683.4791168577103,
+    -1683.4791168577103,
+    -1683.4791168577103,
+    -1683.4791168577103,
+    -1683.4791168577103,
+    -1683.4791168577103,
+    -1683.4791168577103,
+    -1683.4791168577103,
+    -1683.4791168577103,
+    -1683.4791168577103,
+    -1683.4791168577103,
+    -1683.4791168577103,
+    -1683.4791168577103,
+    -1683.4791168577103,
+    -1683.4791168577103,
+    -1683.4791168577103,
+    -1683.4791168577103,
+    -1683.4791168577103,
+    -1683.4791168577103,
+    -1683.4791168577103,
+    -1683.4791168577103,
+    -1683.4791168577103,
+    -1683.4791168577103,
+    -1683.4791168577103,
+    -1683.4791168577103,
+    -1683.4791168577103,
+    -1683.4791168577103,
+    -1683.4791168577103,
+    -1683.4791168577103,
+    -1683.4791168577103,
+    -1683.4791168577103,
+    -1683.4791168577103,
+    -1683.4791168577103,
+    -1683.4791168577103,
+    -1683.4791168577103,
+    -1683.4791168577103,
+    -1683.4791168577103,
+    -1683.4791168577103,
+    -1683.4791168577103,
+    -1683.4791168577103,
+    -1683.4791168577103,
+    -1683.4791168577103,
+    -1683.4791168577103,
+    -1683.4791168577103,
+    -1683.4791168577103,
+    -1683.4791168577103,
+    -1683.4791168577103,
+    -1683.4791168577103,
+    -1683.4791168577103,
+    -1683.4791168577103,
+    -1683.4791168577103,
+    -1683.4791168577103,
+    -1683.4791168577103,
+    -1683.4791168577103,
+    -1683.4791168577103,
+    -1683.4791168577103,
+    -1683.4791168577103,
+    -1683.4791168577103,
+    -1683.4791168577103,
+    -1683.4791168577103,
+    -1683.4791168577103,
+    -1683.4791168577103,
+    -1683.4791168577103,
+    -1683.4791168577103,
+    -1683.4791168577103,
+    -1683.4791168577103,
+    -1683.4791168577103,
+    -1683.4791168577103,
+    -1683.4791168577103,
+    -1683.4791168577103,
+    -1683.4791168577103,
+    -1683.4791168577103,
+    -1683.4791168577103,
+    -1683.4791168577103,
+    -1683.4791168577103,
+    -1683.4791168577103,
+    -1683.4791168577103,
+    -1683.4791168577103,
+    -1683.4791168577103,
+    -1683.4791168577103,
+    -1683.4791168577103,
+    -1683.4791168577103,
+    -1683.4791168577103,
+    -1683.4791168577103,
+    -1683.4791168577103,
+    -1683.4791168577103,
+    -1683.4791168577103,
+    -1683.4791168577103,
+    -1683.4791168577103,
+    -1683.4791168577103,
+    -1683.4791168577103,
+    -1683.4791168577103,
+    -1683.4791168577103,
+    -1683.4791168577103,
+    -1683.4791168577103,
+    -1901.9831732731545,
+    -1901.9831732731545
+  ],
+  "energy_stats": {
+    "mean": -681.4937,
+    "min": -1901.9832,
+    "max": -82.3979,
+    "n": 143
+  }
+}

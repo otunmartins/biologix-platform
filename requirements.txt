@@ -1,0 +1,60 @@
+# pip-only fallback. OpenMM / RDKit / Packmol / pdbfixer / OpenFF are NOT installed
+# by this file alone — use environment-simulation.yml (env: insulin-ai-sim).
+#
+# Preferred: ./install  (or: bash scripts/install_insulin_ai_sim_lowmem.sh)
+# One-shot YAML: ./install --conda-yml  or  mamba env create -f environment-simulation.yml
+#
+# If you insist on pip after conda binaries, install conda packages first, e.g.:
+#   conda install -c conda-forge python=3.11 rdkit openmm pdbfixer packmol \
+#     openff-toolkit openff-units
+#
+# Then:
+#   pip install -r requirements.txt
+
+# --- Core numerics ---
+numpy>=1.24
+pandas>=2.0
+scipy>=1.11
+matplotlib>=3.7
+Pillow>=10.0
+
+# --- OpenMM force-field stack (conda binaries required above) ---
+openmmforcefields>=0.14.0
+# openff-toolkit and openff-units: conda-forge only — install via:
+#   conda install -c conda-forge openff-toolkit openff-units
+
+# --- Polymer / PSMILES ---
+psmiles @ git+https://github.com/FermiQ/psmiles.git
+psp>=0.0.5
+
+# --- MCP server ---
+mcp[cli]>=1.0.0
+
+# --- HTTP / web ---
+requests>=2.28.0
+duckduckgo-search>=8.0.0
+
+# --- LLM clients ---
+ollama>=0.2
+langchain>=0.2
+langchain-core>=0.2
+langchain-community>=0.2
+
+# --- Literature / RAG ---
+paper-qa>=2026.2
+
+# --- Reporting ---
+fpdf2>=2.8.0
+markdown>=3.5
+
+# --- Optimisation ---
+optuna>=3.0
+
+# --- RL benchmarks ---
+gymnasium>=0.29
+stable-baselines3>=2.0
+GPy>=1.10
+
+# --- Dev / testing ---
+pytest>=7.4.0
+pytest-asyncio>=0.23

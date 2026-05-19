@@ -1,0 +1,32 @@
+# Minimal OpenMM environment: protein (AMBER14) + ligand (GAFF + RDKit Gasteiger charges).
+# No antechamber/acpype. conda-forge only — see environment-simulation.yml header for omnia note.
+# Create: mamba env create -f environment-openmm.yml
+name: insulin-ai-openmm
+channels:
+  - conda-forge
+dependencies:
+  - python=3.11
+  - rdkit
+  - openmm
+  - pdbfixer
+  - packmol
+  - openff-toolkit>=0.18.0       # conda-forge only
+  - openff-units>=0.2            # conda-forge only
+  - pip
+
+  - pip:
+    - numpy>=1.24
+    - scipy>=1.11
+    - matplotlib>=3.7
+    - Pillow>=10.0
+    - openmmforcefields>=0.14.0
+    # openff-toolkit and openff-units are conda-managed (see above)
+    - psmiles @ git+https://github.com/FermiQ/psmiles.git
+    - psp>=0.0.5
+    - requests>=2.28.0
+    - mcp[cli]>=1.0.0
+    - fpdf2>=2.8.0
+    - markdown>=3.5
+    - pytest>=7.4.0
+    - pytest-asyncio>=0.23
+    - -e .

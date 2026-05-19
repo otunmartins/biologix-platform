@@ -1,0 +1,115 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual Environment
+.venv/
+venv/
+ENV/
+env/
+
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# IDE
+.vscode/
+.idea/
+# Cursor MCP with local secrets (use mcp.json.example + env)
+.cursor/mcp.json
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Project specific
+mining_results/*.json
+.discovery_pdf_cache/
+
+# Chat / caches (chatbot_system used chat_memory/)
+chat_memory/
+*.pkl
+
+# LaTeX build artifacts (proposal.tex)
+*.aux
+*.bbl
+*.blg
+*.out
+*.toc
+cycle_results/
+iterative_results/
+discovery_state/
+runs/
+*.log
+
+# Papers (PDFs for PaperQA2 – user-provided, not tracked)
+papers/*.pdf
+papers/**/*.pdf
+
+# OpenCode source (clone separately: git clone https://github.com/anomalyco/opencode.git opencode_src)
+opencode_src/
+
+# Conda env temp files
+condaenv.*.requirements.txt
+
+# Local clone of FRIDGEFREENET (separate repo; push via remote)
+FRIDGEFREENET/
+
+# Optional: Karpathy autoresearch (GPU LLM training boilerplate — not part of insulin-ai MCP)
+autoresearch/
+
+# External benchmark clones (see extern/benchmarks/README.md; not vendored in git)
+extern/benchmarks/polymer-generative-models/Polymer-Generative-Models-Benchmark/
+extern/benchmarks/ibm-logical-agent-polymer/logical-agent-driven-polymer-discovery/
+
+# AiZynthFinder models/stock (download locally; too large for GitHub)
+data/aizynthfinder/*.onnx
+data/aizynthfinder/*.hdf5
+data/aizynthfinder/*.csv.gz
+data/aizynthfinder/config.yml
+
+# Legacy MCP folder / setuptools
+mcp_servers/
+*.egg-info/
+
+# Jupyter Notebooks
+.ipynb_checkpoints
+
+# pytest
+.pytest_cache/
+.coverage
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json 

@@ -1,0 +1,74 @@
+% Packages for paper/main.tex (fairmeta). fairmeta.cls already loads graphicx,
+% booktabs, bm, hyperref, natbib, subcaption, xcolor, tikz (via tcolorbox), etc.
+\usepackage{amsmath}
+% Times text + matching math (heavier strokes than Computer Modern; common in ML journal PDFs).
+% Omit amssymb/amsfonts: newtxmath supplies AMS-compatible symbols.
+\usepackage{newtxtext,newtxmath}
+% Full-width displays in \texttt{twocolumn} (e.g.\ key equations).
+\usepackage{cuted}
+\usepackage{tabularx}
+\usepackage{url}
+\usepackage{listings}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta, calc, positioning, shapes.geometric, decorations.pathreplacing, backgrounds}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.18}
+\usepackage{chemformula}
+\usepackage[version=4]{mhchem}
+\usepackage{float}
+\usepackage{textcomp}
+
+\usepackage[most]{tcolorbox}
+\newtcolorbox{agentthought}{
+  colback=activepurple!8, colframe=activepurple!60,
+  fonttitle=\small\sffamily\bfseries, title={Agent thought ($t_i$)},
+  boxrule=0.4pt, arc=2pt, left=4pt, right=4pt, top=2pt, bottom=2pt,
+  before skip=4pt, after skip=4pt
+}
+\newtcolorbox{toolcall}[1][]{
+  colback=ragblue!8, colframe=ragblue!60,
+  fonttitle=\small\sffamily\bfseries, title={#1},
+  boxrule=0.4pt, arc=2pt, left=4pt, right=4pt, top=2pt, bottom=2pt,
+  before skip=4pt, after skip=4pt
+}
+\newtcolorbox{observation}{
+  colback=psmilesgreen!8, colframe=psmilesgreen!60,
+  fonttitle=\small\sffamily\bfseries, title={Observation ($o_i$)},
+  boxrule=0.4pt, arc=2pt, left=4pt, right=4pt, top=2pt, bottom=2pt,
+  before skip=4pt, after skip=4pt
+}
+
+\definecolor{deepblue}{RGB}{0,0,120}
+\definecolor{midgreen}{RGB}{0,120,0}
+\definecolor{darkred}{RGB}{120,0,0}
+\definecolor{codecolor}{RGB}{240,240,240}
+\definecolor{ragblue}{RGB}{51,122,183}
+\definecolor{psmilesgreen}{RGB}{92,184,92}
+\definecolor{mdorange}{RGB}{240,173,78}
+\definecolor{activepurple}{RGB}{150,100,200}
+\definecolor{expbteal}{RGB}{0,128,128}
+\definecolor{expccopper}{RGB}{180,90,40}
+
+% Section hierarchy: slightly denser than fairmeta defaults but not flat (reads closer to ML journal prose)
+\titleformat{\section}{\large\sffamily\bfseries}{\thesection}{0.5em}{}
+\titleformat{\subsection}{\normalsize\sffamily\bfseries}{\thesubsection}{0.5em}{}
+\titleformat{\subsubsection}{\normalsize\sffamily\bfseries}{\thesubsubsection}{0.5em}{}
+\titlespacing*{\section}{0pt}{0.85ex plus 0.2ex minus 0.1ex}{0.35ex plus 0.1ex}
+\titlespacing*{\subsection}{0pt}{0.7ex plus 0.15ex}{0.3ex plus 0.1ex}
+\titlespacing*{\subsubsection}{0pt}{0.6ex plus 0.1ex}{0.28ex plus 0.05ex}
+
+\lstset{
+  backgroundcolor=\color{codecolor},
+  basicstyle=\tiny\ttfamily,
+  keywordstyle=\color{deepblue},
+  commentstyle=\color{midgreen},
+  stringstyle=\color{darkred},
+  showstringspaces=false,
+  breaklines=true,
+  frame=single,
+  captionpos=b,
+  numbers=left,
+  numberstyle=\tiny\color{gray}
+}

@@ -1,0 +1,25 @@
+{
+  "mcpServers": {
+    "insulin-ai": {
+      "command": "bash",
+      "args": ["/ABSOLUTE/PATH/TO/insulin-ai/scripts/run_mcp_server.sh"],
+      "env": {
+        "PAPER_DIRECTORY": "/ABSOLUTE/PATH/TO/insulin-ai/papers",
+        "PYTHONPATH": "/ABSOLUTE/PATH/TO/insulin-ai/src/python"
+      }
+    },
+    "allen-ai-scientific": {
+      "url": "https://asta-tools.allen.ai/mcp/v1",
+      "headers": {
+        "x-api-key": "${ASTA_API_KEY}"
+      }
+    },
+    "brave-search": {
+      "command": "npx",
+      "args": ["-y", "@brave/brave-search-mcp-server"],
+      "env": {
+        "BRAVE_API_KEY": "${BRAVE_API_KEY}"
+      }
+    }
+  }
+}

@@ -1,0 +1,174 @@
+#!/usr/bin/env bash
+# Insulin AI Materials Discovery - Install
+#
+# 1) OpenCode + insulin-ai launcher
+# 2) Python deps: conda env insulin-ai-sim (chunked conda + pip — low OOM risk) OR pip-only
+#
+# Usage: ./install [--no-path] [--pip-only] [--conda-yml]
+
+set -euo pipefail
+
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m'
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+BIN_NAME="insulin-ai"
+YML="$SCRIPT_DIR/environment-simulation.yml"
+
+usage() {
+  cat <<EOF
+Insulin AI Materials Discovery – Install
+
+Usage: ./install [options]
+
+  --no-path      Don't add ~/.local/bin to PATH in shell config
+  --pip-only     Skip conda; use pip install -e ".[simulation]" (weaker OpenMM setup)
+  --conda-yml    One-shot conda env create/update from environment-simulation.yml
+                 (needs more RAM; default is chunked install via scripts/install_insulin_ai_sim_lowmem.sh)
+
+Installs:
+  - OpenCode (https://opencode.ai/install)
+  - Python environment: chunked conda-forge + pip (default), or --conda-yml, or --pip-only
+
+Run from the insulin-ai repo root.
+EOF
+}
+
+no_modify_path=false
+pip_only=false
+conda_yml=false
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -h|--help) usage; exit 0 ;;
+    --no-path) no_modify_path=true; shift ;;
+    --pip-only) pip_only=true; shift ;;
+    --conda-yml) conda_yml=true; shift ;;
+    *) echo -e "${RED}Unknown option: $1${NC}"; usage; exit 1 ;;
+  esac
+done
+
+INSTALL_DIR="${OPENCODE_INSTALL_DIR:-${XDG_BIN_DIR:-$HOME/.local/bin}}"
+mkdir -p "$INSTALL_DIR"
+
+echo -e "${GREEN}Insulin AI Materials Discovery – Install${NC}"
+echo ""
+
+# --- OpenCode ---
+OPENCODE_BIN_DIR="${HOME}/.opencode/bin"
+export PATH="${OPENCODE_BIN_DIR}:$PATH"
+if [[ ! -x "${OPENCODE_BIN_DIR}/opencode" ]] && ! command -v opencode >/dev/null 2>&1; then
+  echo "Installing OpenCode..."
+  curl -fsSL https://opencode.ai/install | bash || true
+  export PATH="${OPENCODE_BIN_DIR}:$PATH"
+fi
+if [[ -x "${OPENCODE_BIN_DIR}/opencode" ]]; then
+  echo "OpenCode: ${OPENCODE_BIN_DIR}/opencode"
+elif command -v opencode >/dev/null 2>&1; then
+  echo "OpenCode: $(command -v opencode)"
+else
+  echo -e "${RED}OpenCode not found.${NC} curl -fsSL https://opencode.ai/install | bash"
+  exit 1
+fi
+
+# --- Python / MCP dependencies ---
+echo ""
+echo -e "${GREEN}Python dependencies (MCP server + simulation)${NC}"
+
+install_conda_env() {
+  if ! command -v conda &>/dev/null && ! command -v mamba &>/dev/null; then
+    return 1
+  fi
+
+  # Default: chunked conda solves + pip (low peak RAM; avoids OOM "Killed" during solve).
+  if [[ "$conda_yml" != "true" ]]; then
+    echo -e "${YELLOW}Installing conda env insulin-ai-sim (chunked conda-forge + pip; see scripts/install_insulin_ai_sim_lowmem.sh)...${NC}"
+    bash "$SCRIPT_DIR/scripts/install_insulin_ai_sim_lowmem.sh"
+    echo -e "${GREEN}Activate before MCP:  conda activate insulin-ai-sim${NC}"
+    return 0
+  fi
+
+  # Optional: single environment-simulation.yml solve (needs more RAM).
+  local runner
+  if command -v mamba &>/dev/null; then
+    runner=mamba
+  else
+    runner=conda
+  fi
+  if conda config --show channels 2>/dev/null | grep -qi omnia; then
+    echo -e "${RED}Your conda channel list includes \"omnia\" (see: conda config --show channels).${NC}"
+    echo -e "${YELLOW}Remove it, then re-run ./install — e.g.:  conda config --remove channels omnia${NC}"
+    echo -e "${YELLOW}Or edit ~/.condarc and delete the omnia entry. See docs/DEPENDENCIES.md (Troubleshooting).${NC}"
+    echo ""
+  fi
+  local solver_args=()
+  if [[ "$runner" == "conda" ]]; then
+    solver_args=(--solver classic)
+  fi
+  if conda env list 2>/dev/null | awk '{print $1}' | grep -qx insulin-ai-sim; then
+    echo -e "${YELLOW}Conda env insulin-ai-sim exists — updating from environment-simulation.yml...${NC}"
+    "$runner" env update -f "$YML" --prune "${solver_args[@]}"
+  else
+    echo "Creating conda env insulin-ai-sim from environment-simulation.yml..."
+    "$runner" env create -f "$YML" "${solver_args[@]}"
+  fi
+  echo -e "${GREEN}Activate before MCP:  conda activate insulin-ai-sim${NC}"
+  return 0
+}
+
+install_pip() {
+  echo "pip: requirements.txt + editable (no conda)..."
+  cd "$SCRIPT_DIR"
+  python3 -m pip install -U pip setuptools wheel
+  python3 -m pip install -r requirements.txt
+  python3 -m pip install -e ".[simulation,paperqa]" 2>/dev/null || python3 -m pip install -e ".[simulation]"
+  echo -e "${YELLOW}Warning: OpenMM, RDKit, pdbfixer, Packmol, and OpenFF Toolkit are NOT installed by pip-only.${NC}"
+  echo -e "${YELLOW}  Use ./install (chunked conda) or bash scripts/install_insulin_ai_sim_lowmem.sh for the full stack.${NC}"
+  echo -e "${YELLOW}  Verify:  mamba run -n insulin-ai-sim python -c \"import openmm\"${NC}"
+}
+
+if [[ "$pip_only" == "true" ]] || ! command -v mamba &>/dev/null && ! command -v conda &>/dev/null; then
+  install_pip
+else
+  if ! install_conda_env; then
+    install_pip
+  fi
+fi
+
+# --- Launcher ---
+LAUNCHER="$INSTALL_DIR/$BIN_NAME"
+cat > "$LAUNCHER" <<LAUNCHER_SCRIPT
+#!/usr/bin/env bash
+INSULIN_AI_ROOT="$SCRIPT_DIR"
+PROJECT="\${1:-\$INSULIN_AI_ROOT}"
+cd "\$INSULIN_AI_ROOT"
+export PATH="\${HOME}/.opencode/bin:\$PATH"
+if [[ -x "\${HOME}/.opencode/bin/opencode" ]]; then
+  exec "\${HOME}/.opencode/bin/opencode" "\$PROJECT"
+fi
+command -v opencode >/dev/null 2>&1 && exec opencode "\$PROJECT"
+echo "opencode not found" >&2
+exit 127
+LAUNCHER_SCRIPT
+chmod +x "$LAUNCHER"
+
+echo ""
+echo -e "${GREEN}Launcher: $LAUNCHER${NC}"
+echo "  Run:  $BIN_NAME"
+echo "  MCP:  started automatically by OpenCode (or debug: mamba activate insulin-ai-sim && bash scripts/run_mcp_server.sh)"
+echo ""
+
+if [[ "$no_modify_path" != "true" ]] && [[ ":$PATH:" != *":$INSTALL_DIR:"* ]]; then
+  for rc in .zshrc .bashrc .bash_profile .profile; do
+    if [[ -f "$HOME/$rc" ]]; then
+      if ! grep -q "Insulin AI Materials Discovery" "$HOME/$rc" 2>/dev/null; then
+        echo "" >> "$HOME/$rc"
+        echo "# Insulin AI Materials Discovery" >> "$HOME/$rc"
+        echo "export PATH=\"$INSTALL_DIR:\$PATH\"" >> "$HOME/$rc"
+        echo "  Added $INSTALL_DIR to $HOME/$rc"
+        break
+      fi
+    fi
+  done
+fi

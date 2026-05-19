@@ -1,0 +1,74 @@
+# Full development environment: OpenMM + RDKit + Packmol + MCP server + all features.
+#
+# Use conda-forge only (no "defaults") so the solver does not mix ABI variants.
+# If you still see "libgfortran 1.0" / old packmol: remove the legacy "omnia" channel
+# from ~/.condarc — it ships ancient packmol builds that break the solve.
+#
+# Preferred install: ./install  (chunked conda + pip; avoids OOM on solve)
+# One-shot YAML (needs more RAM): ./install --conda-yml
+#   or:  mamba env create -f environment-simulation.yml
+#        mamba env update -f environment-simulation.yml --prune
+name: insulin-ai-sim
+channels:
+  - conda-forge
+dependencies:
+  - python=3.11
+  # --- Conda-managed: compiled binaries / C extensions ---
+  - rdkit                        # cheminformatics (RDKit)
+  - openmm                       # molecular dynamics engine
+  - pdbfixer                     # PDB structure repair
+  - packmol                      # molecular packing (binary on PATH)
+  - openff-toolkit>=0.18.0       # conda-forge only (not on PyPI)
+  - openff-units>=0.2            # conda-forge only
+  - pip
+
+  - pip:
+    # --- Core numerics ---
+    - numpy>=1.24
+    - pandas>=2.0
+    - scipy>=1.11
+    - matplotlib>=3.7
+    - Pillow>=10.0
+
+    # --- OpenMM force-field stack ---
+    - openmmforcefields>=0.14.0
+    # openff-toolkit and openff-units are conda-managed (see conda section above)
+
+    # --- Polymer / PSMILES ---
+    - psmiles @ git+https://github.com/FermiQ/psmiles.git
+    - psp>=0.0.5                   # optional PSP MoleculeBuilder (psp_polymer_build.py)
+
+    # --- MCP server (FastMCP bundled in mcp>=1.0; [cli] adds typer/rich for mcp.run()) ---
+    - mcp[cli]>=1.0.0
+
+    # --- HTTP / web ---
+    - requests>=2.28.0
+    - duckduckgo-search>=8.0.0
+
+    # --- LLM clients (psmiles_generator.py, llm/ollama_client.py) ---
+    - ollama>=0.2
+    - langchain>=0.2
+    - langchain-core>=0.2
+    - langchain-community>=0.2
+
+    # --- Literature / RAG ---
+    - paper-qa>=2026.2
+
+    # --- Reporting ---
+    - fpdf2>=2.8.0
+    - markdown>=3.5
+
+    # --- Optimisation / active learning ---
+    - optuna>=3.0
+
+    # --- RL benchmarks (ibm_insulin_env.py, stable_baselines3) ---
+    - gymnasium>=0.29
+    - stable-baselines3>=2.0
+    - GPy>=1.10                    # Bayesian optimisation in IBM benchmark
+
+    # --- Dev / testing ---
+    - pytest>=7.4.0
+    - pytest-asyncio>=0.23
+
+    # --- Project package (editable install) ---
+    - -e .

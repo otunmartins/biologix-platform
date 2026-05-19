@@ -1,0 +1,3316 @@
+{
+  "algorithm": "dqn",
+  "mode": "train_and_test",
+  "seed_psmiles": "[*]OCC[*]",
+  "n_proposals": 8,
+  "target_energy_kj": -1000.0,
+  "n_timesteps": 160,
+  "n_episodes": 20,
+  "evaluation": "live_openmm",
+  "train_completed": true,
+  "avg_episode_reward": -0.5810000000000002,
+  "avg_targets_per_episode": 0.45,
+  "avg_episode_length": 8.0,
+  "avg_steps_to_first_target": 4.0,
+  "best_discovery_score": 14.1708,
+  "best_interaction_energy_kj_mol": -1412.3081,
+  "n_high_performers_found": 1,
+  "n_unique_psmiles_evaluated": 14,
+  "n_evaluations": 121,
+  "all_target_psmiles": [
+    "[*]CCC(=O)C([*])=O"
+  ],
+  "energy_stats": {
+    "mean": -568.3144,
+    "min": -1412.3081,
+    "max": -101.1479,
+    "n": 121
+  },
+  "wall_time_s": 492.9,
+  "evaluation_trace": [
+    {
+      "phase": "train",
+      "interaction_energy_kj_mol": -393.71768162978697,
+      "psmiles": "[*]NC([*])=O",
+      "tier": "valid"
+    },
+    {
+      "phase": "train",
+      "interaction_energy_kj_mol": -701.5036341705672,
+      "psmiles": "[*]COC[*]",
+      "tier": "valid"
+    },
+    {
+      "phase": "train",
+      "interaction_energy_kj_mol": -382.67949122943537,
+      "psmiles": "[*]OC([*])=O",
+      "tier": "valid"
+    },
+    {
+      "phase": "train",
+      "interaction_energy_kj_mol": -1134.9437845094799,
+      "psmiles": "[*]CCOC([*])=O",
+      "tier": "target"
+    },
+    {
+      "phase": "train",
+      "interaction_energy_kj_mol": -382.67949122943537,
+      "psmiles": "[*]OC([*])=O",
+      "tier": "valid"
+    },
+    {
+      "phase": "train",
+      "interaction_energy_kj_mol": -701.5036341705672,
+      "psmiles": "[*]COC[*]",
+      "tier": "valid"
+    },
+    {
+      "phase": "train",
+      "interaction_energy_kj_mol": -286.6361450382883,
+      "psmiles": "[*]CS[*]",
+      "tier": "valid"
+    },
+    {
+      "phase": "train",
+      "interaction_energy_kj_mol": -1134.9437845094799,
+      "psmiles": "[*]CCOC([*])=O",
+      "tier": "target"
+    },
+    {
+      "phase": "train",
+      "interaction_energy_kj_mol": -257.16797323930507,
+      "psmiles": "[*]C([*])=S",
+      "tier": "valid"
+    },
+    {
+      "phase": "train",
+      "interaction_energy_kj_mol": -157.9734549795612,
+      "psmiles": "[*]C([*])(F)F",
+      "tier": "valid"
+    },
+    {
+      "phase": "train",
+      "interaction_energy_kj_mol": -119.32340191553169,
+      "psmiles": "[*]C[*]",
+      "tier": "valid"
+    },
+    {
+      "phase": "train",
+      "interaction_energy_kj_mol": -1134.9437845094799,
+      "psmiles": "[*]CCOC([*])=O",
+      "tier": "target"
+    },
+    {
+      "phase": "train",
+      "interaction_energy_kj_mol": -393.71768162978697,
+      "psmiles": "[*]NC([*])=O",
+      "tier": "valid"
+    },
+    {
+      "phase": "train",
+      "interaction_energy_kj_mol": -257.16797323930507,
+      "psmiles": "[*]C([*])=S",
+      "tier": "valid"
+    },
+    {
+      "phase": "train",
+      "interaction_energy_kj_mol": -382.67949122943537,
+      "psmiles": "[*]OC([*])=O",
+      "tier": "valid"
+    },
+    {
+      "phase": "train",
+      "interaction_energy_kj_mol": -830.8855028858525,
+      "psmiles": "[*]NC(C)C([*])=O",
+      "tier": "valid"
+    },
+    {
+      "phase": "train",
+      "interaction_energy_kj_mol": -393.58707499442517,
+      "psmiles": "[*]CC([*])C",
+      "tier": "valid"
+    },
+    {
+      "phase": "train",
+      "interaction_energy_kj_mol": -286.6361450382883,
+      "psmiles": "[*]CS[*]",
+      "tier": "valid"
+    },
+    {
+      "phase": "train",
+      "interaction_energy_kj_mol": -393.71768162978697,
+      "psmiles": "[*]NC([*])=O",
+      "tier": "valid"
+    },
+    {
+      "phase": "train",
+      "interaction_energy_kj_mol": -382.67949122943537,
+      "psmiles": "[*]OC([*])=O",
+      "tier": "valid"
+    },
+    {
+      "phase": "train",
+      "interaction_energy_kj_mol": -393.58707499442517,
+      "psmiles": "[*]CC([*])C",
+      "tier": "valid"
+    },
+    {
+      "phase": "train",
+      "interaction_energy_kj_mol": -157.9734549795612,
+      "psmiles": "[*]C([*])(F)F",
+      "tier": "valid"
+    },
+    {
+      "phase": "train",
+      "interaction_energy_kj_mol": -119.32340191553169,
+      "psmiles": "[*]C[*]",
+      "tier": "valid"
+    },
+    {
+      "phase": "train",
+      "interaction_energy_kj_mol": -393.71768162978697,
+      "psmiles": "[*]NC([*])=O",
+      "tier": "valid"
+    },
+    {
+      "phase": "train",
+      "interaction_energy_kj_mol": -382.67949122943537,
+      "psmiles": "[*]OC([*])=O",
+      "tier": "valid"
+    },
+    {
+      "phase": "train",
+      "interaction_energy_kj_mol": -393.58707499442517,
+      "psmiles": "[*]CC([*])C",
+      "tier": "valid"
+    },
+    {
+      "phase": "train",
+      "interaction_energy_kj_mol": -778.9222856045799,
+      "psmiles": "[*]CC([*])O",
+      "tier": "valid"
+    },
+    {
+      "phase": "train",
+      "interaction_energy_kj_mol": -393.71768162978697,
+      "psmiles": "[*]NC([*])=O",
+      "tier": "valid"
+    },
+    {
+      "phase": "train",
+      "interaction_energy_kj_mol": -257.16797323930507,
+      "psmiles": "[*]C([*])=S",
+      "tier": "valid"
+    },
+    {
+      "phase": "train",
+      "interaction_energy_kj_mol": -778.9222856045799,
+      "psmiles": "[*]CC([*])O",
+      "tier": "valid"
+    },
+    {
+      "phase": "train",
+      "interaction_energy_kj_mol": -119.32340191553169,
+      "psmiles": "[*]C[*]",
+      "tier": "valid"
+    },
+    {
+      "phase": "train",
+      "interaction_energy_kj_mol": -593.2012993330718,
+      "psmiles": "[*]c1ccc([*])cc1",
+      "tier": "valid"
+    },
+    {
+      "phase": "train",
+      "interaction_energy_kj_mol": -1134.9437845094799,
+      "psmiles": "[*]CCOC([*])=O",
+      "tier": "target"
+    },
+    {
+      "phase": "train",
+      "interaction_energy_kj_mol": -393.58707499442517,
+      "psmiles": "[*]CC([*])C",
+      "tier": "valid"
+    },
+    {
+      "phase": "train",
+      "interaction_energy_kj_mol": -382.67949122943537,
+      "psmiles": "[*]OC([*])=O",
+      "tier": "valid"
+    },
+    {
+      "phase": "train",
+      "interaction_energy_kj_mol": -393.71768162978697,
+      "psmiles": "[*]NC([*])=O",
+      "tier": "valid"
+    },
+    {
+      "phase": "train",
+      "interaction_energy_kj_mol": -830.8855028858525,
+      "psmiles": "[*]NC(C)C([*])=O",
+      "tier": "valid"
+    },
+    {
+      "phase": "train",
+      "interaction_energy_kj_mol": -701.5036341705672,
+      "psmiles": "[*]COC[*]",
+      "tier": "valid"
+    },
+    {
+      "phase": "train",
+      "interaction_energy_kj_mol": -157.9734549795612,
+      "psmiles": "[*]C([*])(F)F",
+      "tier": "valid"
+    },
+    {
+      "phase": "train",
+      "interaction_energy_kj_mol": -1134.9437845094799,
+      "psmiles": "[*]CCOC([*])=O",
+      "tier": "target"
+    },
+    {
+      "phase": "train",
+      "interaction_energy_kj_mol": -119.32340191553169,
+      "psmiles": "[*]C[*]",
+      "tier": "valid"
+    },
+    {
+      "phase": "train",
+      "interaction_energy_kj_mol": -610.3090339330156,
+      "psmiles": "[*]CC([*])=O",
+      "tier": "valid"
+    },
+    {
+      "phase": "train",
+      "interaction_energy_kj_mol": -593.2012993330718,
+      "psmiles": "[*]c1ccc([*])cc1",
+      "tier": "valid"
+    },
+    {
+      "phase": "train",
+      "interaction_energy_kj_mol": -257.16797323930507,
+      "psmiles": "[*]C([*])=S",
+      "tier": "valid"
+    },
+    {
+      "phase": "train",
+      "interaction_energy_kj_mol": -382.67949122943537,
+      "psmiles": "[*]OC([*])=O",
+      "tier": "valid"
+    },
+    {
+      "phase": "train",
+      "interaction_energy_kj_mol": -393.71768162978697,
+      "psmiles": "[*]NC([*])=O",
+      "tier": "valid"
+    },
+    {
+      "phase": "train",
+      "interaction_energy_kj_mol": -830.8855028858525,
+      "psmiles": "[*]NC(C)C([*])=O",
+      "tier": "valid"
+    },
+    {
+      "phase": "train",
+      "interaction_energy_kj_mol": -701.5036341705672,
+      "psmiles": "[*]COC[*]",
+      "tier": "valid"
+    },
+    {
+      "phase": "train",
+      "interaction_energy_kj_mol": -382.67949122943537,
+      "psmiles": "[*]OC([*])=O",
+      "tier": "valid"
+    },
+    {
+      "phase": "train",
+      "interaction_energy_kj_mol": -393.71768162978697,
+      "psmiles": "[*]NC([*])=O",
+      "tier": "valid"
+    },
+    {
+      "phase": "train",
+      "interaction_energy_kj_mol": -119.32340191553169,
+      "psmiles": "[*]C[*]",
+      "tier": "valid"
+    },
+    {
+      "phase": "train",
+      "interaction_energy_kj_mol": -610.3090339330156,
+      "psmiles": "[*]CC([*])=O",
+      "tier": "valid"
+    },
+    {
+      "phase": "train",
+      "interaction_energy_kj_mol": -286.6361450382883,
+      "psmiles": "[*]CS[*]",
+      "tier": "valid"
+    },
+    {
+      "phase": "train",
+      "interaction_energy_kj_mol": -286.6361450382883,
+      "psmiles": "[*]CS[*]",
+      "tier": "valid"
+    },
+    {
+      "phase": "train",
+      "interaction_energy_kj_mol": -157.9734549795612,
+      "psmiles": "[*]C([*])(F)F",
+      "tier": "valid"
+    },
+    {
+      "phase": "train",
+      "interaction_energy_kj_mol": -119.32340191553169,
+      "psmiles": "[*]C[*]",
+      "tier": "valid"
+    },
+    {
+      "phase": "train",
+      "interaction_energy_kj_mol": -382.67949122943537,
+      "psmiles": "[*]OC([*])=O",
+      "tier": "valid"
+    },
+    {
+      "phase": "train",
+      "interaction_energy_kj_mol": -1370.256452378002,
+      "psmiles": "[*]CCC(=O)C([*])=O",
+      "tier": "target"
+    },
+    {
+      "phase": "train",
+      "interaction_energy_kj_mol": -593.2012993330718,
+      "psmiles": "[*]c1ccc([*])cc1",
+      "tier": "valid"
+    },
+    {
+      "phase": "train",
+      "interaction_energy_kj_mol": -393.71768162978697,
+      "psmiles": "[*]NC([*])=O",
+      "tier": "valid"
+    },
+    {
+      "phase": "train",
+      "interaction_energy_kj_mol": -830.8855028858525,
+      "psmiles": "[*]NC(C)C([*])=O",
+      "tier": "valid"
+    },
+    {
+      "phase": "train",
+      "interaction_energy_kj_mol": -257.16797323930507,
+      "psmiles": "[*]C([*])=S",
+      "tier": "valid"
+    },
+    {
+      "phase": "train",
+      "interaction_energy_kj_mol": -393.71768162978697,
+      "psmiles": "[*]NC([*])=O",
+      "tier": "valid"
+    },
+    {
+      "phase": "train",
+      "interaction_energy_kj_mol": -610.3090339330156,
+      "psmiles": "[*]CC([*])=O",
+      "tier": "valid"
+    },
+    {
+      "phase": "train",
+      "interaction_energy_kj_mol": -701.5036341705672,
+      "psmiles": "[*]COC[*]",
+      "tier": "valid"
+    },
+    {
+      "phase": "train",
+      "interaction_energy_kj_mol": -1370.256452378002,
+      "psmiles": "[*]CCC(=O)C([*])=O",
+      "tier": "target"
+    },
+    {
+      "phase": "train",
+      "interaction_energy_kj_mol": -393.58707499442517,
+      "psmiles": "[*]CC([*])C",
+      "tier": "valid"
+    },
+    {
+      "phase": "train",
+      "interaction_energy_kj_mol": -610.3090339330156,
+      "psmiles": "[*]CC([*])=O",
+      "tier": "valid"
+    },
+    {
+      "phase": "train",
+      "interaction_energy_kj_mol": -778.9222856045799,
+      "psmiles": "[*]CC([*])O",
+      "tier": "valid"
+    },
+    {
+      "phase": "train",
+      "interaction_energy_kj_mol": -701.5036341705672,
+      "psmiles": "[*]COC[*]",
+      "tier": "valid"
+    },
+    {
+      "phase": "train",
+      "interaction_energy_kj_mol": -119.32340191553169,
+      "psmiles": "[*]C[*]",
+      "tier": "valid"
+    },
+    {
+      "phase": "train",
+      "interaction_energy_kj_mol": -393.71768162978697,
+      "psmiles": "[*]NC([*])=O",
+      "tier": "valid"
+    },
+    {
+      "phase": "train",
+      "interaction_energy_kj_mol": -778.9222856045799,
+      "psmiles": "[*]CC([*])O",
+      "tier": "valid"
+    },
+    {
+      "phase": "train",
+      "interaction_energy_kj_mol": -1134.9437845094799,
+      "psmiles": "[*]CCOC([*])=O",
+      "tier": "target"
+    },
+    {
+      "phase": "train",
+      "interaction_energy_kj_mol": -257.16797323930507,
+      "psmiles": "[*]C([*])=S",
+      "tier": "valid"
+    },
+    {
+      "phase": "train",
+      "interaction_energy_kj_mol": -286.6361450382883,
+      "psmiles": "[*]CS[*]",
+      "tier": "valid"
+    },
+    {
+      "phase": "train",
+      "interaction_energy_kj_mol": -393.71768162978697,
+      "psmiles": "[*]NC([*])=O",
+      "tier": "valid"
+    },
+    {
+      "phase": "train",
+      "interaction_energy_kj_mol": -701.5036341705672,
+      "psmiles": "[*]COC[*]",
+      "tier": "valid"
+    },
+    {
+      "phase": "train",
+      "interaction_energy_kj_mol": -119.32340191553169,
+      "psmiles": "[*]C[*]",
+      "tier": "valid"
+    },
+    {
+      "phase": "train",
+      "interaction_energy_kj_mol": -382.67949122943537,
+      "psmiles": "[*]OC([*])=O",
+      "tier": "valid"
+    },
+    {
+      "phase": "train",
+      "interaction_energy_kj_mol": -393.58707499442517,
+      "psmiles": "[*]CC([*])C",
+      "tier": "valid"
+    },
+    {
+      "phase": "train",
+      "interaction_energy_kj_mol": -1370.256452378002,
+      "psmiles": "[*]CCC(=O)C([*])=O",
+      "tier": "target"
+    },
+    {
+      "phase": "train",
+      "interaction_energy_kj_mol": -119.32340191553169,
+      "psmiles": "[*]C[*]",
+      "tier": "valid"
+    },
+    {
+      "phase": "train",
+      "interaction_energy_kj_mol": -610.3090339330156,
+      "psmiles": "[*]CC([*])=O",
+      "tier": "valid"
+    },
+    {
+      "phase": "train",
+      "interaction_energy_kj_mol": -393.71768162978697,
+      "psmiles": "[*]NC([*])=O",
+      "tier": "valid"
+    },
+    {
+      "phase": "train",
+      "interaction_energy_kj_mol": -157.9734549795612,
+      "psmiles": "[*]C([*])(F)F",
+      "tier": "valid"
+    },
+    {
+      "phase": "train",
+      "interaction_energy_kj_mol": -701.5036341705672,
+      "psmiles": "[*]COC[*]",
+      "tier": "valid"
+    },
+    {
+      "phase": "train",
+      "interaction_energy_kj_mol": -382.67949122943537,
+      "psmiles": "[*]OC([*])=O",
+      "tier": "valid"
+    },
+    {
+      "phase": "train",
+      "interaction_energy_kj_mol": -393.71768162978697,
+      "psmiles": "[*]NC([*])=O",
+      "tier": "valid"
+    },
+    {
+      "phase": "train",
+      "interaction_energy_kj_mol": -257.16797323930507,
+      "psmiles": "[*]C([*])=S",
+      "tier": "valid"
+    },
+    {
+      "phase": "train",
+      "interaction_energy_kj_mol": -286.6361450382883,
+      "psmiles": "[*]CS[*]",
+      "tier": "valid"
+    },
+    {
+      "phase": "train",
+      "interaction_energy_kj_mol": -119.32340191553169,
+      "psmiles": "[*]C[*]",
+      "tier": "valid"
+    },
+    {
+      "phase": "train",
+      "interaction_energy_kj_mol": -778.9222856045799,
+      "psmiles": "[*]CC([*])O",
+      "tier": "valid"
+    },
+    {
+      "phase": "train",
+      "interaction_energy_kj_mol": -830.8855028858525,
+      "psmiles": "[*]NC(C)C([*])=O",
+      "tier": "valid"
+    },
+    {
+      "phase": "train",
+      "interaction_energy_kj_mol": -157.9734549795612,
+      "psmiles": "[*]C([*])(F)F",
+      "tier": "valid"
+    },
+    {
+      "phase": "train",
+      "interaction_energy_kj_mol": -593.2012993330718,
+      "psmiles": "[*]c1ccc([*])cc1",
+      "tier": "valid"
+    },
+    {
+      "phase": "train",
+      "interaction_energy_kj_mol": -382.67949122943537,
+      "psmiles": "[*]OC([*])=O",
+      "tier": "valid"
+    },
+    {
+      "phase": "train",
+      "interaction_energy_kj_mol": -382.67949122943537,
+      "psmiles": "[*]OC([*])=O",
+      "tier": "valid"
+    },
+    {
+      "phase": "train",
+      "interaction_energy_kj_mol": -701.5036341705672,
+      "psmiles": "[*]COC[*]",
+      "tier": "valid"
+    },
+    {
+      "phase": "train",
+      "interaction_energy_kj_mol": -157.9734549795612,
+      "psmiles": "[*]C([*])(F)F",
+      "tier": "valid"
+    },
+    {
+      "phase": "train",
+      "interaction_energy_kj_mol": -1370.256452378002,
+      "psmiles": "[*]CCC(=O)C([*])=O",
+      "tier": "target"
+    },
+    {
+      "phase": "train",
+      "interaction_energy_kj_mol": -830.8855028858525,
+      "psmiles": "[*]NC(C)C([*])=O",
+      "tier": "valid"
+    },
+    {
+      "phase": "train",
+      "interaction_energy_kj_mol": -1370.256452378002,
+      "psmiles": "[*]CCC(=O)C([*])=O",
+      "tier": "target"
+    },
+    {
+      "phase": "train",
+      "interaction_energy_kj_mol": -393.71768162978697,
+      "psmiles": "[*]NC([*])=O",
+      "tier": "valid"
+    },
+    {
+      "phase": "train",
+      "interaction_energy_kj_mol": -593.2012993330718,
+      "psmiles": "[*]c1ccc([*])cc1",
+      "tier": "valid"
+    },
+    {
+      "phase": "train",
+      "interaction_energy_kj_mol": -157.9734549795612,
+      "psmiles": "[*]C([*])(F)F",
+      "tier": "valid"
+    },
+    {
+      "phase": "train",
+      "interaction_energy_kj_mol": -382.67949122943537,
+      "psmiles": "[*]OC([*])=O",
+      "tier": "valid"
+    },
+    {
+      "phase": "train",
+      "interaction_energy_kj_mol": -393.58707499442517,
+      "psmiles": "[*]CC([*])C",
+      "tier": "valid"
+    },
+    {
+      "phase": "train",
+      "interaction_energy_kj_mol": -393.71768162978697,
+      "psmiles": "[*]NC([*])=O",
+      "tier": "valid"
+    },
+    {
+      "phase": "train",
+      "interaction_energy_kj_mol": -593.2012993330718,
+      "psmiles": "[*]c1ccc([*])cc1",
+      "tier": "valid"
+    },
+    {
+      "phase": "train",
+      "interaction_energy_kj_mol": -286.6361450382883,
+      "psmiles": "[*]CS[*]",
+      "tier": "valid"
+    },
+    {
+      "phase": "train",
+      "interaction_energy_kj_mol": -701.5036341705672,
+      "psmiles": "[*]COC[*]",
+      "tier": "valid"
+    },
+    {
+      "phase": "train",
+      "interaction_energy_kj_mol": -1370.256452378002,
+      "psmiles": "[*]CCC(=O)C([*])=O",
+      "tier": "target"
+    },
+    {
+      "phase": "train",
+      "interaction_energy_kj_mol": -119.32340191553169,
+      "psmiles": "[*]C[*]",
+      "tier": "valid"
+    },
+    {
+      "phase": "train",
+      "interaction_energy_kj_mol": -1134.9437845094799,
+      "psmiles": "[*]CCOC([*])=O",
+      "tier": "target"
+    },
+    {
+      "phase": "train",
+      "interaction_energy_kj_mol": -393.71768162978697,
+      "psmiles": "[*]NC([*])=O",
+      "tier": "valid"
+    },
+    {
+      "phase": "train",
+      "interaction_energy_kj_mol": -257.16797323930507,
+      "psmiles": "[*]C([*])=S",
+      "tier": "valid"
+    },
+    {
+      "phase": "train",
+      "interaction_energy_kj_mol": -286.6361450382883,
+      "psmiles": "[*]CS[*]",
+      "tier": "valid"
+    },
+    {
+      "phase": "train",
+      "interaction_energy_kj_mol": -778.9222856045799,
+      "psmiles": "[*]CC([*])O",
+      "tier": "valid"
+    },
+    {
+      "phase": "test",
+      "interaction_energy_kj_mol": -500.69559976286837,
+      "psmiles": "[*]NC([*])=O",
+      "tier": "valid"
+    },
+    {
+      "phase": "test",
+      "interaction_energy_kj_mol": -745.5241295582782,
+      "psmiles": "[*]COC[*]",
+      "tier": "valid"
+    },
+    {
+      "phase": "test",
+      "interaction_energy_kj_mol": -1412.3081269684553,
+      "psmiles": "[*]CCC(=O)C([*])=O",
+      "tier": "target"
+    },
+    {
+      "phase": "test",
+      "interaction_energy_kj_mol": -504.39333261938555,
+      "psmiles": "[*]CC([*])O",
+      "tier": "valid"
+    },
+    {
+      "phase": "test",
+      "interaction_energy_kj_mol": -267.00801768467386,
+      "psmiles": "[*]C([*])=S",
+      "tier": "valid"
+    },
+    {
+      "phase": "test",
+      "interaction_energy_kj_mol": -449.1930247708069,
+      "psmiles": "[*]CC([*])C",
+      "tier": "valid"
+    },
+    {
+      "phase": "test",
+      "interaction_energy_kj_mol": -504.39333261938555,
+      "psmiles": "[*]CC([*])O",
+      "tier": "valid"
+    },
+    {
+      "phase": "test",
+      "interaction_energy_kj_mol": -745.5241295582782,
+      "psmiles": "[*]COC[*]",
+      "tier": "valid"
+    },
+    {
+      "phase": "test",
+      "interaction_energy_kj_mol": -292.3317396098332,
+      "psmiles": "[*]CS[*]",
+      "tier": "valid"
+    },
+    {
+      "phase": "test",
+      "interaction_energy_kj_mol": -595.1786072286477,
+      "psmiles": "[*]c1ccc([*])cc1",
+      "tier": "valid"
+    },
+    {
+      "phase": "test",
+      "interaction_energy_kj_mol": -535.33819007704,
+      "psmiles": "[*]OC([*])=O",
+      "tier": "valid"
+    },
+    {
+      "phase": "test",
+      "interaction_energy_kj_mol": -500.69559976286837,
+      "psmiles": "[*]NC([*])=O",
+      "tier": "valid"
+    },
+    {
+      "phase": "test",
+      "interaction_energy_kj_mol": -149.04531673137535,
+      "psmiles": "[*]C([*])(F)F",
+      "tier": "valid"
+    },
+    {
+      "phase": "test",
+      "interaction_energy_kj_mol": -869.5818704026387,
+      "psmiles": "[*]CCOC([*])=O",
+      "tier": "valid"
+    },
+    {
+      "phase": "test",
+      "interaction_energy_kj_mol": -595.1786072286477,
+      "psmiles": "[*]c1ccc([*])cc1",
+      "tier": "valid"
+    },
+    {
+      "phase": "test",
+      "interaction_energy_kj_mol": -449.1930247708069,
+      "psmiles": "[*]CC([*])C",
+      "tier": "valid"
+    },
+    {
+      "phase": "test",
+      "interaction_energy_kj_mol": -149.04531673137535,
+      "psmiles": "[*]C([*])(F)F",
+      "tier": "valid"
+    },
+    {
+      "phase": "test",
+      "interaction_energy_kj_mol": -535.33819007704,
+      "psmiles": "[*]OC([*])=O",
+      "tier": "valid"
+    },
+    {
+      "phase": "test",
+      "interaction_energy_kj_mol": -1412.3081269684553,
+      "psmiles": "[*]CCC(=O)C([*])=O",
+      "tier": "target"
+    },
+    {
+      "phase": "test",
+      "interaction_energy_kj_mol": -449.1930247708069,
+      "psmiles": "[*]CC([*])C",
+      "tier": "valid"
+    },
+    {
+      "phase": "test",
+      "interaction_energy_kj_mol": -267.00801768467386,
+      "psmiles": "[*]C([*])=S",
+      "tier": "valid"
+    },
+    {
+      "phase": "test",
+      "interaction_energy_kj_mol": -500.69559976286837,
+      "psmiles": "[*]NC([*])=O",
+      "tier": "valid"
+    },
+    {
+      "phase": "test",
+      "interaction_energy_kj_mol": -101.14790304315625,
+      "psmiles": "[*]C[*]",
+      "tier": "valid"
+    },
+    {
+      "phase": "test",
+      "interaction_energy_kj_mol": -535.33819007704,
+      "psmiles": "[*]OC([*])=O",
+      "tier": "valid"
+    },
+    {
+      "phase": "test",
+      "interaction_energy_kj_mol": -869.5818704026387,
+      "psmiles": "[*]CCOC([*])=O",
+      "tier": "valid"
+    },
+    {
+      "phase": "test",
+      "interaction_energy_kj_mol": -869.5818704026387,
+      "psmiles": "[*]CCOC([*])=O",
+      "tier": "valid"
+    },
+    {
+      "phase": "test",
+      "interaction_energy_kj_mol": -535.33819007704,
+      "psmiles": "[*]OC([*])=O",
+      "tier": "valid"
+    },
+    {
+      "phase": "test",
+      "interaction_energy_kj_mol": -504.39333261938555,
+      "psmiles": "[*]CC([*])O",
+      "tier": "valid"
+    },
+    {
+      "phase": "test",
+      "interaction_energy_kj_mol": -745.5241295582782,
+      "psmiles": "[*]COC[*]",
+      "tier": "valid"
+    },
+    {
+      "phase": "test",
+      "interaction_energy_kj_mol": -595.1786072286477,
+      "psmiles": "[*]c1ccc([*])cc1",
+      "tier": "valid"
+    },
+    {
+      "phase": "test",
+      "interaction_energy_kj_mol": -101.14790304315625,
+      "psmiles": "[*]C[*]",
+      "tier": "valid"
+    },
+    {
+      "phase": "test",
+      "interaction_energy_kj_mol": -979.6324007520307,
+      "psmiles": "[*]NC(C)C([*])=O",
+      "tier": "valid"
+    },
+    {
+      "phase": "test",
+      "interaction_energy_kj_mol": -869.5818704026387,
+      "psmiles": "[*]CCOC([*])=O",
+      "tier": "valid"
+    },
+    {
+      "phase": "test",
+      "interaction_energy_kj_mol": -101.14790304315625,
+      "psmiles": "[*]C[*]",
+      "tier": "valid"
+    },
+    {
+      "phase": "test",
+      "interaction_energy_kj_mol": -745.5241295582782,
+      "psmiles": "[*]COC[*]",
+      "tier": "valid"
+    },
+    {
+      "phase": "test",
+      "interaction_energy_kj_mol": -149.04531673137535,
+      "psmiles": "[*]C([*])(F)F",
+      "tier": "valid"
+    },
+    {
+      "phase": "test",
+      "interaction_energy_kj_mol": -535.33819007704,
+      "psmiles": "[*]OC([*])=O",
+      "tier": "valid"
+    },
+    {
+      "phase": "test",
+      "interaction_energy_kj_mol": -595.1786072286477,
+      "psmiles": "[*]c1ccc([*])cc1",
+      "tier": "valid"
+    },
+    {
+      "phase": "test",
+      "interaction_energy_kj_mol": -768.188503669975,
+      "psmiles": "[*]CC([*])=O",
+      "tier": "valid"
+    },
+    {
+      "phase": "test",
+      "interaction_energy_kj_mol": -745.5241295582782,
+      "psmiles": "[*]COC[*]",
+      "tier": "valid"
+    },
+    {
+      "phase": "test",
+      "interaction_energy_kj_mol": -267.00801768467386,
+      "psmiles": "[*]C([*])=S",
+      "tier": "valid"
+    },
+    {
+      "phase": "test",
+      "interaction_energy_kj_mol": -292.3317396098332,
+      "psmiles": "[*]CS[*]",
+      "tier": "valid"
+    },
+    {
+      "phase": "test",
+      "interaction_energy_kj_mol": -101.14790304315625,
+      "psmiles": "[*]C[*]",
+      "tier": "valid"
+    },
+    {
+      "phase": "test",
+      "interaction_energy_kj_mol": -449.1930247708069,
+      "psmiles": "[*]CC([*])C",
+      "tier": "valid"
+    },
+    {
+      "phase": "test",
+      "interaction_energy_kj_mol": -149.04531673137535,
+      "psmiles": "[*]C([*])(F)F",
+      "tier": "valid"
+    },
+    {
+      "phase": "test",
+      "interaction_energy_kj_mol": -869.5818704026387,
+      "psmiles": "[*]CCOC([*])=O",
+      "tier": "valid"
+    },
+    {
+      "phase": "test",
+      "interaction_energy_kj_mol": -979.6324007520307,
+      "psmiles": "[*]NC(C)C([*])=O",
+      "tier": "valid"
+    },
+    {
+      "phase": "test",
+      "interaction_energy_kj_mol": -745.5241295582782,
+      "psmiles": "[*]COC[*]",
+      "tier": "valid"
+    },
+    {
+      "phase": "test",
+      "interaction_energy_kj_mol": -500.69559976286837,
+      "psmiles": "[*]NC([*])=O",
+      "tier": "valid"
+    },
+    {
+      "phase": "test",
+      "interaction_energy_kj_mol": -768.188503669975,
+      "psmiles": "[*]CC([*])=O",
+      "tier": "valid"
+    },
+    {
+      "phase": "test",
+      "interaction_energy_kj_mol": -267.00801768467386,
+      "psmiles": "[*]C([*])=S",
+      "tier": "valid"
+    },
+    {
+      "phase": "test",
+      "interaction_energy_kj_mol": -449.1930247708069,
+      "psmiles": "[*]CC([*])C",
+      "tier": "valid"
+    },
+    {
+      "phase": "test",
+      "interaction_energy_kj_mol": -149.04531673137535,
+      "psmiles": "[*]C([*])(F)F",
+      "tier": "valid"
+    },
+    {
+      "phase": "test",
+      "interaction_energy_kj_mol": -979.6324007520307,
+      "psmiles": "[*]NC(C)C([*])=O",
+      "tier": "valid"
+    },
+    {
+      "phase": "test",
+      "interaction_energy_kj_mol": -500.69559976286837,
+      "psmiles": "[*]NC([*])=O",
+      "tier": "valid"
+    },
+    {
+      "phase": "test",
+      "interaction_energy_kj_mol": -768.188503669975,
+      "psmiles": "[*]CC([*])=O",
+      "tier": "valid"
+    },
+    {
+      "phase": "test",
+      "interaction_energy_kj_mol": -869.5818704026387,
+      "psmiles": "[*]CCOC([*])=O",
+      "tier": "valid"
+    },
+    {
+      "phase": "test",
+      "interaction_energy_kj_mol": -267.00801768467386,
+      "psmiles": "[*]C([*])=S",
+      "tier": "valid"
+    },
+    {
+      "phase": "test",
+      "interaction_energy_kj_mol": -535.33819007704,
+      "psmiles": "[*]OC([*])=O",
+      "tier": "valid"
+    },
+    {
+      "phase": "test",
+      "interaction_energy_kj_mol": -535.33819007704,
+      "psmiles": "[*]OC([*])=O",
+      "tier": "valid"
+    },
+    {
+      "phase": "test",
+      "interaction_energy_kj_mol": -768.188503669975,
+      "psmiles": "[*]CC([*])=O",
+      "tier": "valid"
+    },
+    {
+      "phase": "test",
+      "interaction_energy_kj_mol": -267.00801768467386,
+      "psmiles": "[*]C([*])=S",
+      "tier": "valid"
+    },
+    {
+      "phase": "test",
+      "interaction_energy_kj_mol": -504.39333261938555,
+      "psmiles": "[*]CC([*])O",
+      "tier": "valid"
+    },
+    {
+      "phase": "test",
+      "interaction_energy_kj_mol": -101.14790304315625,
+      "psmiles": "[*]C[*]",
+      "tier": "valid"
+    },
+    {
+      "phase": "test",
+      "interaction_energy_kj_mol": -1412.3081269684553,
+      "psmiles": "[*]CCC(=O)C([*])=O",
+      "tier": "target"
+    },
+    {
+      "phase": "test",
+      "interaction_energy_kj_mol": -500.69559976286837,
+      "psmiles": "[*]NC([*])=O",
+      "tier": "valid"
+    },
+    {
+      "phase": "test",
+      "interaction_energy_kj_mol": -535.33819007704,
+      "psmiles": "[*]OC([*])=O",
+      "tier": "valid"
+    },
+    {
+      "phase": "test",
+      "interaction_energy_kj_mol": -101.14790304315625,
+      "psmiles": "[*]C[*]",
+      "tier": "valid"
+    },
+    {
+      "phase": "test",
+      "interaction_energy_kj_mol": -149.04531673137535,
+      "psmiles": "[*]C([*])(F)F",
+      "tier": "valid"
+    },
+    {
+      "phase": "test",
+      "interaction_energy_kj_mol": -292.3317396098332,
+      "psmiles": "[*]CS[*]",
+      "tier": "valid"
+    },
+    {
+      "phase": "test",
+      "interaction_energy_kj_mol": -1412.3081269684553,
+      "psmiles": "[*]CCC(=O)C([*])=O",
+      "tier": "target"
+    },
+    {
+      "phase": "test",
+      "interaction_energy_kj_mol": -149.04531673137535,
+      "psmiles": "[*]C([*])(F)F",
+      "tier": "valid"
+    },
+    {
+      "phase": "test",
+      "interaction_energy_kj_mol": -500.69559976286837,
+      "psmiles": "[*]NC([*])=O",
+      "tier": "valid"
+    },
+    {
+      "phase": "test",
+      "interaction_energy_kj_mol": -979.6324007520307,
+      "psmiles": "[*]NC(C)C([*])=O",
+      "tier": "valid"
+    },
+    {
+      "phase": "test",
+      "interaction_energy_kj_mol": -1412.3081269684553,
+      "psmiles": "[*]CCC(=O)C([*])=O",
+      "tier": "target"
+    },
+    {
+      "phase": "test",
+      "interaction_energy_kj_mol": -101.14790304315625,
+      "psmiles": "[*]C[*]",
+      "tier": "valid"
+    },
+    {
+      "phase": "test",
+      "interaction_energy_kj_mol": -535.33819007704,
+      "psmiles": "[*]OC([*])=O",
+      "tier": "valid"
+    },
+    {
+      "phase": "test",
+      "interaction_energy_kj_mol": -500.69559976286837,
+      "psmiles": "[*]NC([*])=O",
+      "tier": "valid"
+    },
+    {
+      "phase": "test",
+      "interaction_energy_kj_mol": -745.5241295582782,
+      "psmiles": "[*]COC[*]",
+      "tier": "valid"
+    },
+    {
+      "phase": "test",
+      "interaction_energy_kj_mol": -292.3317396098332,
+      "psmiles": "[*]CS[*]",
+      "tier": "valid"
+    },
+    {
+      "phase": "test",
+      "interaction_energy_kj_mol": -535.33819007704,
+      "psmiles": "[*]OC([*])=O",
+      "tier": "valid"
+    },
+    {
+      "phase": "test",
+      "interaction_energy_kj_mol": -449.1930247708069,
+      "psmiles": "[*]CC([*])C",
+      "tier": "valid"
+    },
+    {
+      "phase": "test",
+      "interaction_energy_kj_mol": -1412.3081269684553,
+      "psmiles": "[*]CCC(=O)C([*])=O",
+      "tier": "target"
+    },
+    {
+      "phase": "test",
+      "interaction_energy_kj_mol": -101.14790304315625,
+      "psmiles": "[*]C[*]",
+      "tier": "valid"
+    },
+    {
+      "phase": "test",
+      "interaction_energy_kj_mol": -768.188503669975,
+      "psmiles": "[*]CC([*])=O",
+      "tier": "valid"
+    },
+    {
+      "phase": "test",
+      "interaction_energy_kj_mol": -500.69559976286837,
+      "psmiles": "[*]NC([*])=O",
+      "tier": "valid"
+    },
+    {
+      "phase": "test",
+      "interaction_energy_kj_mol": -869.5818704026387,
+      "psmiles": "[*]CCOC([*])=O",
+      "tier": "valid"
+    },
+    {
+      "phase": "test",
+      "interaction_energy_kj_mol": -149.04531673137535,
+      "psmiles": "[*]C([*])(F)F",
+      "tier": "valid"
+    },
+    {
+      "phase": "test",
+      "interaction_energy_kj_mol": -500.69559976286837,
+      "psmiles": "[*]NC([*])=O",
+      "tier": "valid"
+    },
+    {
+      "phase": "test",
+      "interaction_energy_kj_mol": -979.6324007520307,
+      "psmiles": "[*]NC(C)C([*])=O",
+      "tier": "valid"
+    },
+    {
+      "phase": "test",
+      "interaction_energy_kj_mol": -267.00801768467386,
+      "psmiles": "[*]C([*])=S",
+      "tier": "valid"
+    },
+    {
+      "phase": "test",
+      "interaction_energy_kj_mol": -292.3317396098332,
+      "psmiles": "[*]CS[*]",
+      "tier": "valid"
+    },
+    {
+      "phase": "test",
+      "interaction_energy_kj_mol": -101.14790304315625,
+      "psmiles": "[*]C[*]",
+      "tier": "valid"
+    },
+    {
+      "phase": "test",
+      "interaction_energy_kj_mol": -504.39333261938555,
+      "psmiles": "[*]CC([*])O",
+      "tier": "valid"
+    },
+    {
+      "phase": "test",
+      "interaction_energy_kj_mol": -149.04531673137535,
+      "psmiles": "[*]C([*])(F)F",
+      "tier": "valid"
+    },
+    {
+      "phase": "test",
+      "interaction_energy_kj_mol": -595.1786072286477,
+      "psmiles": "[*]c1ccc([*])cc1",
+      "tier": "valid"
+    },
+    {
+      "phase": "test",
+      "interaction_energy_kj_mol": -535.33819007704,
+      "psmiles": "[*]OC([*])=O",
+      "tier": "valid"
+    },
+    {
+      "phase": "test",
+      "interaction_energy_kj_mol": -979.6324007520307,
+      "psmiles": "[*]NC(C)C([*])=O",
+      "tier": "valid"
+    },
+    {
+      "phase": "test",
+      "interaction_energy_kj_mol": -535.33819007704,
+      "psmiles": "[*]OC([*])=O",
+      "tier": "valid"
+    },
+    {
+      "phase": "test",
+      "interaction_energy_kj_mol": -745.5241295582782,
+      "psmiles": "[*]COC[*]",
+      "tier": "valid"
+    },
+    {
+      "phase": "test",
+      "interaction_energy_kj_mol": -869.5818704026387,
+      "psmiles": "[*]CCOC([*])=O",
+      "tier": "valid"
+    },
+    {
+      "phase": "test",
+      "interaction_energy_kj_mol": -149.04531673137535,
+      "psmiles": "[*]C([*])(F)F",
+      "tier": "valid"
+    },
+    {
+      "phase": "test",
+      "interaction_energy_kj_mol": -1412.3081269684553,
+      "psmiles": "[*]CCC(=O)C([*])=O",
+      "tier": "target"
+    },
+    {
+      "phase": "test",
+      "interaction_energy_kj_mol": -979.6324007520307,
+      "psmiles": "[*]NC(C)C([*])=O",
+      "tier": "valid"
+    },
+    {
+      "phase": "test",
+      "interaction_energy_kj_mol": -1412.3081269684553,
+      "psmiles": "[*]CCC(=O)C([*])=O",
+      "tier": "target"
+    },
+    {
+      "phase": "test",
+      "interaction_energy_kj_mol": -500.69559976286837,
+      "psmiles": "[*]NC([*])=O",
+      "tier": "valid"
+    },
+    {
+      "phase": "test",
+      "interaction_energy_kj_mol": -595.1786072286477,
+      "psmiles": "[*]c1ccc([*])cc1",
+      "tier": "valid"
+    },
+    {
+      "phase": "test",
+      "interaction_energy_kj_mol": -149.04531673137535,
+      "psmiles": "[*]C([*])(F)F",
+      "tier": "valid"
+    },
+    {
+      "phase": "test",
+      "interaction_energy_kj_mol": -535.33819007704,
+      "psmiles": "[*]OC([*])=O",
+      "tier": "valid"
+    },
+    {
+      "phase": "test",
+      "interaction_energy_kj_mol": -449.1930247708069,
+      "psmiles": "[*]CC([*])C",
+      "tier": "valid"
+    },
+    {
+      "phase": "test",
+      "interaction_energy_kj_mol": -500.69559976286837,
+      "psmiles": "[*]NC([*])=O",
+      "tier": "valid"
+    },
+    {
+      "phase": "test",
+      "interaction_energy_kj_mol": -595.1786072286477,
+      "psmiles": "[*]c1ccc([*])cc1",
+      "tier": "valid"
+    },
+    {
+      "phase": "test",
+      "interaction_energy_kj_mol": -292.3317396098332,
+      "psmiles": "[*]CS[*]",
+      "tier": "valid"
+    },
+    {
+      "phase": "test",
+      "interaction_energy_kj_mol": -745.5241295582782,
+      "psmiles": "[*]COC[*]",
+      "tier": "valid"
+    },
+    {
+      "phase": "test",
+      "interaction_energy_kj_mol": -1412.3081269684553,
+      "psmiles": "[*]CCC(=O)C([*])=O",
+      "tier": "target"
+    },
+    {
+      "phase": "test",
+      "interaction_energy_kj_mol": -101.14790304315625,
+      "psmiles": "[*]C[*]",
+      "tier": "valid"
+    },
+    {
+      "phase": "test",
+      "interaction_energy_kj_mol": -869.5818704026387,
+      "psmiles": "[*]CCOC([*])=O",
+      "tier": "valid"
+    },
+    {
+      "phase": "test",
+      "interaction_energy_kj_mol": -504.39333261938555,
+      "psmiles": "[*]CC([*])O",
+      "tier": "valid"
+    },
+    {
+      "phase": "test",
+      "interaction_energy_kj_mol": -449.1930247708069,
+      "psmiles": "[*]CC([*])C",
+      "tier": "valid"
+    },
+    {
+      "phase": "test",
+      "interaction_energy_kj_mol": -292.3317396098332,
+      "psmiles": "[*]CS[*]",
+      "tier": "valid"
+    },
+    {
+      "phase": "test",
+      "interaction_energy_kj_mol": -500.69559976286837,
+      "psmiles": "[*]NC([*])=O",
+      "tier": "valid"
+    }
+  ],
+  "rl_step_progress_trace": [
+    {
+      "phase": "train",
+      "global_step": 1,
+      "running_best_interaction_energy_kj_mol": -393.71768162978697
+    },
+    {
+      "phase": "train",
+      "global_step": 2,
+      "running_best_interaction_energy_kj_mol": -701.5036341705672
+    },
+    {
+      "phase": "train",
+      "global_step": 3,
+      "running_best_interaction_energy_kj_mol": -701.5036341705672
+    },
+    {
+      "phase": "train",
+      "global_step": 4,
+      "running_best_interaction_energy_kj_mol": -701.5036341705672
+    },
+    {
+      "phase": "train",
+      "global_step": 5,
+      "running_best_interaction_energy_kj_mol": -701.5036341705672
+    },
+    {
+      "phase": "train",
+      "global_step": 6,
+      "running_best_interaction_energy_kj_mol": -701.5036341705672
+    },
+    {
+      "phase": "train",
+      "global_step": 7,
+      "running_best_interaction_energy_kj_mol": -701.5036341705672
+    },
+    {
+      "phase": "train",
+      "global_step": 8,
+      "running_best_interaction_energy_kj_mol": -1134.9437845094799
+    },
+    {
+      "phase": "train",
+      "global_step": 9,
+      "running_best_interaction_energy_kj_mol": -1134.9437845094799
+    },
+    {
+      "phase": "train",
+      "global_step": 10,
+      "running_best_interaction_energy_kj_mol": -1134.9437845094799
+    },
+    {
+      "phase": "train",
+      "global_step": 11,
+      "running_best_interaction_energy_kj_mol": -1134.9437845094799
+    },
+    {
+      "phase": "train",
+      "global_step": 12,
+      "running_best_interaction_energy_kj_mol": -1134.9437845094799
+    },
+    {
+      "phase": "train",
+      "global_step": 13,
+      "running_best_interaction_energy_kj_mol": -1134.9437845094799
+    },
+    {
+      "phase": "train",
+      "global_step": 14,
+      "running_best_interaction_energy_kj_mol": -1134.9437845094799
+    },
+    {
+      "phase": "train",
+      "global_step": 15,
+      "running_best_interaction_energy_kj_mol": -1134.9437845094799
+    },
+    {
+      "phase": "train",
+      "global_step": 16,
+      "running_best_interaction_energy_kj_mol": -1134.9437845094799
+    },
+    {
+      "phase": "train",
+      "global_step": 17,
+      "running_best_interaction_energy_kj_mol": -1134.9437845094799
+    },
+    {
+      "phase": "train",
+      "global_step": 18,
+      "running_best_interaction_energy_kj_mol": -1134.9437845094799
+    },
+    {
+      "phase": "train",
+      "global_step": 19,
+      "running_best_interaction_energy_kj_mol": -1134.9437845094799
+    },
+    {
+      "phase": "train",
+      "global_step": 20,
+      "running_best_interaction_energy_kj_mol": -1134.9437845094799
+    },
+    {
+      "phase": "train",
+      "global_step": 21,
+      "running_best_interaction_energy_kj_mol": -1134.9437845094799
+    },
+    {
+      "phase": "train",
+      "global_step": 22,
+      "running_best_interaction_energy_kj_mol": -1134.9437845094799
+    },
+    {
+      "phase": "train",
+      "global_step": 23,
+      "running_best_interaction_energy_kj_mol": -1134.9437845094799
+    },
+    {
+      "phase": "train",
+      "global_step": 24,
+      "running_best_interaction_energy_kj_mol": -1134.9437845094799
+    },
+    {
+      "phase": "train",
+      "global_step": 25,
+      "running_best_interaction_energy_kj_mol": -1134.9437845094799
+    },
+    {
+      "phase": "train",
+      "global_step": 26,
+      "running_best_interaction_energy_kj_mol": -1134.9437845094799
+    },
+    {
+      "phase": "train",
+      "global_step": 27,
+      "running_best_interaction_energy_kj_mol": -1134.9437845094799
+    },
+    {
+      "phase": "train",
+      "global_step": 28,
+      "running_best_interaction_energy_kj_mol": -1134.9437845094799
+    },
+    {
+      "phase": "train",
+      "global_step": 29,
+      "running_best_interaction_energy_kj_mol": -1134.9437845094799
+    },
+    {
+      "phase": "train",
+      "global_step": 30,
+      "running_best_interaction_energy_kj_mol": -1134.9437845094799
+    },
+    {
+      "phase": "train",
+      "global_step": 31,
+      "running_best_interaction_energy_kj_mol": -1134.9437845094799
+    },
+    {
+      "phase": "train",
+      "global_step": 32,
+      "running_best_interaction_energy_kj_mol": -1134.9437845094799
+    },
+    {
+      "phase": "train",
+      "global_step": 33,
+      "running_best_interaction_energy_kj_mol": -1134.9437845094799
+    },
+    {
+      "phase": "train",
+      "global_step": 34,
+      "running_best_interaction_energy_kj_mol": -1134.9437845094799
+    },
+    {
+      "phase": "train",
+      "global_step": 35,
+      "running_best_interaction_energy_kj_mol": -1134.9437845094799
+    },
+    {
+      "phase": "train",
+      "global_step": 36,
+      "running_best_interaction_energy_kj_mol": -1134.9437845094799
+    },
+    {
+      "phase": "train",
+      "global_step": 37,
+      "running_best_interaction_energy_kj_mol": -1134.9437845094799
+    },
+    {
+      "phase": "train",
+      "global_step": 38,
+      "running_best_interaction_energy_kj_mol": -1134.9437845094799
+    },
+    {
+      "phase": "train",
+      "global_step": 39,
+      "running_best_interaction_energy_kj_mol": -1134.9437845094799
+    },
+    {
+      "phase": "train",
+      "global_step": 40,
+      "running_best_interaction_energy_kj_mol": -1134.9437845094799
+    },
+    {
+      "phase": "train",
+      "global_step": 41,
+      "running_best_interaction_energy_kj_mol": -1134.9437845094799
+    },
+    {
+      "phase": "train",
+      "global_step": 42,
+      "running_best_interaction_energy_kj_mol": -1134.9437845094799
+    },
+    {
+      "phase": "train",
+      "global_step": 43,
+      "running_best_interaction_energy_kj_mol": -1134.9437845094799
+    },
+    {
+      "phase": "train",
+      "global_step": 44,
+      "running_best_interaction_energy_kj_mol": -1134.9437845094799
+    },
+    {
+      "phase": "train",
+      "global_step": 45,
+      "running_best_interaction_energy_kj_mol": -1134.9437845094799
+    },
+    {
+      "phase": "train",
+      "global_step": 46,
+      "running_best_interaction_energy_kj_mol": -1134.9437845094799
+    },
+    {
+      "phase": "train",
+      "global_step": 47,
+      "running_best_interaction_energy_kj_mol": -1134.9437845094799
+    },
+    {
+      "phase": "train",
+      "global_step": 48,
+      "running_best_interaction_energy_kj_mol": -1134.9437845094799
+    },
+    {
+      "phase": "train",
+      "global_step": 49,
+      "running_best_interaction_energy_kj_mol": -1134.9437845094799
+    },
+    {
+      "phase": "train",
+      "global_step": 50,
+      "running_best_interaction_energy_kj_mol": -1134.9437845094799
+    },
+    {
+      "phase": "train",
+      "global_step": 51,
+      "running_best_interaction_energy_kj_mol": -1134.9437845094799
+    },
+    {
+      "phase": "train",
+      "global_step": 52,
+      "running_best_interaction_energy_kj_mol": -1134.9437845094799
+    },
+    {
+      "phase": "train",
+      "global_step": 53,
+      "running_best_interaction_energy_kj_mol": -1134.9437845094799
+    },
+    {
+      "phase": "train",
+      "global_step": 54,
+      "running_best_interaction_energy_kj_mol": -1134.9437845094799
+    },
+    {
+      "phase": "train",
+      "global_step": 55,
+      "running_best_interaction_energy_kj_mol": -1134.9437845094799
+    },
+    {
+      "phase": "train",
+      "global_step": 56,
+      "running_best_interaction_energy_kj_mol": -1134.9437845094799
+    },
+    {
+      "phase": "train",
+      "global_step": 57,
+      "running_best_interaction_energy_kj_mol": -1134.9437845094799
+    },
+    {
+      "phase": "train",
+      "global_step": 58,
+      "running_best_interaction_energy_kj_mol": -1134.9437845094799
+    },
+    {
+      "phase": "train",
+      "global_step": 59,
+      "running_best_interaction_energy_kj_mol": -1134.9437845094799
+    },
+    {
+      "phase": "train",
+      "global_step": 60,
+      "running_best_interaction_energy_kj_mol": -1134.9437845094799
+    },
+    {
+      "phase": "train",
+      "global_step": 61,
+      "running_best_interaction_energy_kj_mol": -1134.9437845094799
+    },
+    {
+      "phase": "train",
+      "global_step": 62,
+      "running_best_interaction_energy_kj_mol": -1134.9437845094799
+    },
+    {
+      "phase": "train",
+      "global_step": 63,
+      "running_best_interaction_energy_kj_mol": -1134.9437845094799
+    },
+    {
+      "phase": "train",
+      "global_step": 64,
+      "running_best_interaction_energy_kj_mol": -1134.9437845094799
+    },
+    {
+      "phase": "train",
+      "global_step": 65,
+      "running_best_interaction_energy_kj_mol": -1134.9437845094799
+    },
+    {
+      "phase": "train",
+      "global_step": 66,
+      "running_best_interaction_energy_kj_mol": -1134.9437845094799
+    },
+    {
+      "phase": "train",
+      "global_step": 67,
+      "running_best_interaction_energy_kj_mol": -1134.9437845094799
+    },
+    {
+      "phase": "train",
+      "global_step": 68,
+      "running_best_interaction_energy_kj_mol": -1134.9437845094799
+    },
+    {
+      "phase": "train",
+      "global_step": 69,
+      "running_best_interaction_energy_kj_mol": -1134.9437845094799
+    },
+    {
+      "phase": "train",
+      "global_step": 70,
+      "running_best_interaction_energy_kj_mol": -1134.9437845094799
+    },
+    {
+      "phase": "train",
+      "global_step": 71,
+      "running_best_interaction_energy_kj_mol": -1134.9437845094799
+    },
+    {
+      "phase": "train",
+      "global_step": 72,
+      "running_best_interaction_energy_kj_mol": -1134.9437845094799
+    },
+    {
+      "phase": "train",
+      "global_step": 73,
+      "running_best_interaction_energy_kj_mol": -1134.9437845094799
+    },
+    {
+      "phase": "train",
+      "global_step": 74,
+      "running_best_interaction_energy_kj_mol": -1134.9437845094799
+    },
+    {
+      "phase": "train",
+      "global_step": 75,
+      "running_best_interaction_energy_kj_mol": -1134.9437845094799
+    },
+    {
+      "phase": "train",
+      "global_step": 76,
+      "running_best_interaction_energy_kj_mol": -1134.9437845094799
+    },
+    {
+      "phase": "train",
+      "global_step": 77,
+      "running_best_interaction_energy_kj_mol": -1370.256452378002
+    },
+    {
+      "phase": "train",
+      "global_step": 78,
+      "running_best_interaction_energy_kj_mol": -1370.256452378002
+    },
+    {
+      "phase": "train",
+      "global_step": 79,
+      "running_best_interaction_energy_kj_mol": -1370.256452378002
+    },
+    {
+      "phase": "train",
+      "global_step": 80,
+      "running_best_interaction_energy_kj_mol": -1370.256452378002
+    },
+    {
+      "phase": "train",
+      "global_step": 81,
+      "running_best_interaction_energy_kj_mol": -1370.256452378002
+    },
+    {
+      "phase": "train",
+      "global_step": 82,
+      "running_best_interaction_energy_kj_mol": -1370.256452378002
+    },
+    {
+      "phase": "train",
+      "global_step": 83,
+      "running_best_interaction_energy_kj_mol": -1370.256452378002
+    },
+    {
+      "phase": "train",
+      "global_step": 84,
+      "running_best_interaction_energy_kj_mol": -1370.256452378002
+    },
+    {
+      "phase": "train",
+      "global_step": 85,
+      "running_best_interaction_energy_kj_mol": -1370.256452378002
+    },
+    {
+      "phase": "train",
+      "global_step": 86,
+      "running_best_interaction_energy_kj_mol": -1370.256452378002
+    },
+    {
+      "phase": "train",
+      "global_step": 87,
+      "running_best_interaction_energy_kj_mol": -1370.256452378002
+    },
+    {
+      "phase": "train",
+      "global_step": 88,
+      "running_best_interaction_energy_kj_mol": -1370.256452378002
+    },
+    {
+      "phase": "train",
+      "global_step": 89,
+      "running_best_interaction_energy_kj_mol": -1370.256452378002
+    },
+    {
+      "phase": "train",
+      "global_step": 90,
+      "running_best_interaction_energy_kj_mol": -1370.256452378002
+    },
+    {
+      "phase": "train",
+      "global_step": 91,
+      "running_best_interaction_energy_kj_mol": -1370.256452378002
+    },
+    {
+      "phase": "train",
+      "global_step": 92,
+      "running_best_interaction_energy_kj_mol": -1370.256452378002
+    },
+    {
+      "phase": "train",
+      "global_step": 93,
+      "running_best_interaction_energy_kj_mol": -1370.256452378002
+    },
+    {
+      "phase": "train",
+      "global_step": 94,
+      "running_best_interaction_energy_kj_mol": -1370.256452378002
+    },
+    {
+      "phase": "train",
+      "global_step": 95,
+      "running_best_interaction_energy_kj_mol": -1370.256452378002
+    },
+    {
+      "phase": "train",
+      "global_step": 96,
+      "running_best_interaction_energy_kj_mol": -1370.256452378002
+    },
+    {
+      "phase": "train",
+      "global_step": 97,
+      "running_best_interaction_energy_kj_mol": -1370.256452378002
+    },
+    {
+      "phase": "train",
+      "global_step": 98,
+      "running_best_interaction_energy_kj_mol": -1370.256452378002
+    },
+    {
+      "phase": "train",
+      "global_step": 99,
+      "running_best_interaction_energy_kj_mol": -1370.256452378002
+    },
+    {
+      "phase": "train",
+      "global_step": 100,
+      "running_best_interaction_energy_kj_mol": -1370.256452378002
+    },
+    {
+      "phase": "train",
+      "global_step": 101,
+      "running_best_interaction_energy_kj_mol": -1370.256452378002
+    },
+    {
+      "phase": "train",
+      "global_step": 102,
+      "running_best_interaction_energy_kj_mol": -1370.256452378002
+    },
+    {
+      "phase": "train",
+      "global_step": 103,
+      "running_best_interaction_energy_kj_mol": -1370.256452378002
+    },
+    {
+      "phase": "train",
+      "global_step": 104,
+      "running_best_interaction_energy_kj_mol": -1370.256452378002
+    },
+    {
+      "phase": "train",
+      "global_step": 105,
+      "running_best_interaction_energy_kj_mol": -1370.256452378002
+    },
+    {
+      "phase": "train",
+      "global_step": 106,
+      "running_best_interaction_energy_kj_mol": -1370.256452378002
+    },
+    {
+      "phase": "train",
+      "global_step": 107,
+      "running_best_interaction_energy_kj_mol": -1370.256452378002
+    },
+    {
+      "phase": "train",
+      "global_step": 108,
+      "running_best_interaction_energy_kj_mol": -1370.256452378002
+    },
+    {
+      "phase": "train",
+      "global_step": 109,
+      "running_best_interaction_energy_kj_mol": -1370.256452378002
+    },
+    {
+      "phase": "train",
+      "global_step": 110,
+      "running_best_interaction_energy_kj_mol": -1370.256452378002
+    },
+    {
+      "phase": "train",
+      "global_step": 111,
+      "running_best_interaction_energy_kj_mol": -1370.256452378002
+    },
+    {
+      "phase": "train",
+      "global_step": 112,
+      "running_best_interaction_energy_kj_mol": -1370.256452378002
+    },
+    {
+      "phase": "train",
+      "global_step": 113,
+      "running_best_interaction_energy_kj_mol": -1370.256452378002
+    },
+    {
+      "phase": "train",
+      "global_step": 114,
+      "running_best_interaction_energy_kj_mol": -1370.256452378002
+    },
+    {
+      "phase": "train",
+      "global_step": 115,
+      "running_best_interaction_energy_kj_mol": -1370.256452378002
+    },
+    {
+      "phase": "train",
+      "global_step": 116,
+      "running_best_interaction_energy_kj_mol": -1370.256452378002
+    },
+    {
+      "phase": "train",
+      "global_step": 117,
+      "running_best_interaction_energy_kj_mol": -1370.256452378002
+    },
+    {
+      "phase": "train",
+      "global_step": 118,
+      "running_best_interaction_energy_kj_mol": -1370.256452378002
+    },
+    {
+      "phase": "train",
+      "global_step": 119,
+      "running_best_interaction_energy_kj_mol": -1370.256452378002
+    },
+    {
+      "phase": "train",
+      "global_step": 120,
+      "running_best_interaction_energy_kj_mol": -1370.256452378002
+    },
+    {
+      "phase": "train",
+      "global_step": 121,
+      "running_best_interaction_energy_kj_mol": -1370.256452378002
+    },
+    {
+      "phase": "train",
+      "global_step": 122,
+      "running_best_interaction_energy_kj_mol": -1370.256452378002
+    },
+    {
+      "phase": "train",
+      "global_step": 123,
+      "running_best_interaction_energy_kj_mol": -1370.256452378002
+    },
+    {
+      "phase": "train",
+      "global_step": 124,
+      "running_best_interaction_energy_kj_mol": -1370.256452378002
+    },
+    {
+      "phase": "train",
+      "global_step": 125,
+      "running_best_interaction_energy_kj_mol": -1370.256452378002
+    },
+    {
+      "phase": "train",
+      "global_step": 126,
+      "running_best_interaction_energy_kj_mol": -1370.256452378002
+    },
+    {
+      "phase": "train",
+      "global_step": 127,
+      "running_best_interaction_energy_kj_mol": -1370.256452378002
+    },
+    {
+      "phase": "train",
+      "global_step": 128,
+      "running_best_interaction_energy_kj_mol": -1370.256452378002
+    },
+    {
+      "phase": "train",
+      "global_step": 129,
+      "running_best_interaction_energy_kj_mol": -1370.256452378002
+    },
+    {
+      "phase": "train",
+      "global_step": 130,
+      "running_best_interaction_energy_kj_mol": -1370.256452378002
+    },
+    {
+      "phase": "train",
+      "global_step": 131,
+      "running_best_interaction_energy_kj_mol": -1370.256452378002
+    },
+    {
+      "phase": "train",
+      "global_step": 132,
+      "running_best_interaction_energy_kj_mol": -1370.256452378002
+    },
+    {
+      "phase": "train",
+      "global_step": 133,
+      "running_best_interaction_energy_kj_mol": -1370.256452378002
+    },
+    {
+      "phase": "train",
+      "global_step": 134,
+      "running_best_interaction_energy_kj_mol": -1370.256452378002
+    },
+    {
+      "phase": "train",
+      "global_step": 135,
+      "running_best_interaction_energy_kj_mol": -1370.256452378002
+    },
+    {
+      "phase": "train",
+      "global_step": 136,
+      "running_best_interaction_energy_kj_mol": -1370.256452378002
+    },
+    {
+      "phase": "train",
+      "global_step": 137,
+      "running_best_interaction_energy_kj_mol": -1370.256452378002
+    },
+    {
+      "phase": "train",
+      "global_step": 138,
+      "running_best_interaction_energy_kj_mol": -1370.256452378002
+    },
+    {
+      "phase": "train",
+      "global_step": 139,
+      "running_best_interaction_energy_kj_mol": -1370.256452378002
+    },
+    {
+      "phase": "train",
+      "global_step": 140,
+      "running_best_interaction_energy_kj_mol": -1370.256452378002
+    },
+    {
+      "phase": "train",
+      "global_step": 141,
+      "running_best_interaction_energy_kj_mol": -1370.256452378002
+    },
+    {
+      "phase": "train",
+      "global_step": 142,
+      "running_best_interaction_energy_kj_mol": -1370.256452378002
+    },
+    {
+      "phase": "train",
+      "global_step": 143,
+      "running_best_interaction_energy_kj_mol": -1370.256452378002
+    },
+    {
+      "phase": "train",
+      "global_step": 144,
+      "running_best_interaction_energy_kj_mol": -1370.256452378002
+    },
+    {
+      "phase": "train",
+      "global_step": 145,
+      "running_best_interaction_energy_kj_mol": -1370.256452378002
+    },
+    {
+      "phase": "train",
+      "global_step": 146,
+      "running_best_interaction_energy_kj_mol": -1370.256452378002
+    },
+    {
+      "phase": "train",
+      "global_step": 147,
+      "running_best_interaction_energy_kj_mol": -1370.256452378002
+    },
+    {
+      "phase": "train",
+      "global_step": 148,
+      "running_best_interaction_energy_kj_mol": -1370.256452378002
+    },
+    {
+      "phase": "train",
+      "global_step": 149,
+      "running_best_interaction_energy_kj_mol": -1370.256452378002
+    },
+    {
+      "phase": "train",
+      "global_step": 150,
+      "running_best_interaction_energy_kj_mol": -1370.256452378002
+    },
+    {
+      "phase": "train",
+      "global_step": 151,
+      "running_best_interaction_energy_kj_mol": -1370.256452378002
+    },
+    {
+      "phase": "train",
+      "global_step": 152,
+      "running_best_interaction_energy_kj_mol": -1370.256452378002
+    },
+    {
+      "phase": "train",
+      "global_step": 153,
+      "running_best_interaction_energy_kj_mol": -1370.256452378002
+    },
+    {
+      "phase": "train",
+      "global_step": 154,
+      "running_best_interaction_energy_kj_mol": -1370.256452378002
+    },
+    {
+      "phase": "train",
+      "global_step": 155,
+      "running_best_interaction_energy_kj_mol": -1370.256452378002
+    },
+    {
+      "phase": "train",
+      "global_step": 156,
+      "running_best_interaction_energy_kj_mol": -1370.256452378002
+    },
+    {
+      "phase": "train",
+      "global_step": 157,
+      "running_best_interaction_energy_kj_mol": -1370.256452378002
+    },
+    {
+      "phase": "train",
+      "global_step": 158,
+      "running_best_interaction_energy_kj_mol": -1370.256452378002
+    },
+    {
+      "phase": "train",
+      "global_step": 159,
+      "running_best_interaction_energy_kj_mol": -1370.256452378002
+    },
+    {
+      "phase": "train",
+      "global_step": 160,
+      "running_best_interaction_energy_kj_mol": -1370.256452378002
+    },
+    {
+      "phase": "test",
+      "global_step": 161,
+      "running_best_interaction_energy_kj_mol": -1370.256452378002
+    },
+    {
+      "phase": "test",
+      "global_step": 162,
+      "running_best_interaction_energy_kj_mol": -1370.256452378002
+    },
+    {
+      "phase": "test",
+      "global_step": 163,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    },
+    {
+      "phase": "test",
+      "global_step": 164,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    },
+    {
+      "phase": "test",
+      "global_step": 165,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    },
+    {
+      "phase": "test",
+      "global_step": 166,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    },
+    {
+      "phase": "test",
+      "global_step": 167,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    },
+    {
+      "phase": "test",
+      "global_step": 168,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    },
+    {
+      "phase": "test",
+      "global_step": 169,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    },
+    {
+      "phase": "test",
+      "global_step": 170,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    },
+    {
+      "phase": "test",
+      "global_step": 171,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    },
+    {
+      "phase": "test",
+      "global_step": 172,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    },
+    {
+      "phase": "test",
+      "global_step": 173,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    },
+    {
+      "phase": "test",
+      "global_step": 174,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    },
+    {
+      "phase": "test",
+      "global_step": 175,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    },
+    {
+      "phase": "test",
+      "global_step": 176,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    },
+    {
+      "phase": "test",
+      "global_step": 177,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    },
+    {
+      "phase": "test",
+      "global_step": 178,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    },
+    {
+      "phase": "test",
+      "global_step": 179,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    },
+    {
+      "phase": "test",
+      "global_step": 180,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    },
+    {
+      "phase": "test",
+      "global_step": 181,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    },
+    {
+      "phase": "test",
+      "global_step": 182,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    },
+    {
+      "phase": "test",
+      "global_step": 183,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    },
+    {
+      "phase": "test",
+      "global_step": 184,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    },
+    {
+      "phase": "test",
+      "global_step": 185,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    },
+    {
+      "phase": "test",
+      "global_step": 186,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    },
+    {
+      "phase": "test",
+      "global_step": 187,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    },
+    {
+      "phase": "test",
+      "global_step": 188,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    },
+    {
+      "phase": "test",
+      "global_step": 189,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    },
+    {
+      "phase": "test",
+      "global_step": 190,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    },
+    {
+      "phase": "test",
+      "global_step": 191,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    },
+    {
+      "phase": "test",
+      "global_step": 192,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    },
+    {
+      "phase": "test",
+      "global_step": 193,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    },
+    {
+      "phase": "test",
+      "global_step": 194,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    },
+    {
+      "phase": "test",
+      "global_step": 195,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    },
+    {
+      "phase": "test",
+      "global_step": 196,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    },
+    {
+      "phase": "test",
+      "global_step": 197,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    },
+    {
+      "phase": "test",
+      "global_step": 198,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    },
+    {
+      "phase": "test",
+      "global_step": 199,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    },
+    {
+      "phase": "test",
+      "global_step": 200,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    },
+    {
+      "phase": "test",
+      "global_step": 201,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    },
+    {
+      "phase": "test",
+      "global_step": 202,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    },
+    {
+      "phase": "test",
+      "global_step": 203,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    },
+    {
+      "phase": "test",
+      "global_step": 204,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    },
+    {
+      "phase": "test",
+      "global_step": 205,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    },
+    {
+      "phase": "test",
+      "global_step": 206,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    },
+    {
+      "phase": "test",
+      "global_step": 207,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    },
+    {
+      "phase": "test",
+      "global_step": 208,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    },
+    {
+      "phase": "test",
+      "global_step": 209,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    },
+    {
+      "phase": "test",
+      "global_step": 210,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    },
+    {
+      "phase": "test",
+      "global_step": 211,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    },
+    {
+      "phase": "test",
+      "global_step": 212,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    },
+    {
+      "phase": "test",
+      "global_step": 213,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    },
+    {
+      "phase": "test",
+      "global_step": 214,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    },
+    {
+      "phase": "test",
+      "global_step": 215,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    },
+    {
+      "phase": "test",
+      "global_step": 216,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    },
+    {
+      "phase": "test",
+      "global_step": 217,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    },
+    {
+      "phase": "test",
+      "global_step": 218,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    },
+    {
+      "phase": "test",
+      "global_step": 219,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    },
+    {
+      "phase": "test",
+      "global_step": 220,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    },
+    {
+      "phase": "test",
+      "global_step": 221,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    },
+    {
+      "phase": "test",
+      "global_step": 222,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    },
+    {
+      "phase": "test",
+      "global_step": 223,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    },
+    {
+      "phase": "test",
+      "global_step": 224,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    },
+    {
+      "phase": "test",
+      "global_step": 225,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    },
+    {
+      "phase": "test",
+      "global_step": 226,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    },
+    {
+      "phase": "test",
+      "global_step": 227,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    },
+    {
+      "phase": "test",
+      "global_step": 228,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    },
+    {
+      "phase": "test",
+      "global_step": 229,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    },
+    {
+      "phase": "test",
+      "global_step": 230,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    },
+    {
+      "phase": "test",
+      "global_step": 231,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    },
+    {
+      "phase": "test",
+      "global_step": 232,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    },
+    {
+      "phase": "test",
+      "global_step": 233,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    },
+    {
+      "phase": "test",
+      "global_step": 234,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    },
+    {
+      "phase": "test",
+      "global_step": 235,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    },
+    {
+      "phase": "test",
+      "global_step": 236,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    },
+    {
+      "phase": "test",
+      "global_step": 237,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    },
+    {
+      "phase": "test",
+      "global_step": 238,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    },
+    {
+      "phase": "test",
+      "global_step": 239,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    },
+    {
+      "phase": "test",
+      "global_step": 240,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    },
+    {
+      "phase": "test",
+      "global_step": 241,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    },
+    {
+      "phase": "test",
+      "global_step": 242,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    },
+    {
+      "phase": "test",
+      "global_step": 243,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    },
+    {
+      "phase": "test",
+      "global_step": 244,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    },
+    {
+      "phase": "test",
+      "global_step": 245,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    },
+    {
+      "phase": "test",
+      "global_step": 246,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    },
+    {
+      "phase": "test",
+      "global_step": 247,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    },
+    {
+      "phase": "test",
+      "global_step": 248,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    },
+    {
+      "phase": "test",
+      "global_step": 249,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    },
+    {
+      "phase": "test",
+      "global_step": 250,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    },
+    {
+      "phase": "test",
+      "global_step": 251,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    },
+    {
+      "phase": "test",
+      "global_step": 252,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    },
+    {
+      "phase": "test",
+      "global_step": 253,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    },
+    {
+      "phase": "test",
+      "global_step": 254,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    },
+    {
+      "phase": "test",
+      "global_step": 255,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    },
+    {
+      "phase": "test",
+      "global_step": 256,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    },
+    {
+      "phase": "test",
+      "global_step": 257,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    },
+    {
+      "phase": "test",
+      "global_step": 258,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    },
+    {
+      "phase": "test",
+      "global_step": 259,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    },
+    {
+      "phase": "test",
+      "global_step": 260,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    },
+    {
+      "phase": "test",
+      "global_step": 261,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    },
+    {
+      "phase": "test",
+      "global_step": 262,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    },
+    {
+      "phase": "test",
+      "global_step": 263,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    },
+    {
+      "phase": "test",
+      "global_step": 264,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    },
+    {
+      "phase": "test",
+      "global_step": 265,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    },
+    {
+      "phase": "test",
+      "global_step": 266,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    },
+    {
+      "phase": "test",
+      "global_step": 267,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    },
+    {
+      "phase": "test",
+      "global_step": 268,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    },
+    {
+      "phase": "test",
+      "global_step": 269,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    },
+    {
+      "phase": "test",
+      "global_step": 270,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    },
+    {
+      "phase": "test",
+      "global_step": 271,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    },
+    {
+      "phase": "test",
+      "global_step": 272,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    },
+    {
+      "phase": "test",
+      "global_step": 273,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    },
+    {
+      "phase": "test",
+      "global_step": 274,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    },
+    {
+      "phase": "test",
+      "global_step": 275,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    },
+    {
+      "phase": "test",
+      "global_step": 276,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    },
+    {
+      "phase": "test",
+      "global_step": 277,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    },
+    {
+      "phase": "test",
+      "global_step": 278,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    },
+    {
+      "phase": "test",
+      "global_step": 279,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    },
+    {
+      "phase": "test",
+      "global_step": 280,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    },
+    {
+      "phase": "test",
+      "global_step": 281,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    },
+    {
+      "phase": "test",
+      "global_step": 282,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    },
+    {
+      "phase": "test",
+      "global_step": 283,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    },
+    {
+      "phase": "test",
+      "global_step": 284,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    },
+    {
+      "phase": "test",
+      "global_step": 285,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    },
+    {
+      "phase": "test",
+      "global_step": 286,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    },
+    {
+      "phase": "test",
+      "global_step": 287,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    },
+    {
+      "phase": "test",
+      "global_step": 288,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    },
+    {
+      "phase": "test",
+      "global_step": 289,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    },
+    {
+      "phase": "test",
+      "global_step": 290,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    },
+    {
+      "phase": "test",
+      "global_step": 291,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    },
+    {
+      "phase": "test",
+      "global_step": 292,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    },
+    {
+      "phase": "test",
+      "global_step": 293,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    },
+    {
+      "phase": "test",
+      "global_step": 294,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    },
+    {
+      "phase": "test",
+      "global_step": 295,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    },
+    {
+      "phase": "test",
+      "global_step": 296,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    },
+    {
+      "phase": "test",
+      "global_step": 297,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    },
+    {
+      "phase": "test",
+      "global_step": 298,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    },
+    {
+      "phase": "test",
+      "global_step": 299,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    },
+    {
+      "phase": "test",
+      "global_step": 300,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    },
+    {
+      "phase": "test",
+      "global_step": 301,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    },
+    {
+      "phase": "test",
+      "global_step": 302,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    },
+    {
+      "phase": "test",
+      "global_step": 303,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    },
+    {
+      "phase": "test",
+      "global_step": 304,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    },
+    {
+      "phase": "test",
+      "global_step": 305,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    },
+    {
+      "phase": "test",
+      "global_step": 306,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    },
+    {
+      "phase": "test",
+      "global_step": 307,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    },
+    {
+      "phase": "test",
+      "global_step": 308,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    },
+    {
+      "phase": "test",
+      "global_step": 309,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    },
+    {
+      "phase": "test",
+      "global_step": 310,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    },
+    {
+      "phase": "test",
+      "global_step": 311,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    },
+    {
+      "phase": "test",
+      "global_step": 312,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    },
+    {
+      "phase": "test",
+      "global_step": 313,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    },
+    {
+      "phase": "test",
+      "global_step": 314,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    },
+    {
+      "phase": "test",
+      "global_step": 315,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    },
+    {
+      "phase": "test",
+      "global_step": 316,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    },
+    {
+      "phase": "test",
+      "global_step": 317,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    },
+    {
+      "phase": "test",
+      "global_step": 318,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    },
+    {
+      "phase": "test",
+      "global_step": 319,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    },
+    {
+      "phase": "test",
+      "global_step": 320,
+      "running_best_interaction_energy_kj_mol": -1412.3081269684553
+    }
+  ],
+  "running_best_interaction_energy_kj_mol": [
+    -393.71768162978697,
+    -701.5036341705672,
+    -701.5036341705672,
+    -1134.9437845094799,
+    -1134.9437845094799,
+    -1134.9437845094799,
+    -1134.9437845094799,
+    -1134.9437845094799,
+    -1134.9437845094799,
+    -1134.9437845094799,
+    -1134.9437845094799,
+    -1134.9437845094799,
+    -1134.9437845094799,
+    -1134.9437845094799,
+    -1134.9437845094799,
+    -1134.9437845094799,
+    -1134.9437845094799,
+    -1134.9437845094799,
+    -1134.9437845094799,
+    -1134.9437845094799,
+    -1134.9437845094799,
+    -1134.9437845094799,
+    -1134.9437845094799,
+    -1134.9437845094799,
+    -1134.9437845094799,
+    -1134.9437845094799,
+    -1134.9437845094799,
+    -1134.9437845094799,
+    -1134.9437845094799,
+    -1134.9437845094799,
+    -1134.9437845094799,
+    -1134.9437845094799,
+    -1134.9437845094799,
+    -1134.9437845094799,
+    -1134.9437845094799,
+    -1134.9437845094799,
+    -1134.9437845094799,
+    -1134.9437845094799,
+    -1134.9437845094799,
+    -1134.9437845094799,
+    -1134.9437845094799,
+    -1134.9437845094799,
+    -1134.9437845094799,
+    -1134.9437845094799,
+    -1134.9437845094799,
+    -1134.9437845094799,
+    -1134.9437845094799,
+    -1134.9437845094799,
+    -1134.9437845094799,
+    -1134.9437845094799,
+    -1134.9437845094799,
+    -1134.9437845094799,
+    -1134.9437845094799,
+    -1134.9437845094799,
+    -1134.9437845094799,
+    -1134.9437845094799,
+    -1134.9437845094799,
+    -1370.256452378002,
+    -1370.256452378002,
+    -1370.256452378002,
+    -1370.256452378002,
+    -1370.256452378002,
+    -1370.256452378002,
+    -1370.256452378002,
+    -1370.256452378002,
+    -1370.256452378002,
+    -1370.256452378002,
+    -1370.256452378002,
+    -1370.256452378002,
+    -1370.256452378002,
+    -1370.256452378002,
+    -1370.256452378002,
+    -1370.256452378002,
+    -1370.256452378002,
+    -1370.256452378002,
+    -1370.256452378002,
+    -1370.256452378002,
+    -1370.256452378002,
+    -1370.256452378002,
+    -1370.256452378002,
+    -1370.256452378002,
+    -1370.256452378002,
+    -1370.256452378002,
+    -1370.256452378002,
+    -1370.256452378002,
+    -1370.256452378002,
+    -1370.256452378002,
+    -1370.256452378002,
+    -1370.256452378002,
+    -1370.256452378002,
+    -1370.256452378002,
+    -1370.256452378002,
+    -1370.256452378002,
+    -1370.256452378002,
+    -1370.256452378002,
+    -1370.256452378002,
+    -1370.256452378002,
+    -1370.256452378002,
+    -1370.256452378002,
+    -1370.256452378002,
+    -1370.256452378002,
+    -1370.256452378002,
+    -1370.256452378002,
+    -1370.256452378002,
+    -1370.256452378002,
+    -1370.256452378002,
+    -1370.256452378002,
+    -1370.256452378002,
+    -1370.256452378002,
+    -1370.256452378002,
+    -1370.256452378002,
+    -1370.256452378002,
+    -1370.256452378002,
+    -1370.256452378002,
+    -1370.256452378002,
+    -1370.256452378002,
+    -1370.256452378002,
+    -1370.256452378002,
+    -1370.256452378002,
+    -1370.256452378002,
+    -1370.256452378002,
+    -1412.3081269684553,
+    -1412.3081269684553,
+    -1412.3081269684553,
+    -1412.3081269684553,
+    -1412.3081269684553,
+    -1412.3081269684553,
+    -1412.3081269684553,
+    -1412.3081269684553,
+    -1412.3081269684553,
+    -1412.3081269684553,
+    -1412.3081269684553,
+    -1412.3081269684553,
+    -1412.3081269684553,
+    -1412.3081269684553,
+    -1412.3081269684553,
+    -1412.3081269684553,
+    -1412.3081269684553,
+    -1412.3081269684553,
+    -1412.3081269684553,
+    -1412.3081269684553,
+    -1412.3081269684553,
+    -1412.3081269684553,
+    -1412.3081269684553,
+    -1412.3081269684553,
+    -1412.3081269684553,
+    -1412.3081269684553,
+    -1412.3081269684553,
+    -1412.3081269684553,
+    -1412.3081269684553,
+    -1412.3081269684553,
+    -1412.3081269684553,
+    -1412.3081269684553,
+    -1412.3081269684553,
+    -1412.3081269684553,
+    -1412.3081269684553,
+    -1412.3081269684553,
+    -1412.3081269684553,
+    -1412.3081269684553,
+    -1412.3081269684553,
+    -1412.3081269684553,
+    -1412.3081269684553,
+    -1412.3081269684553,
+    -1412.3081269684553,
+    -1412.3081269684553,
+    -1412.3081269684553,
+    -1412.3081269684553,
+    -1412.3081269684553,
+    -1412.3081269684553,
+    -1412.3081269684553,
+    -1412.3081269684553,
+    -1412.3081269684553,
+    -1412.3081269684553,
+    -1412.3081269684553,
+    -1412.3081269684553,
+    -1412.3081269684553,
+    -1412.3081269684553,
+    -1412.3081269684553,
+    -1412.3081269684553,
+    -1412.3081269684553,
+    -1412.3081269684553,
+    -1412.3081269684553,
+    -1412.3081269684553,
+    -1412.3081269684553,
+    -1412.3081269684553,
+    -1412.3081269684553,
+    -1412.3081269684553,
+    -1412.3081269684553,
+    -1412.3081269684553,
+    -1412.3081269684553,
+    -1412.3081269684553,
+    -1412.3081269684553,
+    -1412.3081269684553,
+    -1412.3081269684553,
+    -1412.3081269684553,
+    -1412.3081269684553,
+    -1412.3081269684553,
+    -1412.3081269684553,
+    -1412.3081269684553,
+    -1412.3081269684553,
+    -1412.3081269684553,
+    -1412.3081269684553,
+    -1412.3081269684553,
+    -1412.3081269684553,
+    -1412.3081269684553,
+    -1412.3081269684553,
+    -1412.3081269684553,
+    -1412.3081269684553,
+    -1412.3081269684553,
+    -1412.3081269684553,
+    -1412.3081269684553,
+    -1412.3081269684553,
+    -1412.3081269684553,
+    -1412.3081269684553,
+    -1412.3081269684553,
+    -1412.3081269684553,
+    -1412.3081269684553,
+    -1412.3081269684553,
+    -1412.3081269684553,
+    -1412.3081269684553,
+    -1412.3081269684553,
+    -1412.3081269684553,
+    -1412.3081269684553,
+    -1412.3081269684553,
+    -1412.3081269684553,
+    -1412.3081269684553,
+    -1412.3081269684553,
+    -1412.3081269684553,
+    -1412.3081269684553,
+    -1412.3081269684553,
+    -1412.3081269684553,
+    -1412.3081269684553,
+    -1412.3081269684553,
+    -1412.3081269684553,
+    -1412.3081269684553,
+    -1412.3081269684553,
+    -1412.3081269684553,
+    -1412.3081269684553,
+    -1412.3081269684553,
+    -1412.3081269684553
+  ]
+}

@@ -1,0 +1,113 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "insulin-ai"
+version = "0.3.0"
+description = "AI-Driven Biologics Stabilisation Platform - Retrosynthesis, Simulation & Discovery"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "Proprietary"}
+authors = [{name = "Biologics AI Team"}]
+keywords = ["biologics", "retrosynthesis", "PSMILES", "openmm", "ADMET", "excipient"]
+dependencies = [
+    # MCP server (FastMCP bundled; [cli] adds typer/rich for mcp.run())
+    "mcp[cli]>=1.0.0",
+    # HTTP / web search
+    "requests>=2.28.0",
+    "duckduckgo-search>=8.0.0",
+    # Polymer / PSMILES
+    "psmiles @ git+https://github.com/FermiQ/psmiles.git",
+    # Reporting
+    "fpdf2>=2.8.0",
+    "markdown>=3.5",
+    "Pillow>=10.0",
+    # Numerics (explicit; also pulled as transitive deps)
+    "numpy>=1.24",
+    "pandas>=2.0",
+]
+# Full conda+pip environment: see environment-simulation.yml
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Chemistry",
+]
+
+[project.optional-dependencies]
+simulation = [
+    "rdkit",
+    "openmm",
+    "openmmforcefields>=0.14.0",
+    # openff-toolkit and openff-units are conda-forge only; install via conda:
+    #   conda install -c conda-forge openff-toolkit openff-units
+    "pdbfixer",
+    "scipy>=1.11",
+    "matplotlib>=3.7",
+    "psp>=0.0.5",
+]
+paperqa = [
+    "paper-qa>=2026.2",
+]
+llm = [
+    "ollama>=0.2",
+    "langchain>=0.2",
+    "langchain-core>=0.2",
+    "langchain-community>=0.2",
+]
+rl = [
+    "gymnasium>=0.29",
+    "stable-baselines3>=2.0",
+    "GPy>=1.10",
+]
+benchmark = [
+    "optuna>=3.0",
+    "scipy>=1.11",
+]
+retro = [
+    # RetroSynthesisAgent deps (submodule: extern/RetroSynthesisAgent)
+    # Imported via sys.path by mcp_server; no setup.py in the submodule.
+    "networkx>=3.0",
+    "pubchempy>=1.0",
+    "scholarly>=1.7",
+    "PyMuPDF>=1.22",
+    "graphviz>=0.20",
+    "pyvis>=0.3",
+    "loguru>=0.7",
+    "jsonpickle>=3.0",
+    "fake-useragent>=1.4",
+    "selenium>=4.0",
+    "python-dotenv>=1.0",
+    # AiZynthFinder: install from submodule with pip install -e extern/aizynthfinder
+]
+admet = [
+    # ADMET-AI: install from submodule with pip install -e extern/admet_ai
+]
+api = [
+    "fastapi>=0.115",
+    "uvicorn>=0.30",
+]
+dev = [
+    "pytest>=7.4.0",
+    "pytest-asyncio>=0.23",
+    "httpx>=0.27",
+]
+all = [
+    "insulin-ai[simulation,paperqa,llm,rl,benchmark,retro,admet,api,dev]",
+]
+
+[tool.setuptools.packages.find]
+where = ["src/python"]
+include = ["insulin_ai*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+addopts = "-v --tb=short"
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+]
