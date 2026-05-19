@@ -2,8 +2,6 @@
 
 AI-driven discovery of **formulation and delivery materials for any biologic** (insulin, mAbs, enzymes, vaccines, peptides). A single discovery campaign produces: candidate polymer screening, retrosynthesis routes, residual-monomer ADMET, regulatory excipient compliance (EMA/FDA/GRAS), and an immutable GxP audit trail — all in one session via MCP (OpenCode) or FastAPI.
 
-> **Insulin patch screening is one use case.** The platform's primary workflow is `biologics-delivery-discovery` — a unified pipeline that runs retrosynthesis + compliance as default outputs for any biologic, not optional extras.
-
 ### One session, one biologic
 
 Start with the **`biologics-delivery-discovery`** OpenCode agent (default). It guides you through:
