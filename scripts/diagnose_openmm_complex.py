@@ -9,9 +9,10 @@ REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(REPO, "src", "python"))
 
 _HINT = """
-OpenMM stack not importable. Use biologix-ai-sim env or:
-  pip install -e '.[openmm]'
-Create env: mamba env create -f environment-simulation.yml
+OpenMM stack not importable. Use conda env biologix-ai-sim:
+  ./install
+  conda activate biologix-ai-sim
+  bash scripts/verify_install.sh --conda-only
 """.strip()
 
 

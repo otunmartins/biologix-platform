@@ -83,7 +83,20 @@ From the repo root:
 ./install
 ```
 
-**`./install`** builds **`biologix-ai-sim`** by default with **chunked conda-forge installs + pip** (lower RAM than solving the whole YAML at once). For a single-shot solve from the YAML (more RAM): **`./install --conda-yml`**.
+**`./install`** builds **`biologix-ai-sim`**, installs **OpenMM + Packmol + OpenFF + MCP + retro/admet submodules + AiZynthFinder models** (default), and runs **`scripts/verify_install.sh`** — install fails loudly if anything is missing. Options: **`--skip-aizynth-models`**, **`--skip-submodules`**, **`--conda-yml`**, **`--pip-only`**.
+
+Verify anytime:
+
+```bash
+bash scripts/verify_install.sh
+```
+
+Repair a partial install:
+
+```bash
+rm -f ~/.local/bin/micromamba
+./install
+```
 
 Or create/update the env manually:
 
@@ -148,31 +161,17 @@ The `experimental` branch adds:
 
 ### Installation (vendored tools)
 
-All third-party retrosynthesis and ADMET tools are vendored as git submodules under `extern/`. **If OpenCode reports "extern/RetroSynthesisAgent wasn't available" or you get an import error for `RetroSynAgent`, run:**
+**Included in `./install` by default** (submodules, AiZynthFinder package, ADMET-AI, model download). To verify:
 
 ```bash
-# 1. Make sure submodules are populated
-git submodule update --init --recursive
+bash scripts/verify_install.sh
+```
 
-# 2. Install everything — submodule deps + aizynthfinder + admet_ai + biologix-ai extras
+Manual repair only if `./install` was skipped or interrupted:
+
+```bash
 bash scripts/install_submodules.sh
-```
-
-`RetroSynthesisAgent` has no `setup.py` so it cannot be `pip install -e`'d directly — the MCP server adds `extern/RetroSynthesisAgent` to `sys.path` at startup. `install_submodules.sh` installs its Python-side dependencies (`graphviz`, `pubchempy`, `pyvis`, `scholarly`, `jsonpickle`, `fake-useragent`, etc.).
-
-```bash
-# Verify after install:
-python -c "import sys; sys.path.insert(0,'extern/RetroSynthesisAgent'); from RetroSynAgent.treeBuilder import Tree; print('RetroSynAgent OK')"
-python -c "from aizynthfinder.aizynthfinder import AiZynthFinder; print('AiZynthFinder OK')"
-python -c "from admet_ai import ADMETModel; print('ADMET-AI OK')"
-```
-
-Or manually (if you only want retro deps without running the full script):
-
-```bash
-pip install -e extern/aizynthfinder
-pip install -e extern/admet_ai
-pip install -e ".[retro,admet,api,dev]"
+bash scripts/setup_aizynthfinder.sh   # ~800MB models
 ```
 
 ---

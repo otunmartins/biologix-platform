@@ -82,6 +82,20 @@ mamba run -n biologix-ai-sim pip install -e .
 
 ```bash
 biologix-ai                    # should launch OpenCode
-python -c "import biologix_ai" # should import cleanly
+bash scripts/verify_install.sh   # all checks must pass
+conda run -n biologix-ai-sim python -c "import biologix_ai; import openmm"
 bash scripts/run_mcp_server.sh # MCP server should start
 ```
+
+## Repair broken or partial install
+
+If OpenMM, Packmol, or MCP tools are missing after `./install` (common cause: broken
+`~/.local/bin/micromamba` from a wrong-platform download):
+
+```bash
+rm -f ~/.local/bin/micromamba
+./install
+bash scripts/verify_install.sh
+```
+
+Do not switch MCP back to the old `insulin-ai-sim` env — finish `biologix-ai-sim` instead.

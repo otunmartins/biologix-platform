@@ -4,6 +4,9 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+# shellcheck source=install_lib.sh
+source "$SCRIPT_DIR/install_lib.sh"
+
 DEST="$REPO_ROOT/data/aizynthfinder"
 mkdir -p "$DEST"
 
@@ -12,16 +15,13 @@ if [[ -f "$DEST/config.yml" ]]; then
   exit 0
 fi
 
-echo "Installing AiZynthFinder package..."
-if command -v mamba &>/dev/null; then
-  mamba run -n biologix-ai-sim pip install -e "$REPO_ROOT/extern/aizynthfinder" paretoset
-elif command -v conda &>/dev/null; then
-  conda run -n biologix-ai-sim pip install -e "$REPO_ROOT/extern/aizynthfinder" paretoset
-else
-  pip install -e "$REPO_ROOT/extern/aizynthfinder" paretoset
+if ! conda_run python -c "import aizynthfinder" 2>/dev/null; then
+  echo "Installing AiZynthFinder package into ${ENV_NAME}..."
+  pip_in_env install paretoset
+  pip_in_env install -e "$REPO_ROOT/extern/aizynthfinder"
 fi
 
 echo "Downloading public data to $DEST ..."
-python -m aizynthfinder.tools.download_public_data "$DEST"
+conda_run python -m aizynthfinder.tools.download_public_data "$DEST"
 
 echo "Done. Set BIOLOGIX_AI_AIZYNTH_CONFIG=$DEST/config.yml"

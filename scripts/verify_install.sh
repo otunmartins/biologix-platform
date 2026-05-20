@@ -1,0 +1,119 @@
+#!/usr/bin/env bash
+# Verify biologix-ai install completeness. Exit 1 on failure.
+#
+# Usage:
+#   bash scripts/verify_install.sh              # full check
+#   bash scripts/verify_install.sh --conda-only # OpenMM/Packmol/OpenFF/RDKit only
+#   bash scripts/verify_install.sh --skip-submodules --skip-aizynth-models
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+# shellcheck source=install_lib.sh
+source "$SCRIPT_DIR/install_lib.sh"
+
+CONDA_ONLY=false
+SKIP_SUBMODULES="${VERIFY_SKIP_SUBMODULES:-false}"
+SKIP_AIZYNTH_MODELS="${VERIFY_SKIP_AIZYNTH_MODELS:-false}"
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --conda-only) CONDA_ONLY=true; shift ;;
+    --skip-submodules) SKIP_SUBMODULES=true; shift ;;
+    --skip-aizynth-models) SKIP_AIZYNTH_MODELS=true; shift ;;
+    -h|--help)
+      echo "Usage: bash scripts/verify_install.sh [--conda-only] [--skip-submodules] [--skip-aizynth-models]"
+      exit 0
+      ;;
+    *) echo "Unknown option: $1" >&2; exit 1 ;;
+  esac
+done
+
+if ! env_exists; then
+  echo "FAIL: conda env ${ENV_NAME} does not exist" >&2
+  repair_hint
+  exit 1
+fi
+
+refresh_conda_prefix_path
+export PYTHONPATH="${REPO_ROOT}/src/python${PYTHONPATH:+:${PYTHONPATH}}"
+
+failures=0
+pass() { echo "  OK: $1"; }
+fail() { echo "  FAIL: $1" >&2; failures=$((failures + 1)); }
+
+echo "=== Verifying biologix-ai install (${ENV_NAME}) ==="
+
+# Conda simulation stack
+if conda_run python -c "
+import shutil
+import openmm
+from openff.toolkit import Molecule
+from rdkit.Chem import AllChem
+assert shutil.which('packmol'), 'packmol not on PATH'
+" 2>/dev/null; then
+  pass "conda stack (openmm, packmol, openff, rdkit)"
+else
+  fail "conda stack (openmm, packmol, openff, rdkit)"
+fi
+
+if [[ "$CONDA_ONLY" == "true" ]]; then
+  [[ "$failures" -eq 0 ]] && echo "=== All conda checks passed ===" && exit 0
+  repair_hint
+  exit 1
+fi
+
+# MCP + openmm_available
+if conda_run python -c "
+import sys
+sys.path.insert(0, '${REPO_ROOT}')
+import biologix_ai_mcp_server  # noqa: F401
+from biologix_ai.simulation.openmm_compat import openmm_available
+assert openmm_available(), 'openmm_available() is False'
+" 2>/dev/null; then
+  pass "MCP server import + openmm_available()"
+else
+  fail "MCP server import + openmm_available()"
+fi
+
+if [[ "$SKIP_SUBMODULES" != "true" ]]; then
+  if conda_run python -c "
+import sys
+sys.path.insert(0, '${REPO_ROOT}/extern/RetroSynthesisAgent')
+from RetroSynAgent.treeBuilder import Tree  # noqa: F401
+" 2>/dev/null; then
+    pass "RetroSynthesisAgent"
+  else
+    fail "RetroSynthesisAgent"
+  fi
+
+  if conda_run python -c "from aizynthfinder.aizynthfinder import AiZynthFinder" 2>/dev/null; then
+    pass "AiZynthFinder package"
+  else
+    fail "AiZynthFinder package"
+  fi
+
+  if conda_run python -c "from admet_ai import ADMETModel" 2>/dev/null; then
+    pass "ADMET-AI"
+  else
+    fail "ADMET-AI"
+  fi
+fi
+
+if [[ "$SKIP_AIZYNTH_MODELS" != "true" ]] && [[ "$SKIP_SUBMODULES" != "true" ]]; then
+  if [[ -f "${REPO_ROOT}/data/aizynthfinder/config.yml" ]]; then
+    pass "AiZynthFinder models (data/aizynthfinder/config.yml)"
+  else
+    fail "AiZynthFinder models (run: bash scripts/setup_aizynthfinder.sh)"
+  fi
+fi
+
+if [[ "$failures" -eq 0 ]]; then
+  echo "=== All checks passed ==="
+  exit 0
+fi
+
+echo "=== ${failures} check(s) failed ===" >&2
+repair_hint
+exit 1

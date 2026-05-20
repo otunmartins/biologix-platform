@@ -1,19 +1,19 @@
 #!/usr/bin/env bash
-# Reliable conda env installer: uses micromamba (fast, stable libmamba 2.x) when available,
-# falls back to conda --solver classic. Installs in waves to keep peak RAM low.
+# Reliable conda env installer: conda-first waves + pip; fail-fast on partial installs.
 #
 # Usage (from repo root):
 #   ./install                    # default conda path runs this script
 #   bash scripts/install_biologix_ai_sim_lowmem.sh
 #
-# Requires: micromamba (preferred), conda, or mamba on PATH.
+# Requires: conda (preferred) or working micromamba on PATH.
 # Remove legacy "omnia" channel first — see scripts/fix_conda_channels_for_biologix_ai.sh.
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-ENV_NAME="${BIOLOGIX_AI_CONDA_ENV:-biologix-ai-sim}"
+# shellcheck source=install_lib.sh
+source "$SCRIPT_DIR/install_lib.sh"
 
 if conda config --show channels 2>/dev/null | grep -Fqi omnia; then
   echo "ERROR: conda still lists channel 'omnia'. Run:  bash scripts/fix_conda_channels_for_biologix_ai.sh" >&2
@@ -22,84 +22,68 @@ fi
 
 cd "$REPO_ROOT"
 
-# --- Detect package manager + conda prefix path ---
-CONDA_PREFIX_PATH=""
-if command -v conda &>/dev/null; then
-  CONDA_PREFIX_PATH="$(conda info --base 2>/dev/null)/envs/$ENV_NAME"
-fi
+maybe_install_micromamba || true
+refresh_conda_prefix_path
 
-wave_install() {
-  if command -v micromamba &>/dev/null && [[ -n "$CONDA_PREFIX_PATH" ]]; then
-    micromamba install -p "$CONDA_PREFIX_PATH" -c conda-forge -y "$@"
-  elif command -v conda &>/dev/null; then
-    conda install -n "$ENV_NAME" --override-channels -c conda-forge -y --solver classic "$@"
-  else
-    echo "ERROR: need micromamba or conda on PATH" >&2
-    exit 1
-  fi
-}
-
-create_env() {
-  if command -v conda &>/dev/null; then
-    conda create -n "$ENV_NAME" --override-channels -c conda-forge -y --solver classic python=3.11 pip
-    CONDA_PREFIX_PATH="$(conda info --base 2>/dev/null)/envs/$ENV_NAME"
-  elif command -v micromamba &>/dev/null; then
-    micromamba create -n "$ENV_NAME" -c conda-forge -y python=3.11 pip
-    CONDA_PREFIX_PATH="$(micromamba info 2>/dev/null | grep 'base environment' | awk '{print $NF}')/envs/$ENV_NAME"
-  else
-    echo "ERROR: need conda or micromamba on PATH" >&2
-    exit 1
-  fi
-}
-
-# --- Auto-install micromamba if missing (fast, ~10 MB) ---
-if ! command -v micromamba &>/dev/null; then
-  echo "micromamba not found — installing standalone binary to ~/.local/bin ..."
-  mkdir -p "$HOME/.local/bin"
-  case "$(uname -s)-$(uname -m)" in
-    Darwin-arm64) _PLAT="osx-arm64" ;;
-    Darwin-x86_64) _PLAT="osx-64" ;;
-    Linux-aarch64) _PLAT="linux-aarch64" ;;
-    *) _PLAT="linux-64" ;;
-  esac
-  if curl -Ls "https://micro.mamba.pm/api/micromamba/${_PLAT}/latest" | tar -xvj -C "$HOME/.local/bin" --strip-components=1 bin/micromamba 2>/dev/null; then
-    export PATH="$HOME/.local/bin:$PATH"
-    echo "Installed micromamba $(micromamba --version 2>&1)"
-  else
-    echo "WARNING: could not install micromamba; falling back to conda --solver classic." >&2
-  fi
-fi
-
-# --- Create or reuse env ---
-if ! conda env list 2>/dev/null | awk '{print $1}' | grep -qx "$ENV_NAME"; then
-  echo "Creating env $ENV_NAME (python 3.11 + pip)..."
+if ! env_exists; then
+  echo "Creating env ${ENV_NAME} (python 3.11 + pip)..."
   create_env
 else
-  echo "Env $ENV_NAME exists — adding missing conda packages in waves."
+  echo "Env ${ENV_NAME} exists — adding missing conda packages in waves."
+  refresh_conda_prefix_path
 fi
 
-# --- Conda waves ---
+check_conda_pkg() {
+  local pkg="$1"
+  conda list -n "${ENV_NAME}" "${pkg}" 2>/dev/null | grep -qE "^${pkg}[[:space:]]" || return 1
+}
+
 echo "Wave 1/4: openmm, pdbfixer, packmol..."
 wave_install openmm pdbfixer packmol
+for pkg in openmm pdbfixer packmol; do
+  if ! check_conda_pkg "${pkg}"; then
+    echo "ERROR: Wave 1 failed — ${pkg} not installed in ${ENV_NAME}" >&2
+    repair_hint
+    exit 1
+  fi
+done
 
-echo "Wave 2/4: rdkit..."
+echo "Wave 2/4: rdkit (conda; remove pip rdkit first)..."
+pip_in_env uninstall -y rdkit rdkit-pypi 2>/dev/null || true
 wave_install rdkit
-
-echo "Wave 3/4: OpenFF toolkit + units..."
-wave_install "openff-toolkit>=0.18.0" "openff-units>=0.2"
-
-# --- Pip wave ---
-echo "Wave 4/4: pip packages + editable biologix-ai..."
-RUN=(conda run -n "$ENV_NAME" --no-capture-output)
-if ! command -v conda &>/dev/null; then
-  RUN=(micromamba run -p "$CONDA_PREFIX_PATH")
+if ! check_conda_pkg rdkit; then
+  echo "ERROR: Wave 2 failed — rdkit not installed in ${ENV_NAME}" >&2
+  repair_hint
+  exit 1
 fi
 
-"${RUN[@]}" python -m pip install -U pip setuptools wheel
-"${RUN[@]}" python -m pip install -r "$REPO_ROOT/requirements.txt"
-"${RUN[@]}" python -m pip install -e "$REPO_ROOT"
+echo "Wave 3/4: OpenFF toolkit + units..."
+if ! wave_install "openff-units>=0.2" "openff-toolkit-base>=0.18.0" 2>/dev/null; then
+  echo "Retrying OpenFF wave with minimal packages..."
+  wave_install "openff-units>=0.2" || {
+    echo "ERROR: Wave 3 failed — openff-units not installed" >&2
+    repair_hint
+    exit 1
+  }
+  wave_install "openff-toolkit-base>=0.18.0" || {
+    echo "ERROR: Wave 3 failed — openff-toolkit-base not installed" >&2
+    repair_hint
+    exit 1
+  }
+fi
+if ! check_conda_pkg openff-toolkit-base && ! check_conda_pkg openff-toolkit; then
+  echo "ERROR: Wave 3 failed — no OpenFF toolkit package in ${ENV_NAME}" >&2
+  repair_hint
+  exit 1
+fi
+
+echo "Wave 4/4: pip packages + editable biologix-ai..."
+pip_in_env install -U pip setuptools wheel
+pip_in_env install -r "$REPO_ROOT/requirements.txt"
+pip_in_env install -e "$REPO_ROOT[retro,admet,dev]"
+pip_in_env install -U "pydantic>=2.10" "pydantic-core>=2.27"
+
+verify_conda_stack
 
 echo ""
-echo "Done. Verify:"
-echo "  conda activate $ENV_NAME"
-echo "  python -c \"import openmm, rdkit; from openff.toolkit import Molecule; print('OK')\""
+echo "Done. Activate: conda activate ${ENV_NAME}"

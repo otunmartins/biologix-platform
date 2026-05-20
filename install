@@ -1,10 +1,12 @@
 #!/usr/bin/env bash
 # Biologix AI Platform - Install
 #
-# 1) OpenCode + biologix-ai launcher (legacy alias: biologix-ai)
+# 1) OpenCode + biologix-ai launcher
 # 2) Python deps: conda env biologix-ai-sim (chunked conda + pip — low OOM risk) OR pip-only
+# 3) Retro/admet submodules + AiZynthFinder models (default)
+# 4) verify_install.sh (fail-fast)
 #
-# Usage: ./install [--no-path] [--pip-only] [--conda-yml]
+# Usage: ./install [--no-path] [--pip-only] [--conda-yml] [--skip-submodules] [--skip-aizynth-models]
 
 set -euo pipefail
 
@@ -16,6 +18,10 @@ NC='\033[0m'
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BIN_NAME="biologix-ai"
 YML="$SCRIPT_DIR/environment-simulation.yml"
+export BIOLOGIX_AI_CONDA_ENV="${BIOLOGIX_AI_CONDA_ENV:-biologix-ai-sim}"
+
+# shellcheck source=scripts/install_lib.sh
+source "$SCRIPT_DIR/scripts/install_lib.sh"
 
 usage() {
   cat <<EOF
@@ -27,10 +33,15 @@ Usage: ./install [options]
   --pip-only     Skip conda; use pip install -e ".[simulation]" (weaker OpenMM setup)
   --conda-yml    One-shot conda env create/update from environment-simulation.yml
                  (needs more RAM; default is chunked install via scripts/install_biologix_ai_sim_lowmem.sh)
+  --skip-submodules   Skip RetroSynthesisAgent, AiZynthFinder package, ADMET-AI (not recommended)
+  --skip-aizynth-models   Skip ~800MB AiZynthFinder model download (retro still works; monomer enrichment limited)
 
 Installs:
   - OpenCode (https://opencode.ai/install)
   - Python environment: chunked conda-forge + pip (default), or --conda-yml, or --pip-only
+  - Git submodules + retro/admet stack (default; use --skip-submodules to omit)
+  - AiZynthFinder public models (default; use --skip-aizynth-models to omit)
+  - Verification gate (scripts/verify_install.sh)
 
 Run from the repo root.
 EOF
@@ -39,12 +50,16 @@ EOF
 no_modify_path=false
 pip_only=false
 conda_yml=false
+skip_submodules=false
+skip_aizynth_models=false
 while [[ $# -gt 0 ]]; do
   case "$1" in
     -h|--help) usage; exit 0 ;;
     --no-path) no_modify_path=true; shift ;;
     --pip-only) pip_only=true; shift ;;
     --conda-yml) conda_yml=true; shift ;;
+    --skip-submodules) skip_submodules=true; shift ;;
+    --skip-aizynth-models) skip_aizynth_models=true; shift ;;
     *) echo -e "${RED}Unknown option: $1${NC}"; usage; exit 1 ;;
   esac
 done
@@ -81,15 +96,13 @@ install_conda_env() {
     return 1
   fi
 
-  # Default: chunked conda solves + pip (low peak RAM; avoids OOM "Killed" during solve).
   if [[ "$conda_yml" != "true" ]]; then
-    echo -e "${YELLOW}Installing conda env biologix-ai-sim (chunked conda-forge + pip; see scripts/install_biologix_ai_sim_lowmem.sh)...${NC}"
+    echo -e "${YELLOW}Installing conda env ${ENV_NAME} (chunked conda-forge + pip)...${NC}"
     bash "$SCRIPT_DIR/scripts/install_biologix_ai_sim_lowmem.sh"
-    echo -e "${GREEN}Activate before MCP:  conda activate biologix-ai-sim${NC}"
+    echo -e "${GREEN}Conda env ${ENV_NAME} ready${NC}"
     return 0
   fi
 
-  # Optional: single environment-simulation.yml solve (needs more RAM).
   local runner
   if command -v mamba &>/dev/null; then
     runner=mamba
@@ -97,23 +110,24 @@ install_conda_env() {
     runner=conda
   fi
   if conda config --show channels 2>/dev/null | grep -qi omnia; then
-    echo -e "${RED}Your conda channel list includes \"omnia\" (see: conda config --show channels).${NC}"
-    echo -e "${YELLOW}Remove it, then re-run ./install — e.g.:  conda config --remove channels omnia${NC}"
-    echo -e "${YELLOW}Or edit ~/.condarc and delete the omnia entry. See docs/DEPENDENCIES.md (Troubleshooting).${NC}"
+    echo -e "${RED}Your conda channel list includes \"omnia\".${NC}"
+    echo -e "${YELLOW}Run: bash scripts/fix_conda_channels_for_biologix_ai.sh${NC}"
     echo ""
   fi
   local solver_args=()
   if [[ "$runner" == "conda" ]]; then
     solver_args=(--solver classic)
   fi
-  if conda env list 2>/dev/null | awk '{print $1}' | grep -qx biologix-ai-sim; then
-    echo -e "${YELLOW}Conda env biologix-ai-sim exists — updating from environment-simulation.yml...${NC}"
+  if env_exists; then
+    echo -e "${YELLOW}Conda env ${ENV_NAME} exists — updating from environment-simulation.yml...${NC}"
     "$runner" env update -f "$YML" --prune "${solver_args[@]}"
   else
-    echo "Creating conda env biologix-ai-sim from environment-simulation.yml..."
+    echo "Creating conda env ${ENV_NAME} from environment-simulation.yml..."
     "$runner" env create -f "$YML" "${solver_args[@]}"
   fi
-  echo -e "${GREEN}Activate before MCP:  conda activate biologix-ai-sim${NC}"
+  refresh_conda_prefix_path
+  verify_conda_stack
+  echo -e "${GREEN}Conda env ${ENV_NAME} ready${NC}"
   return 0
 }
 
@@ -122,18 +136,54 @@ install_pip() {
   cd "$SCRIPT_DIR"
   python3 -m pip install -U pip setuptools wheel
   python3 -m pip install -r requirements.txt
-  python3 -m pip install -e ".[simulation,paperqa]" 2>/dev/null || python3 -m pip install -e ".[simulation]"
+  python3 -m pip install -e ".[simulation,paperqa,retro,admet,dev]" 2>/dev/null \
+    || python3 -m pip install -e ".[simulation,retro,admet,dev]"
   echo -e "${YELLOW}Warning: OpenMM, RDKit, pdbfixer, Packmol, and OpenFF Toolkit are NOT installed by pip-only.${NC}"
-  echo -e "${YELLOW}  Use ./install (chunked conda) or bash scripts/install_biologix_ai_sim_lowmem.sh for the full stack.${NC}"
-  echo -e "${YELLOW}  Verify:  mamba run -n biologix-ai-sim python -c \"import openmm\"${NC}"
+  echo -e "${YELLOW}  Use ./install (chunked conda) for the full stack.${NC}"
 }
 
-if [[ "$pip_only" == "true" ]] || ! command -v mamba &>/dev/null && ! command -v conda &>/dev/null; then
+if [[ "$pip_only" == "true" ]] || { ! command -v mamba &>/dev/null && ! command -v conda &>/dev/null; }; then
   install_pip
 else
   if ! install_conda_env; then
     install_pip
   fi
+fi
+
+# Conda-only verify (lowmem script verifies inline; conda-yml path verifies in install_conda_env)
+if [[ "$pip_only" != "true" ]] && command -v conda &>/dev/null && env_exists; then
+  VERIFY_ARGS=(--conda-only)
+  bash "$SCRIPT_DIR/scripts/verify_install.sh" "${VERIFY_ARGS[@]}"
+fi
+
+# --- Submodules: RetroSyn, AiZynthFinder package, ADMET-AI ---
+if [[ "$skip_submodules" != "true" ]]; then
+  echo ""
+  echo -e "${GREEN}Retrosynthesis + ADMET submodules${NC}"
+  bash "$SCRIPT_DIR/scripts/install_submodules.sh"
+else
+  echo -e "${YELLOW}Skipped submodules (--skip-submodules)${NC}"
+fi
+
+# --- AiZynthFinder model weights (~800MB, one-time) ---
+if [[ "$skip_aizynth_models" != "true" ]] && [[ "$skip_submodules" != "true" ]]; then
+  echo ""
+  echo -e "${GREEN}AiZynthFinder models${NC}"
+  bash "$SCRIPT_DIR/scripts/setup_aizynthfinder.sh"
+elif [[ "$skip_aizynth_models" == "true" ]]; then
+  echo -e "${YELLOW}Skipped AiZynthFinder models (--skip-aizynth-models)${NC}"
+fi
+
+# --- Full verification ---
+echo ""
+echo -e "${GREEN}Verifying install${NC}"
+VERIFY_FULL=( )
+[[ "$skip_submodules" == "true" ]] && VERIFY_FULL+=(--skip-submodules)
+[[ "$skip_aizynth_models" == "true" ]] && VERIFY_FULL+=(--skip-aizynth-models)
+if [[ "$pip_only" == "true" ]]; then
+  echo -e "${YELLOW}Skipping full verify (--pip-only); OpenMM stack not expected.${NC}"
+else
+  bash "$SCRIPT_DIR/scripts/verify_install.sh" "${VERIFY_FULL[@]}"
 fi
 
 # --- Launcher ---
@@ -159,9 +209,17 @@ LAUNCHER="$INSTALL_DIR/$BIN_NAME"
 write_launcher "$LAUNCHER"
 
 echo ""
-echo -e "${GREEN}Launcher: $LAUNCHER${NC}"
-echo "  Run:  $BIN_NAME"
-echo "  MCP:  started automatically by OpenCode (or debug: mamba activate biologix-ai-sim && bash scripts/run_mcp_server.sh)"
+echo -e "${GREEN}Install complete${NC}"
+echo "  Launcher:  $LAUNCHER"
+echo "  Run:       $BIN_NAME"
+echo "  Conda env: ${ENV_NAME}"
+echo "  MCP:       bash scripts/run_mcp_server.sh (auto-started by OpenCode)"
+if [[ "$skip_submodules" != "true" ]]; then
+  echo "  Retro/ADMET: installed"
+fi
+if [[ "$skip_aizynth_models" != "true" ]] && [[ "$skip_submodules" != "true" ]]; then
+  echo "  AiZynth models: data/aizynthfinder/"
+fi
 echo ""
 
 if [[ "$no_modify_path" != "true" ]] && [[ ":$PATH:" != *":$INSTALL_DIR:"* ]]; then
