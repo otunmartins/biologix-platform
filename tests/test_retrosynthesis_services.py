@@ -2,7 +2,7 @@
 
 import pytest
 
-from insulin_ai.retrosynthesis.models import (
+from biologix_ai.retrosynthesis.models import (
     MonomerInfo,
     MonomerSource,
     PolymerRoute,
@@ -16,7 +16,7 @@ from insulin_ai.retrosynthesis.models import (
 
 class TestRetrosynthesisService:
     def test_plan_returns_result(self):
-        from insulin_ai.services.retrosynthesis_service import plan_retrosynthesis
+        from biologix_ai.services.retrosynthesis_service import plan_retrosynthesis
 
         request = RetrosynthesisRequest(
             target="PEG",
@@ -32,7 +32,7 @@ class TestRetrosynthesisService:
         assert isinstance(result.polymer_routes, list)
 
     def test_plan_with_non_insulin_biologic(self):
-        from insulin_ai.services.retrosynthesis_service import plan_retrosynthesis
+        from biologix_ai.services.retrosynthesis_service import plan_retrosynthesis
 
         request = RetrosynthesisRequest(
             target="[*]OCC[*]",
@@ -42,7 +42,7 @@ class TestRetrosynthesisService:
         assert result.request.biologic_target == "adalimumab"
 
     def test_plan_metadata_reports_availability(self):
-        from insulin_ai.services.retrosynthesis_service import plan_retrosynthesis
+        from biologix_ai.services.retrosynthesis_service import plan_retrosynthesis
 
         request = RetrosynthesisRequest(
             target="test_polymer",
@@ -55,7 +55,7 @@ class TestRetrosynthesisService:
         assert "aizynthfinder_models_ready" in result.metadata
 
     def test_plan_unknown_target_no_fake_route(self):
-        from insulin_ai.services.retrosynthesis_service import plan_retrosynthesis
+        from biologix_ai.services.retrosynthesis_service import plan_retrosynthesis
 
         request = RetrosynthesisRequest(target="some_unknown_polymer_xyz_12345")
         result = plan_retrosynthesis(request)
@@ -65,7 +65,7 @@ class TestRetrosynthesisService:
             assert result.metadata.get("requires_agent_extractions") is True
 
     def test_plan_peg_uses_template_when_no_agent(self):
-        from insulin_ai.services.retrosynthesis_service import plan_retrosynthesis
+        from biologix_ai.services.retrosynthesis_service import plan_retrosynthesis
 
         request = RetrosynthesisRequest(target="PEG", constraints=RetrosynthesisConstraints(max_routes=1))
         result = plan_retrosynthesis(request)
@@ -75,8 +75,8 @@ class TestRetrosynthesisService:
     def test_plan_with_session_extractions_uses_template_or_routes(self, tmp_path):
         import json
 
-        from insulin_ai.retrosynthesis.retro_adapter import write_llm_res
-        from insulin_ai.services.retrosynthesis_service import plan_retrosynthesis
+        from biologix_ai.retrosynthesis.retro_adapter import write_llm_res
+        from biologix_ai.services.retrosynthesis_service import plan_retrosynthesis
 
         extractions = {
             "test_paper": (
@@ -110,7 +110,7 @@ class TestRetrosynthesisService:
 
 class TestToxicityService:
     def test_screen_monomer_returns_result(self):
-        from insulin_ai.services.toxicity_service import screen_monomer
+        from biologix_ai.services.toxicity_service import screen_monomer
 
         result = screen_monomer("CCO")
         assert result.smiles == "CCO"
@@ -118,7 +118,7 @@ class TestToxicityService:
         assert isinstance(result.warnings, list)
 
     def test_smarts_detects_acrylamide(self):
-        from insulin_ai.services.toxicity_service import _run_smarts_screen
+        from biologix_ai.services.toxicity_service import _run_smarts_screen
 
         hits = _run_smarts_screen("C=CC(=O)N")
         rdkit_available = False
@@ -135,7 +135,7 @@ class TestToxicityService:
             assert hits == []
 
     def test_batch_screening(self):
-        from insulin_ai.services.toxicity_service import screen_monomers_batch
+        from biologix_ai.services.toxicity_service import screen_monomers_batch
 
         results = screen_monomers_batch(["CCO", "CC(=O)O"])
         assert len(results) == 2
@@ -178,7 +178,7 @@ class TestResultsCompiler:
         )
 
     def test_compile_produces_report(self):
-        from insulin_ai.services.results_compiler import compile_results
+        from biologix_ai.services.results_compiler import compile_results
 
         retro = self._make_retro_result()
         report = compile_results(retro)
@@ -187,7 +187,7 @@ class TestResultsCompiler:
         assert report.scorecards[0].recommended is True
 
     def test_compile_ranks_by_score(self):
-        from insulin_ai.services.results_compiler import compile_results
+        from biologix_ai.services.results_compiler import compile_results
 
         retro = self._make_retro_result()
         report = compile_results(retro)
@@ -195,7 +195,7 @@ class TestResultsCompiler:
         assert scores == sorted(scores, reverse=True)
 
     def test_compile_generates_narrative(self):
-        from insulin_ai.services.results_compiler import compile_results
+        from biologix_ai.services.results_compiler import compile_results
 
         retro = self._make_retro_result()
         report = compile_results(retro, generate_narrative=True)
@@ -203,7 +203,7 @@ class TestResultsCompiler:
         assert "trastuzumab" in report.narrative.lower()
 
     def test_compile_next_steps_nonempty(self):
-        from insulin_ai.services.results_compiler import compile_results
+        from biologix_ai.services.results_compiler import compile_results
 
         retro = self._make_retro_result()
         report = compile_results(retro)

@@ -20,7 +20,7 @@ def _make_two_atom_bonded_topology():
 
 
 def test_min_image_displacement():
-    from insulin_ai.simulation.pbc_unwrap import min_image_displacement
+    from biologix_ai.simulation.pbc_unwrap import min_image_displacement
 
     L = 2.0
     dr = np.array([1.8, 0.0, 0.0])
@@ -29,7 +29,7 @@ def test_min_image_displacement():
 
 
 def test_unwrap_restores_short_bond_across_periodic_image():
-    from insulin_ai.simulation.pbc_unwrap import unwrap_bond_consistent_pbc
+    from biologix_ai.simulation.pbc_unwrap import unwrap_bond_consistent_pbc
 
     top = _make_two_atom_bonded_topology()
     L = 2.0
@@ -47,7 +47,7 @@ def test_unwrap_restores_short_bond_across_periodic_image():
 
 
 def test_center_protein_com_at_cubic_cell_center():
-    from insulin_ai.simulation.pbc_unwrap import center_protein_com_at_cubic_cell_center
+    from biologix_ai.simulation.pbc_unwrap import center_protein_com_at_cubic_cell_center
 
     L = 4.0
     pos = np.array([[0.0, 0.0, 0.0], [10.0, 0.0, 0.0]], dtype=float)
@@ -57,7 +57,7 @@ def test_center_protein_com_at_cubic_cell_center():
 
 
 def test_prepare_matrix_complex_matches_unwrap_then_center():
-    from insulin_ai.simulation.pbc_unwrap import (
+    from biologix_ai.simulation.pbc_unwrap import (
         center_protein_com_at_cubic_cell_center,
         prepare_matrix_complex_pdb_positions_nm,
         unwrap_bond_consistent_pbc,
@@ -74,7 +74,7 @@ def test_prepare_matrix_complex_matches_unwrap_then_center():
 
 
 def test_cubic_box_edge_from_vectors():
-    from insulin_ai.simulation.pbc_unwrap import cubic_box_edge_nm_from_vectors
+    from biologix_ai.simulation.pbc_unwrap import cubic_box_edge_nm_from_vectors
     import openmm.unit as u
 
     L = 5.0

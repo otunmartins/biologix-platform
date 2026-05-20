@@ -39,7 +39,7 @@ def main() -> int:
     p = Path(args.path).expanduser().resolve()
     chains = tuple(c.strip() for c in args.protein_chains.split(",") if c.strip())
 
-    from insulin_ai.simulation.pymol_complex_viz import write_complex_pymol_png
+    from biologix_ai.simulation.pymol_complex_viz import write_complex_pymol_png
 
     pdbs: list[Path] = []
     if p.is_file() and p.suffix.lower() == ".pdb":

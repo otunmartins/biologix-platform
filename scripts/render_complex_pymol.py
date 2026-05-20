@@ -3,7 +3,7 @@
 Re-render insulin+polymer complex PNGs with PyMOL (ribbon + DSS for protein, sticks for polymer).
 
 Usage:
-  mamba activate insulin-ai-sim   # env with pymol on PATH
+  mamba activate biologix-ai-sim   # env with pymol on PATH
   python scripts/render_complex_pymol.py runs/insulin_patch_iter1_1/structures
 
 Counts insulin atoms as chain A+B in each PDB (same idea as the matrix viewer when
@@ -20,8 +20,8 @@ REPO = Path(__file__).resolve().parents[1]
 
 
 def _load_pymol_viz():
-    """Load ``pymol_complex_viz`` without importing ``insulin_ai.simulation`` (RDKit, etc.)."""
-    path = REPO / "src" / "python" / "insulin_ai" / "simulation" / "pymol_complex_viz.py"
+    """Load ``pymol_complex_viz`` without importing ``biologix_ai.simulation`` (RDKit, etc.)."""
+    path = REPO / "src" / "python" / "biologix_ai" / "simulation" / "pymol_complex_viz.py"
     spec = importlib.util.spec_from_file_location("pymol_complex_viz", path)
     if spec is None or spec.loader is None:
         raise RuntimeError(f"cannot load {path}")

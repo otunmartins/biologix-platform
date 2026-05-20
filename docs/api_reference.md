@@ -1,6 +1,6 @@
 # Insulin AI API reference (MCP-only)
 
-Discovery is driven **only** via the **insulin-ai** MCP server. There is no command-line `discover` / `mine` / `evaluate` app.
+Discovery is driven **only** via the **biologix-ai** MCP server. There is no command-line `discover` / `mine` / `evaluate` app.
 
 ## Equivalent operations (MCP tools)
 
@@ -12,7 +12,7 @@ Discovery is driven **only** via the **insulin-ai** MCP server. There is no comm
 | System status | `get_materials_status` |
 | PaperQA index | `index_papers` |
 
-## MCP Tools (insulin-ai server)
+## MCP Tools (biologix-ai server)
 
 See [MCP_SERVERS.md](MCP_SERVERS.md) for the full table and environment variables.
 

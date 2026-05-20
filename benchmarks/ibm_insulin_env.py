@@ -1,17 +1,17 @@
 #!/usr/bin/env python3
 """
 InsulinPSMILESEnv — Gym environments adapting IBM's logical-agent polymer
-discovery architecture to the insulin-ai OpenMM evaluation pipeline.
+discovery architecture to the biologix-ai OpenMM evaluation pipeline.
 
 Two classes mirror the IBM upstream structure:
 
-* ``InsulinPSMILESEnv`` (base env, registered as ``insulin-ai:InsulinPSMILES-v1``)
+* ``InsulinPSMILESEnv`` (base env, registered as ``biologix-ai:InsulinPSMILES-v1``)
   — actions are PSMILES strings drawn from a dynamic candidate pool; each step
   runs ``MDSimulator.evaluate_candidates`` (or a test stub / in-memory cache) and returns a
   4-tier IBM-compatible reward.
 
 * ``LogicalInsulinPSMILESEnv`` (logical wrapper, registered as
-  ``insulin-ai:logical-InsulinPSMILES-v1``)
+  ``biologix-ai:logical-InsulinPSMILES-v1``)
   — wraps the base env, proposes N candidates via ``feedback_guided_mutation``,
   computes a 5-feature logical observation vector per candidate (visited, closer,
   confident, similar, feasible), and uses a GPy GP surrogate for efficient
@@ -25,7 +25,7 @@ References
 ----------
 * IBM upstream: https://github.com/IBM/logical-agent-driven-polymer-discovery
   (RL4RealLife @ ICML 2021)
-* insulin-ai scoring: ``src/python/insulin_ai/simulation/scoring.py``
+* biologix-ai scoring: ``src/python/biologix_ai/simulation/scoring.py``
 """
 
 from __future__ import annotations
@@ -120,7 +120,7 @@ def _tanimoto_to_pool(query_smiles: str, pool_smiles: List[str]) -> float:
     try:
         from rdkit import Chem, DataStructs
 
-        from insulin_ai.material_mappings import morgan_fingerprint_bit_vect
+        from biologix_ai.material_mappings import morgan_fingerprint_bit_vect
 
         qmol = Chem.MolFromSmiles(query_smiles.replace("[*]", "[H]"))
         if qmol is None:
@@ -328,7 +328,7 @@ class InsulinPSMILESEnv(_GymEnvBase):  # type: ignore[misc]
     # ------------------------------------------------------------------
     def _get_sim(self) -> Any:
         if self._sim is None:
-            from insulin_ai.simulation import MDSimulator
+            from biologix_ai.simulation import MDSimulator
 
             self._sim = MDSimulator(n_steps=self.md_steps)
         return self._sim
@@ -338,8 +338,8 @@ class InsulinPSMILESEnv(_GymEnvBase):  # type: ignore[misc]
     # ------------------------------------------------------------------
     def _build_initial_pool(self) -> List[str]:
         """Generate initial proposal pool seeded from seed_psmiles."""
-        from insulin_ai.material_mappings import validate_psmiles
-        from insulin_ai.mutation import feedback_guided_mutation
+        from biologix_ai.material_mappings import validate_psmiles
+        from biologix_ai.mutation import feedback_guided_mutation
 
         vr = validate_psmiles(self.seed_psmiles)
         canonical = str(vr.get("canonical") or self.seed_psmiles)
@@ -454,7 +454,7 @@ class InsulinPSMILESEnv(_GymEnvBase):  # type: ignore[misc]
         self, psmiles: str
     ) -> Tuple[float, str, Optional[Dict[str, Any]]]:
         """Evaluate psmiles, return (reward_float, tier_str, md_row_or_None)."""
-        from insulin_ai.material_mappings import prescreen_psmiles_for_md, validate_psmiles
+        from biologix_ai.material_mappings import prescreen_psmiles_for_md, validate_psmiles
 
         # Validate first
         vr = validate_psmiles(psmiles)
@@ -769,7 +769,7 @@ class LogicalInsulinPSMILESEnv(_GymEnvBase):  # type: ignore[misc]
 
     def _is_feasible(self, psmiles: str) -> bool:
         try:
-            from insulin_ai.material_mappings import prescreen_psmiles_for_md
+            from biologix_ai.material_mappings import prescreen_psmiles_for_md
             return bool(prescreen_psmiles_for_md(psmiles).get("ok"))
         except Exception:
             return False
@@ -781,7 +781,7 @@ class LogicalInsulinPSMILESEnv(_GymEnvBase):  # type: ignore[misc]
         try:
             from rdkit import Chem
 
-            from insulin_ai.material_mappings import morgan_fingerprint_bit_vect
+            from biologix_ai.material_mappings import morgan_fingerprint_bit_vect
 
             mol = Chem.MolFromSmiles(psmiles.replace("[*]", "[H]"))
             if mol is None:
@@ -846,11 +846,11 @@ def _register_envs() -> None:
         import gymnasium as gym
 
         gym.register(
-            id="insulin-ai/InsulinPSMILES-v1",
+            id="biologix-ai/InsulinPSMILES-v1",
             entry_point="benchmarks.ibm_insulin_env:InsulinPSMILESEnv",
         )
         gym.register(
-            id="insulin-ai/logical-InsulinPSMILES-v1",
+            id="biologix-ai/logical-InsulinPSMILES-v1",
             entry_point="benchmarks.ibm_insulin_env:LogicalInsulinPSMILESEnv",
         )
     except Exception:

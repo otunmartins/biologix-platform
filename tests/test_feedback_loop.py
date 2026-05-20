@@ -15,9 +15,9 @@ sys.path.insert(0, ROOT)
 def test_mdsimulator_interface():
     """MDSimulator implements evaluate_candidates(candidates) -> feedback dict."""
     import pytest
-    from insulin_ai.simulation import MDSimulator
-    from insulin_ai.simulation.openmm_compat import openmm_available
-    from insulin_ai.simulation.packmol_packer import _packmol_available
+    from biologix_ai.simulation import MDSimulator
+    from biologix_ai.simulation.openmm_compat import openmm_available
+    from biologix_ai.simulation.packmol_packer import _packmol_available
 
     if not openmm_available():
         pytest.skip("OpenMM stack + MDSimulator required")
@@ -58,9 +58,9 @@ def test_feedback_state_update():
 def test_mdsimulator_with_mock_candidates():
     """Full evaluate_candidates with mixed candidate formats."""
     import pytest
-    from insulin_ai.simulation import MDSimulator
-    from insulin_ai.simulation.openmm_compat import openmm_available
-    from insulin_ai.simulation.packmol_packer import _packmol_available
+    from biologix_ai.simulation import MDSimulator
+    from biologix_ai.simulation.openmm_compat import openmm_available
+    from biologix_ai.simulation.packmol_packer import _packmol_available
 
     if not openmm_available():
         pytest.skip("OpenMM stack + MDSimulator required")

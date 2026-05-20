@@ -4,7 +4,7 @@ import pytest
 
 
 def test_build_pymol_complex_script_index_selection(tmp_path):
-    from insulin_ai.simulation.pymol_complex_viz import build_pymol_complex_script
+    from biologix_ai.simulation.pymol_complex_viz import build_pymol_complex_script
 
     pdb = tmp_path / "a.pdb"
     png = tmp_path / "o.png"
@@ -18,7 +18,7 @@ def test_build_pymol_complex_script_index_selection(tmp_path):
 
 
 def test_build_pymol_complex_script_chain_fallback(tmp_path):
-    from insulin_ai.simulation.pymol_complex_viz import build_pymol_complex_script
+    from biologix_ai.simulation.pymol_complex_viz import build_pymol_complex_script
 
     pdb = tmp_path / "a.pdb"
     png = tmp_path / "o.png"
@@ -31,7 +31,7 @@ def test_build_pymol_complex_script_chain_fallback(tmp_path):
 
 
 def test_write_complex_viz_png_auto_is_pymol_only(tmp_path):
-    from insulin_ai.simulation.pymol_complex_viz import write_complex_viz_png_auto
+    from biologix_ai.simulation.pymol_complex_viz import write_complex_viz_png_auto
 
     pdb = tmp_path / "c.pdb"
     pdb.write_text(
@@ -57,7 +57,7 @@ def test_write_complex_viz_png_auto_is_pymol_only(tmp_path):
 
 
 def test_write_complex_pymol_png_integration(tmp_path):
-    from insulin_ai.simulation.pymol_complex_viz import write_complex_pymol_png
+    from biologix_ai.simulation.pymol_complex_viz import write_complex_pymol_png
 
     pdb = tmp_path / "c.pdb"
     pdb.write_text(

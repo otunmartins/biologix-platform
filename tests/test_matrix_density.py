@@ -6,7 +6,7 @@ import pytest
 
 def test_shell_volume_cm3():
     """Cube minus sphere: V_shell = box³ - (4/3)π R³."""
-    from insulin_ai.simulation.matrix_density import shell_volume_cm3
+    from biologix_ai.simulation.matrix_density import shell_volume_cm3
 
     box_nm = 9.0
     r_ang = 14.0
@@ -24,7 +24,7 @@ def test_shell_volume_cm3():
 
 def test_suggest_n_polymers_from_density():
     """For known psmiles, box, density: n_polymers in expected range and scales with density."""
-    from insulin_ai.simulation.matrix_density import suggest_n_polymers_from_density
+    from biologix_ai.simulation.matrix_density import suggest_n_polymers_from_density
 
     n1, shell1 = suggest_n_polymers_from_density(
         target_density_g_cm3=0.5,
@@ -50,7 +50,7 @@ def test_suggest_n_polymers_from_density():
 
 def test_suggest_n_polymers_from_density_bulk():
     """Bulk uses full-box volume; shell_inner is None; n scales above shell for same rho."""
-    from insulin_ai.simulation.matrix_density import suggest_n_polymers_from_density
+    from biologix_ai.simulation.matrix_density import suggest_n_polymers_from_density
 
     n_bulk, inner_bulk = suggest_n_polymers_from_density(
         target_density_g_cm3=0.5,
@@ -77,8 +77,8 @@ def test_suggest_n_polymers_from_density_bulk():
 
 def test_compute_shell_inner_from_pdb():
     """Shell inner from 4F1C PDB returns reasonable radius in Angstrom."""
-    from insulin_ai.simulation.matrix_density import compute_shell_inner_from_pdb
-    from insulin_ai.simulation.polymer_build import ensure_insulin_pdb
+    from biologix_ai.simulation.matrix_density import compute_shell_inner_from_pdb
+    from biologix_ai.simulation.polymer_build import ensure_insulin_pdb
 
     pdb = ensure_insulin_pdb()
     r = compute_shell_inner_from_pdb(pdb)
@@ -87,7 +87,7 @@ def test_compute_shell_inner_from_pdb():
 
 def test_suggest_box_size_from_shell():
     """Box = 2 * (R_inner + thickness + margin)."""
-    from insulin_ai.simulation.matrix_density import suggest_box_size_from_shell
+    from biologix_ai.simulation.matrix_density import suggest_box_size_from_shell
 
     box = suggest_box_size_from_shell(
         shell_inner_angstrom=14.0,

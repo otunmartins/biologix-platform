@@ -453,7 +453,7 @@ def plot_comparison(
     except ImportError as e:
         raise ImportError(
             "matplotlib is required for plotting. Install with: "
-            "pip install 'insulin-ai[simulation]' or pip install matplotlib"
+            "pip install 'biologix-ai[simulation]' or pip install matplotlib"
         ) from e
 
     data = json.loads(ibm_json.read_text(encoding="utf-8"))

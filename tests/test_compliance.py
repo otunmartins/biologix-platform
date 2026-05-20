@@ -7,7 +7,7 @@ import os
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src", "python"))
 
-from insulin_ai.services.compliance_service import check_excipient_compliance, ComplianceResult
+from biologix_ai.services.compliance_service import check_excipient_compliance, ComplianceResult
 
 
 def test_peg_is_approved_fda_ema():

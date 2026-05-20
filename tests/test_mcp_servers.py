@@ -13,8 +13,8 @@ import importlib.util
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 
-# Single MCP server (insulin_ai_mcp_server.py); literature lives in insulin_ai.literature
-MCP_SERVERS = [("insulin_ai_mcp_server", "insulin_ai_mcp_server.py")]
+# Single MCP server (biologix_ai_mcp_server.py); literature lives in biologix_ai.literature
+MCP_SERVERS = [("biologix_ai_mcp_server", "biologix_ai_mcp_server.py")]
 
 
 def _load_mcp_server(path: str):
@@ -26,10 +26,10 @@ def _load_mcp_server(path: str):
     return mod
 
 
-def test_insulin_ai_mcp_server_loads():
-    """insulin-ai MCP server must load (run_autonomous_discovery, mine_literature, etc.)."""
+def test_biologix_ai_mcp_server_loads():
+    """biologix-ai MCP server must load (run_autonomous_discovery, mine_literature, etc.)."""
     try:
-        mod = _load_mcp_server("insulin_ai_mcp_server.py")
+        mod = _load_mcp_server("biologix_ai_mcp_server.py")
     except (ImportError, ModuleNotFoundError) as e:
         import pytest
         pytest.skip(f"MCP dependencies unavailable: {e}")
@@ -40,7 +40,7 @@ def test_insulin_ai_mcp_server_loads():
 def test_all_mcp_servers_load():
     """All OpenCode-enabled MCP servers must load without @tool decorator errors."""
     try:
-        _load_mcp_server("insulin_ai_mcp_server.py")
+        _load_mcp_server("biologix_ai_mcp_server.py")
     except (ImportError, ModuleNotFoundError) as e:
         import pytest
         pytest.skip(f"MCP dependencies unavailable: {e}")
@@ -50,7 +50,7 @@ def test_all_mcp_servers_load():
 
 def test_normalize_psmiles_list_for_eval():
     try:
-        mod = _load_mcp_server("insulin_ai_mcp_server.py")
+        mod = _load_mcp_server("biologix_ai_mcp_server.py")
     except (ImportError, ModuleNotFoundError) as e:
         import pytest
 
@@ -66,7 +66,7 @@ def test_normalize_psmiles_list_for_eval():
 
 def test_openmm_evaluate_psmiles_empty_returns_json_error():
     try:
-        mod = _load_mcp_server("insulin_ai_mcp_server.py")
+        mod = _load_mcp_server("biologix_ai_mcp_server.py")
     except (ImportError, ModuleNotFoundError) as e:
         import pytest
 
@@ -79,7 +79,7 @@ def test_openmm_evaluate_psmiles_empty_returns_json_error():
 def test_validate_psmiles_json_shape():
     """validate_psmiles returns JSON with valid; optional name_crosscheck when enabled."""
     try:
-        mod = _load_mcp_server("insulin_ai_mcp_server.py")
+        mod = _load_mcp_server("biologix_ai_mcp_server.py")
     except (ImportError, ModuleNotFoundError) as e:
         import pytest
 
@@ -118,7 +118,7 @@ def test_no_mcp_tool_without_parens():
 
 def test_discovery_world_mcp_patch_and_get():
     try:
-        mod = _load_mcp_server("insulin_ai_mcp_server.py")
+        mod = _load_mcp_server("biologix_ai_mcp_server.py")
     except (ImportError, ModuleNotFoundError) as e:
         import pytest
 
@@ -146,7 +146,7 @@ def test_discovery_world_mcp_patch_and_get():
 
 def test_save_discovery_state_updates_world_meta_when_world_exists():
     try:
-        mod = _load_mcp_server("insulin_ai_mcp_server.py")
+        mod = _load_mcp_server("biologix_ai_mcp_server.py")
     except (ImportError, ModuleNotFoundError) as e:
         import pytest
 
@@ -154,7 +154,7 @@ def test_save_discovery_state_updates_world_meta_when_world_exists():
     import tempfile
 
     sys.path.insert(0, os.path.join(ROOT, "src", "python"))
-    from insulin_ai.discovery_world import empty_world, save_world, world_path_for_session
+    from biologix_ai.discovery_world import empty_world, save_world, world_path_for_session
 
     with tempfile.TemporaryDirectory() as td:
         wp = world_path_for_session(td)

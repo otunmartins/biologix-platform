@@ -16,7 +16,7 @@
 #
 # Env:
 #   PAPER_STUDY_TSV — comparison TSV path (default: benchmarks/comparison_results_study.tsv)
-#   CONDA_ENV — conda env name (default: insulin-ai-sim)
+#   CONDA_ENV — conda env name (default: biologix-ai-sim)
 
 set -euo pipefail
 
@@ -24,7 +24,7 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_ROOT"
 
 export PYTHONUNBUFFERED=1
-CONDA_ENV="${CONDA_ENV:-insulin-ai-sim}"
+CONDA_ENV="${CONDA_ENV:-biologix-ai-sim}"
 RUN="conda run -n ${CONDA_ENV} --no-capture-output"
 TSV="${PAPER_STUDY_TSV:-benchmarks/comparison_results_study.tsv}"
 SEED_PSMILES="[*]OCC[*]"

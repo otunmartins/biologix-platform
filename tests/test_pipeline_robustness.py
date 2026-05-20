@@ -7,7 +7,7 @@ class TestPrescreenPSMILESForMD:
     """prescreen_psmiles_for_md catches chemistry that would crash OpenMM/GAFF."""
 
     def _prescreen(self, psmiles):
-        from insulin_ai.material_mappings import prescreen_psmiles_for_md
+        from biologix_ai.material_mappings import prescreen_psmiles_for_md
         return prescreen_psmiles_for_md(psmiles)
 
     def test_valid_peg(self):
@@ -62,7 +62,7 @@ class TestBuildPolymerOligomerSmiles:
     """build_polymer_oligomer_smiles returns (smiles, actual_repeats) tuple."""
 
     def _build(self, psmiles, n):
-        from insulin_ai.simulation.polymer_build import build_polymer_oligomer_smiles
+        from biologix_ai.simulation.polymer_build import build_polymer_oligomer_smiles
         return build_polymer_oligomer_smiles(psmiles, n)
 
     def test_single_repeat(self):
@@ -89,7 +89,7 @@ class TestEmbedMol3D:
     def test_success(self):
         from rdkit import Chem
         from rdkit.Chem import AllChem
-        from insulin_ai.simulation.polymer_build import embed_mol_3d
+        from biologix_ai.simulation.polymer_build import embed_mol_3d
 
         mol = Chem.AddHs(Chem.MolFromSmiles("CCCC"))
         ok, err = embed_mol_3d(mol)
@@ -98,7 +98,7 @@ class TestEmbedMol3D:
 
     def test_returns_error_string_on_failure(self):
         from rdkit import Chem
-        from insulin_ai.simulation.polymer_build import embed_mol_3d
+        from biologix_ai.simulation.polymer_build import embed_mol_3d
 
         mol = Chem.RWMol()  # empty molecule
         ok, err = embed_mol_3d(mol)
@@ -111,7 +111,7 @@ class TestPropertyExtractorNameFormat:
     """Problematic features use full names, not truncated."""
 
     def test_full_names_in_problematic_features(self):
-        from insulin_ai.simulation.property_extractor import PropertyExtractor
+        from biologix_ai.simulation.property_extractor import PropertyExtractor
 
         ext = PropertyExtractor()
         long_name = "Candidate_with_a_very_long_material_name_42"
@@ -122,7 +122,7 @@ class TestPropertyExtractorNameFormat:
         assert len(matching) > 0, f"Full name not found in: {probs}"
 
     def test_colon_separator_in_problematic_features(self):
-        from insulin_ai.simulation.property_extractor import PropertyExtractor
+        from biologix_ai.simulation.property_extractor import PropertyExtractor
 
         ext = PropertyExtractor()
         results = [{"interaction_energy_kj_mol": 100.0, "psmiles": "[*]CC[*]"}]
@@ -134,7 +134,7 @@ class TestPropertyExtractorNameFormat:
                 assert p.split(":", 1)[1] == "TestCand"
 
     def test_psmiles_included_in_property_analysis(self):
-        from insulin_ai.simulation.property_extractor import PropertyExtractor
+        from biologix_ai.simulation.property_extractor import PropertyExtractor
 
         ext = PropertyExtractor()
         results = [{"interaction_energy_kj_mol": -10.0, "psmiles": "[*]OCC[*]"}]
@@ -142,7 +142,7 @@ class TestPropertyExtractorNameFormat:
         assert fb["property_analysis"]["C0"]["psmiles"] == "[*]OCC[*]"
 
     def test_all_positive_energy_no_high_performers(self):
-        from insulin_ai.simulation.property_extractor import PropertyExtractor
+        from biologix_ai.simulation.property_extractor import PropertyExtractor
 
         ext = PropertyExtractor()
         results = [
@@ -155,7 +155,7 @@ class TestPropertyExtractorNameFormat:
             f"No high performers expected when all energies positive, got: {fb['high_performers']}"
 
     def test_evaluation_failed_includes_name(self):
-        from insulin_ai.simulation.property_extractor import PropertyExtractor
+        from biologix_ai.simulation.property_extractor import PropertyExtractor
 
         ext = PropertyExtractor()
         results = [None]
@@ -168,7 +168,7 @@ class TestDiscoveryScoreNormalized:
     """discovery_score averages per-candidate bonus instead of summing."""
 
     def test_score_independent_of_batch_size(self):
-        from insulin_ai.simulation.scoring import discovery_score
+        from biologix_ai.simulation.scoring import discovery_score
 
         row = {"interaction_energy_kj_mol": -100.0}
         fb_1 = {

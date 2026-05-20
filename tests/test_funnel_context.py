@@ -10,7 +10,7 @@ from pathlib import Path
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src", "python"))
 
-from insulin_ai.services.funnel_context import (
+from biologix_ai.services.funnel_context import (
     save_funnel_context,
     get_funnel_context,
     list_funnel_stages,

@@ -20,7 +20,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "src" / "python"))
 
-from insulin_ai.simulation.pymol_complex_viz import write_complex_pymol_png
+from biologix_ai.simulation.pymol_complex_viz import write_complex_pymol_png
 
 import matplotlib
 matplotlib.use("Agg")

@@ -7,7 +7,7 @@ import os
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src", "python"))
 
-from insulin_ai.services.pipeline_audit import save_pipeline_stage, get_pipeline_audit
+from biologix_ai.services.pipeline_audit import save_pipeline_stage, get_pipeline_audit
 
 
 PSMILES_A = "[*]OCC[*]"

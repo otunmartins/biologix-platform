@@ -3,7 +3,7 @@ requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "insulin-ai"
+name = "biologix-ai"
 version = "0.3.0"
 description = "AI-Driven Biologics Stabilisation Platform - Retrosynthesis, Simulation & Discovery"
 readme = "README.md"
@@ -97,12 +97,12 @@ dev = [
     "httpx>=0.27",
 ]
 all = [
-    "insulin-ai[simulation,paperqa,llm,rl,benchmark,retro,admet,api,dev]",
+    "biologix-ai[simulation,paperqa,llm,rl,benchmark,retro,admet,api,dev]",
 ]
 
 [tool.setuptools.packages.find]
 where = ["src/python"]
-include = ["insulin_ai*"]
+include = ["biologix_ai*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

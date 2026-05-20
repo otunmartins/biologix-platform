@@ -1,8 +1,8 @@
-# Getting started with the insulin-ai MCP server
+# Getting started with the biologix-ai MCP server
 
-This guide walks you through installing insulin-ai and connecting its MCP (Model Context Protocol) server to an AI-assisted editor like Cursor. The MCP server lets AI assistants search literature, validate polymer structures (PSMILES), and run physics-based screening—all from inside your IDE.
+This guide walks you through installing biologix-ai and connecting its MCP (Model Context Protocol) server to an AI-assisted editor like Cursor. The MCP server lets AI assistants search literature, validate polymer structures (PSMILES), and run physics-based screening—all from inside your IDE.
 
-**New to MCP?** The [Model Context Protocol](https://modelcontextprotocol.io/) lets AI tools call external services. In insulin-ai, those services are things like “evaluate this polymer against insulin” or “search papers for materials that stabilize proteins.”
+**New to MCP?** The [Model Context Protocol](https://modelcontextprotocol.io/) lets AI tools call external services. In biologix-ai, those services are things like “evaluate this polymer against insulin” or “search papers for materials that stabilize proteins.”
 
 ---
 
@@ -19,11 +19,11 @@ This guide walks you through installing insulin-ai and connecting its MCP (Model
 
 ## Windows users: use WSL2
 
-The insulin-ai screening stack (OpenMM, Packmol, bash scripts) does **not** run natively on Windows. You need **WSL2** (Windows Subsystem for Linux).
+The biologix-ai screening stack (OpenMM, Packmol, bash scripts) does **not** run natively on Windows. You need **WSL2** (Windows Subsystem for Linux).
 
 1. Install WSL2 and Ubuntu from the [Microsoft Store](https://apps.microsoft.com/store/detail/ubuntu/9PDXGNCFSCZV) or with `wsl --install` in PowerShell.
 2. Open a **Ubuntu** (or other Linux) terminal—this is your Linux environment.
-3. Clone the insulin-ai repo **inside** your Linux home directory, e.g. `~/insulin-ai`, not `C:\Users\...\insulin-ai`.
+3. Clone the biologix-ai repo **inside** your Linux home directory, e.g. `~/insulin-ai`, not `C:\Users\...\biologix-ai`.
 
 From here, follow the same steps as Linux users. Paths in MCP config will look like `/home/your-username/insulin-ai/...`.
 
@@ -34,7 +34,7 @@ From here, follow the same steps as Linux users. Paths in MCP config will look l
 From a terminal in the repo root:
 
 ```bash
-# Creates conda env insulin-ai-sim (chunked conda-forge + pip — safer on low RAM)
+# Creates conda env biologix-ai-sim (chunked conda-forge + pip — safer on low RAM)
 ./install
 ```
 
@@ -50,7 +50,7 @@ For a **single** solve from `environment-simulation.yml` (needs more RAM than th
 ./install --conda-yml
 ```
 
-The preferred path uses a conda env named **`insulin-ai-sim`**. You can create it manually with **`mamba env create -f environment-simulation.yml`** or **`bash scripts/install_insulin_ai_sim_lowmem.sh`** (same as default `./install`).
+The preferred path uses a conda env named **`biologix-ai-sim`**. You can create it manually with **`mamba env create -f environment-simulation.yml`** or **`bash scripts/install_biologix_ai_sim_lowmem.sh`** (same as default `./install`).
 
 ---
 
@@ -59,7 +59,7 @@ The preferred path uses a conda env named **`insulin-ai-sim`**. You can create i
 Check that the simulation stack is usable:
 
 ```bash
-mamba run -n insulin-ai-sim python scripts/diagnose_openmm_complex.py '[*]COC[*]'
+mamba run -n biologix-ai-sim python scripts/diagnose_openmm_complex.py '[*]COC[*]'
 ```
 
 You should see a short run with energies printed. If this fails, Packmol or OpenMM may be missing—see [Dependencies](DEPENDENCIES.md) and [OpenMM screening](OPENMM_SCREENING.md).
@@ -79,10 +79,10 @@ You should see a short run with energies printed. If this fails, Packmol or Open
    - macOS/Linux: `/Users/jane/insulin-ai` or `/home/jane/insulin-ai`
    - Windows + WSL: `/home/jane/insulin-ai` (use the Linux path inside WSL, not `C:\...`)
 
-3. The insulin-ai block should look like this (paths updated):
+3. The biologix-ai block should look like this (paths updated):
 
    ```json
-   "insulin-ai": {
+   "biologix-ai": {
      "command": "bash",
      "args": ["/home/jane/insulin-ai/scripts/run_mcp_server.sh"],
      "env": {
@@ -98,7 +98,7 @@ You should see a short run with energies printed. If this fails, Packmol or Open
 
 ## Step 4: Confirm the server is running
 
-In Cursor, open a chat and ask the AI to “list available insulin-ai tools” or “validate the PSMILES `[*]OCC[*]`.” If the MCP server is connected, it should call `validate_psmiles` and return a result.
+In Cursor, open a chat and ask the AI to “list available biologix-ai tools” or “validate the PSMILES `[*]OCC[*]`.” If the MCP server is connected, it should call `validate_psmiles` and return a result.
 
 Discovery runs write outputs to `runs/<session_id>/`. Each session gets its own folder with `agent_iteration_*.json`, `SUMMARY_REPORT.md`, and—when screening runs—`structures/` (PNGs, minimized PDBs). See [OpenMM screening](OPENMM_SCREENING.md) for details.
 
@@ -133,10 +133,10 @@ For literature mining and web cross-checks:
 | Problem | What to try |
 |---------|-------------|
 | **“Command not found: mamba”** | Install [Miniforge](https://github.com/conda-forge/miniforge) or use `conda` instead of `mamba` in the commands above. |
-| **“No such file: run_mcp_server.sh”** | Open Cursor from the insulin-ai repo root (or set `command` to the full absolute path to `run_mcp_server.sh`). |
+| **“No such file: run_mcp_server.sh”** | Open Cursor from the biologix-ai repo root (or set `command` to the full absolute path to `run_mcp_server.sh`). |
 | **Paths still point to /ABSOLUTE/PATH/** | Replace every `/ABSOLUTE/PATH/TO/insulin-ai` in `.cursor/mcp.json` with your real path. On Windows, use the WSL path (e.g. `/home/user/insulin-ai`). |
-| **Packmol not found** | Install via `conda install -c conda-forge packmol` in the `insulin-ai-sim` env. Packmol must be on `PATH` when the MCP server runs. |
-| **Wrong Python / wrong env** | The launcher uses `mamba run -n insulin-ai-sim` (or `conda run`). Ensure `insulin-ai-sim` exists: `mamba env list`. |
+| **Packmol not found** | Install via `conda install -c conda-forge packmol` in the `biologix-ai-sim` env. Packmol must be on `PATH` when the MCP server runs. |
+| **Wrong Python / wrong env** | The launcher uses `mamba run -n biologix-ai-sim` (or `conda run`). Ensure `biologix-ai-sim` exists: `mamba env list`. |
 | **MCP server doesn’t show up in Cursor** | Reload the window (Cmd/Ctrl+Shift+P → “Reload Window”). Confirm `.cursor/mcp.json` exists and has valid JSON. |
 
 ---

@@ -38,7 +38,7 @@ Embed **two** visuals per candidate when available:
 - **Insulin–polymer complex after OpenMM minimization** — (1) a quick **point cloud** preview: `structures/<slug>_complex_preview.png`; (2) a **PyMOL** cartoon + polymer ball-and-stick figure: `structures/<slug>_complex_chemviz.png` (requires `pymol` on PATH). Regenerate the latter with `python scripts/render_complex_chemviz.py <session>/structures/`.
 - **PDB** — `structures/<slug>_complex_minimized.pdb` for reproducibility.
 
-With `INSULIN_AI_SESSION_DIR` set (or MCP `openmm_evaluate_psmiles` `run_dir` / `artifacts_dir`), **`openmm_evaluate_psmiles`** writes these files under `<session>/structures/` unless disabled (`INSULIN_AI_EVAL_NO_STRUCTURE_ARTIFACTS=1`). In `SUMMARY_REPORT.md` use relative Markdown images, for example:
+With `BIOLOGIX_AI_SESSION_DIR` set (or MCP `openmm_evaluate_psmiles` `run_dir` / `artifacts_dir`), **`openmm_evaluate_psmiles`** writes these files under `<session>/structures/` unless disabled (`BIOLOGIX_AI_EVAL_NO_STRUCTURE_ARTIFACTS=1`). In `SUMMARY_REPORT.md` use relative Markdown images, for example:
 
 ```markdown
 ![Monomer](structures/Candidate_0_monomer.png)

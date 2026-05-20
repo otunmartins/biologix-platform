@@ -12,7 +12,7 @@ import json
 import pytest
 
 try:
-    from insulin_ai.http_api.schemas import (
+    from biologix_ai.http_api.schemas import (
         APIError,
         CandidateProfileRequest,
         CandidateProfileResponse,
@@ -197,7 +197,7 @@ class TestFunnelManifestEntry:
 
 class TestPersonaPreset:
     def test_weights_sum_to_one(self):
-        from insulin_ai.http_api.routers.personas import _PERSONAS
+        from biologix_ai.http_api.routers.personas import _PERSONAS
 
         for persona in _PERSONAS:
             w = persona.weights
@@ -215,7 +215,7 @@ class TestPersonaPreset:
             )
 
     def test_all_five_personas_present(self):
-        from insulin_ai.http_api.routers.personas import _PERSONAS
+        from biologix_ai.http_api.routers.personas import _PERSONAS
 
         ids = {p.id for p in _PERSONAS}
         expected = {
@@ -252,7 +252,7 @@ class TestPersonaPreset:
 
 class TestSessionResponse:
     def test_serialises(self):
-        from insulin_ai.services.biologic_resolver import BiologicTarget
+        from biologix_ai.services.biologic_resolver import BiologicTarget
 
         bio = BiologicTarget(query="insulin", canonical_name="insulin", pdb_id="")
         obj = SessionResponse(

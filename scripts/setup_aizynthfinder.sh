@@ -14,9 +14,9 @@ fi
 
 echo "Installing AiZynthFinder package..."
 if command -v mamba &>/dev/null; then
-  mamba run -n insulin-ai-sim pip install -e "$REPO_ROOT/extern/aizynthfinder" paretoset
+  mamba run -n biologix-ai-sim pip install -e "$REPO_ROOT/extern/aizynthfinder" paretoset
 elif command -v conda &>/dev/null; then
-  conda run -n insulin-ai-sim pip install -e "$REPO_ROOT/extern/aizynthfinder" paretoset
+  conda run -n biologix-ai-sim pip install -e "$REPO_ROOT/extern/aizynthfinder" paretoset
 else
   pip install -e "$REPO_ROOT/extern/aizynthfinder" paretoset
 fi
@@ -24,4 +24,4 @@ fi
 echo "Downloading public data to $DEST ..."
 python -m aizynthfinder.tools.download_public_data "$DEST"
 
-echo "Done. Set INSULIN_AI_AIZYNTH_CONFIG=$DEST/config.yml"
+echo "Done. Set BIOLOGIX_AI_AIZYNTH_CONFIG=$DEST/config.yml"

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Build or update the PaperQA2 search index over papers in papers/.
 #
-# Uses the same settings as insulin_ai_mcp_server (paper_qa_config.py).
+# Uses the same settings as biologix_ai_mcp_server (paper_qa_config.py).
 # Supports Ollama: PQA_EMBEDDING=ollama/nomic-embed-text (no OpenAI key).
 # Or OpenAI: OPENAI_API_KEY=sk-... with default text-embedding-3-small.
 #
@@ -23,6 +23,6 @@ fi
 
 export PYTHONPATH="$REPO_ROOT/src/python${PYTHONPATH:+:$PYTHONPATH}"
 python3 -c "
-from insulin_ai.paper_qa_config import build_index
+from biologix_ai.paper_qa_config import build_index
 print(build_index())
 "

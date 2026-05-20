@@ -14,18 +14,18 @@ import pytest
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src", "python"))
 
-from insulin_ai.discovery_world import ensure_world_for_session, load_world, world_path_for_session
+from biologix_ai.discovery_world import ensure_world_for_session, load_world, world_path_for_session
 
 
 def _import_mcp_server():
     """Import the MCP server module without starting the server."""
     import importlib
     spec = importlib.util.spec_from_file_location(
-        "insulin_ai_mcp_server",
-        os.path.join(os.path.dirname(__file__), "..", "insulin_ai_mcp_server.py"),
+        "biologix_ai_mcp_server",
+        os.path.join(os.path.dirname(__file__), "..", "biologix_ai_mcp_server.py"),
     )
     mod = importlib.util.module_from_spec(spec)
-    sys.modules["insulin_ai_mcp_server"] = mod
+    sys.modules["biologix_ai_mcp_server"] = mod
 
     original_run = None
     try:
@@ -45,7 +45,7 @@ def _import_mcp_server():
 
 @pytest.fixture
 def _restore_insulin_session_env():
-    keys = ("INSULIN_AI_SESSION_DIR", "INSULIN_AI_TARGET_PROTEIN_PDB")
+    keys = ("BIOLOGIX_AI_SESSION_DIR", "BIOLOGIX_AI_TARGET_PROTEIN_PDB")
     saved = {k: os.environ.get(k) for k in keys}
     yield
     for k in keys:

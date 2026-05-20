@@ -1,6 +1,6 @@
 # Benchmark definition, baselines, ablations, and reproducibility
 
-This document captures how to strengthen a peer-reviewed paper and the insulin-ai **platform** for: benchmark definition, baselines, ablations, and reproducibility. It is intended for an AI agent (or human) orchestrating a systematic benchmarking study later.
+This document captures how to strengthen a peer-reviewed paper and the biologix-ai **platform** for: benchmark definition, baselines, ablations, and reproducibility. It is intended for an AI agent (or human) orchestrating a systematic benchmarking study later.
 
 Related in-repo docs:
 
@@ -22,7 +22,7 @@ Related in-repo docs:
 
 ### Platform (recommended additions)
 
-- Add a **`benchmark_manifest.yaml`** (or extend session `session.json`) per run: git commit, environment fingerprint, all `INSULIN_AI_*` env vars that affect physics, CLI flags, and benchmark / session identifiers.
+- Add a **`benchmark_manifest.yaml`** (or extend session `session.json`) per run: git commit, environment fingerprint, all `BIOLOGIX_AI_*` env vars that affect physics, CLI flags, and benchmark / session identifiers.
 - Provide a single **`benchmarks/run_all_baselines.sh`** (or Makefile target) that runs every method with the **same** budget *B* and writes one combined TSV + one results JSON per method.
 
 ---
@@ -82,7 +82,7 @@ For the **LLM agent**, report **cost** separately (tokens, model id, API vs loca
 ### Platform
 
 - Ship **`conda list --explicit`** or **`pip freeze`** per release; optional **Dockerfile** (packmol + OpenMM + pinned SB3).
-- Document nondeterminism (parallel workers, GPU, threads); recommend **`INSULIN_AI_EVAL_MAX_WORKERS=1`** for strict repro mode.
+- Document nondeterminism (parallel workers, GPU, threads); recommend **`BIOLOGIX_AI_EVAL_MAX_WORKERS=1`** for strict repro mode.
 - **CI:** Keep stub-based tests for benchmark scripts; optional workflow that runs parity checks without OpenMM.
 - **Plotting:** Document in README/SI:  
   `python benchmarks/plot_ibm_vs_agentic_interaction_energy.py --ibm-json ... --agentic-session ...`  
@@ -124,7 +124,7 @@ For the **LLM agent**, report **cost** separately (tokens, model id, API vs loca
 | Paper Table 2 generator | `benchmarks/generate_paper_comparison_table.py` |
 | Random PSMILES baseline | `benchmarks/random_psmiles_baseline.py` |
 | Study TSV (fresh runs) | `benchmarks/comparison_results_study.tsv` |
-| MDSimulator / eval | `src/python/insulin_ai/simulation/md_simulator.py` |
+| MDSimulator / eval | `src/python/biologix_ai/simulation/md_simulator.py` |
 
 ---
 

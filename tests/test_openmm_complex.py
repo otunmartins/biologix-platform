@@ -5,7 +5,7 @@ import pytest
 
 def test_parse_ssbond_from_pdb():
     """Parse SSBOND lines from 4F1C; expect 6 total, 3 for chains A+B."""
-    from insulin_ai.simulation.openmm_complex import parse_ssbond_pairs
+    from biologix_ai.simulation.openmm_complex import parse_ssbond_pairs
 
     pairs = parse_ssbond_pairs("SSBOND   1 CYS A    6    CYS A   11\n")
     assert pairs == [("A", 6, "A", 11)]
@@ -25,8 +25,8 @@ def test_parse_ssbond_from_4f1c():
     """Parse SSBOND from actual 4F1C PDB."""
     from pathlib import Path
 
-    from insulin_ai.simulation.openmm_complex import parse_ssbond_pairs
-    from insulin_ai.simulation.polymer_build import ensure_insulin_pdb
+    from biologix_ai.simulation.openmm_complex import parse_ssbond_pairs
+    from biologix_ai.simulation.polymer_build import ensure_insulin_pdb
 
     pdb_path = ensure_insulin_pdb()
     text = Path(pdb_path).read_text()
@@ -41,8 +41,8 @@ def test_parse_ssbond_from_4f1c():
 
 def test_prepare_insulin_ab_pdb_creates_file(tmp_path):
     """prepare_insulin_ab_pdb writes PDB with only chains A+B and SSBOND."""
-    from insulin_ai.simulation.openmm_complex import prepare_insulin_ab_pdb
-    from insulin_ai.simulation.polymer_build import ensure_insulin_pdb
+    from biologix_ai.simulation.openmm_complex import prepare_insulin_ab_pdb
+    from biologix_ai.simulation.polymer_build import ensure_insulin_pdb
 
     src = ensure_insulin_pdb()
     out = tmp_path / "insulin_AB.pdb"
@@ -61,11 +61,11 @@ def test_openmm_load_protein_with_disulfides():
     """Load insulin_AB PDB, ensure 3 disulfide bonds in topology."""
     from pathlib import Path
 
-    from insulin_ai.simulation.openmm_complex import (
+    from biologix_ai.simulation.openmm_complex import (
         prepare_insulin_ab_pdb,
         ensure_disulfide_bonds,
     )
-    from insulin_ai.simulation.polymer_build import ensure_insulin_pdb
+    from biologix_ai.simulation.polymer_build import ensure_insulin_pdb
     from openmm.app import PDBFile, Modeller
 
     src = ensure_insulin_pdb()
@@ -89,12 +89,12 @@ def test_openmm_protein_minimization():
     """Load insulin A+B (PDBFixer + disulfides), add H, minimize; potential energy finite."""
     from pathlib import Path
 
-    from insulin_ai.simulation.openmm_complex import (
+    from biologix_ai.simulation.openmm_complex import (
         prepare_insulin_ab_pdb,
         run_protein_minimization,
     )
-    from insulin_ai.simulation.openmm_insulin import load_insulin_modeller
-    from insulin_ai.simulation.polymer_build import ensure_insulin_pdb
+    from biologix_ai.simulation.openmm_insulin import load_insulin_modeller
+    from biologix_ai.simulation.polymer_build import ensure_insulin_pdb
     from openmm.app import ForceField
 
     src = ensure_insulin_pdb()
@@ -163,12 +163,12 @@ def test_openmm_npt_api_dry_run():
 
 def test_ligand_gasteiger_charges():
     """RDKit Gasteiger + OpenFF Molecule; charges assigned."""
-    from insulin_ai.simulation.openmm_compat import openmm_available
+    from biologix_ai.simulation.openmm_compat import openmm_available
 
     if not openmm_available():
         pytest.skip("openmm + openmmforcefields + openff.toolkit required")
 
-    from insulin_ai.simulation.openmm_complex import rdkit_mol_to_openff_with_gasteiger
+    from biologix_ai.simulation.openmm_complex import rdkit_mol_to_openff_with_gasteiger
 
     from rdkit import Chem
 
@@ -188,12 +188,12 @@ def test_ligand_gasteiger_charges():
 
 def test_openmm_complex_minimization_and_interaction():
     """Insulin + small ligand; minimize; interaction energy computed."""
-    from insulin_ai.simulation.openmm_compat import openmm_available
+    from biologix_ai.simulation.openmm_compat import openmm_available
 
     if not openmm_available():
         pytest.skip("openmm + openmmforcefields + openff.toolkit required")
 
-    from insulin_ai.simulation.openmm_complex import run_openmm_relax_and_energy
+    from biologix_ai.simulation.openmm_complex import run_openmm_relax_and_energy
 
     res = run_openmm_relax_and_energy(
         "[*]CC[*]",
@@ -211,12 +211,12 @@ def test_openmm_complex_minimization_and_interaction():
 
 def test_openmm_complex_writes_minimized_pdb(tmp_path):
     """Optional save_complex_pdb writes a PDB with ATOM records."""
-    from insulin_ai.simulation.openmm_compat import openmm_available
+    from biologix_ai.simulation.openmm_compat import openmm_available
 
     if not openmm_available():
         pytest.skip("openmm + openmmforcefields + openff.toolkit required")
 
-    from insulin_ai.simulation.openmm_complex import run_openmm_relax_and_energy
+    from biologix_ai.simulation.openmm_complex import run_openmm_relax_and_energy
 
     out_pdb = tmp_path / "complex_min.pdb"
     res = run_openmm_relax_and_energy(
@@ -234,9 +234,9 @@ def test_openmm_complex_writes_minimized_pdb(tmp_path):
 
 def test_openmm_matrix_density_driven():
     """Density-driven matrix encapsulation: Packmol + minimize + interaction energy."""
-    from insulin_ai.simulation.openmm_compat import openmm_available
-    from insulin_ai.simulation.openmm_complex import run_openmm_matrix_relax_and_energy
-    from insulin_ai.simulation.packmol_packer import _packmol_available
+    from biologix_ai.simulation.openmm_compat import openmm_available
+    from biologix_ai.simulation.openmm_complex import run_openmm_matrix_relax_and_energy
+    from biologix_ai.simulation.packmol_packer import _packmol_available
 
     if not openmm_available():
         pytest.skip("openmm + openmmforcefields + openff.toolkit required")

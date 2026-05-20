@@ -19,4 +19,4 @@ Material candidates with: name, composition, thermal stability, biocompatibility
 
 ## MCP Tool
 
-`mine_literature(query, max_candidates)` – Run via MCP insulin-ai server.
+`mine_literature(query, max_candidates)` – Run via MCP biologix-ai server.

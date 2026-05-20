@@ -64,7 +64,7 @@ Third, we analyze the chemical reasoning recorded in the discovery world, demons
 \subsection{Platform architecture}
 
 We implement the platform as a single Python MCP server~\cite{mcp2024} (FastMCP) that registers tools for literature mining, polymer validation, molecular screening, cheminformatics mutation, and session management.
-It runs inside the \texttt{insulin-ai-sim} conda environment, which bundles OpenMM~\cite{eastman2017openmm}, RDKit~\cite{landrum2013rdkit}, Packmol~\cite{packmol2009}, the Open Force Field toolkit~\cite{qiu2021development}, and Stable-Baselines3~\cite{sb3_2021}.
+It runs inside the \texttt{biologix-ai-sim} conda environment, which bundles OpenMM~\cite{eastman2017openmm}, RDKit~\cite{landrum2013rdkit}, Packmol~\cite{packmol2009}, the Open Force Field toolkit~\cite{qiu2021development}, and Stable-Baselines3~\cite{sb3_2021}.
 An LLM hosted by OpenCode (or Cursor) connects to this server and calls tools in response to user prompts; model weights, tool schema, and session artifacts are version-controlled alongside the scientific code.
 
 Figure~\ref{fig:architecture} summarizes the data flow.

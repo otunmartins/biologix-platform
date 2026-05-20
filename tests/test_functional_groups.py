@@ -11,7 +11,7 @@ import pytest
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "src", "python"))
 
-from insulin_ai.material_mappings import (  # noqa: E402
+from biologix_ai.material_mappings import (  # noqa: E402
     annotate_functional_groups,
     check_name_structure_consistency,
     clear_pubchem_lookup_cache,
@@ -213,7 +213,7 @@ class TestMCPValidatePSMILES:
             import importlib.util
 
             spec = importlib.util.spec_from_file_location(
-                "mcp_server", os.path.join(ROOT, "insulin_ai_mcp_server.py")
+                "mcp_server", os.path.join(ROOT, "biologix_ai_mcp_server.py")
             )
             self.mod = importlib.util.module_from_spec(spec)
             spec.loader.exec_module(self.mod)

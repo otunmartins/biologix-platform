@@ -12,9 +12,9 @@ import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src", "python"))
 
-from insulin_ai.services import biologic_resolver as br
-from insulin_ai.services.biologics_session import patch_world_retrosynthesis
-from insulin_ai.discovery_world import load_world, world_path_for_session, ensure_world_for_session
+from biologix_ai.services import biologic_resolver as br
+from biologix_ai.services.biologics_session import patch_world_retrosynthesis
+from biologix_ai.discovery_world import load_world, world_path_for_session, ensure_world_for_session
 
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -68,7 +68,7 @@ def test_patch_world_retrosynthesis_merges_entry():
 
 
 def test_write_retrosynthesis_artifact_path():
-    from insulin_ai.services.biologics_session import write_retrosynthesis_artifact
+    from biologix_ai.services.biologics_session import write_retrosynthesis_artifact
 
     with tempfile.TemporaryDirectory() as td:
         d = Path(td)

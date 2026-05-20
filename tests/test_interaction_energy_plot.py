@@ -301,7 +301,7 @@ def test_parse_agentic_subprocess_log(tmp_path: Path):
 
 
 def test_interaction_energy_stats_autonomous_discovery():
-    from insulin_ai.autonomous_discovery import _interaction_energy_stats
+    from biologix_ai.autonomous_discovery import _interaction_energy_stats
 
     z = _interaction_energy_stats(None)
     assert z["n_md_evaluations"] == 0

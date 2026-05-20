@@ -1,6 +1,6 @@
 # Security
 
-This page covers API keys, secrets, and safe configuration for insulin-ai. For first-time setup, see [MCP Getting Started](MCP_GETTING_STARTED.md).
+This page covers API keys, secrets, and safe configuration for biologix-ai. For first-time setup, see [MCP Getting Started](MCP_GETTING_STARTED.md).
 
 ---
 

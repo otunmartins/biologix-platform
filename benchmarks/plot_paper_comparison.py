@@ -9,7 +9,7 @@ OpenMM evaluation semantics as :data:`evaluation_trace` in
 
 Example::
 
-    mamba run -n insulin-ai-sim python benchmarks/plot_paper_comparison.py \\
+    mamba run -n biologix-ai-sim python benchmarks/plot_paper_comparison.py \\
         --results-dir results \\
         --agentic-session runs/autonomous-20iter \\
         --output runs/paper_comparison_running_best.png

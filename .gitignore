@@ -86,7 +86,7 @@ condaenv.*.requirements.txt
 # Local clone of FRIDGEFREENET (separate repo; push via remote)
 FRIDGEFREENET/
 
-# Optional: Karpathy autoresearch (GPU LLM training boilerplate — not part of insulin-ai MCP)
+# Optional: Karpathy autoresearch (GPU LLM training boilerplate — not part of biologix-ai MCP)
 autoresearch/
 
 # External benchmark clones (see extern/benchmarks/README.md; not vendored in git)

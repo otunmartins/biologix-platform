@@ -4,14 +4,14 @@ import pytest
 
 
 def test_packmol_packer_import():
-    from insulin_ai.simulation.packmol_packer import pack_insulin_polymers, _packmol_available
+    from biologix_ai.simulation.packmol_packer import pack_insulin_polymers, _packmol_available
 
     assert callable(pack_insulin_polymers)
     assert isinstance(_packmol_available(), bool)
 
 
 def test_packmol_inp_contains_shell_when_requested():
-    from insulin_ai.simulation.packmol_packer import build_packmol_inp_content
+    from biologix_ai.simulation.packmol_packer import build_packmol_inp_content
 
     # 10 nm cube → 100 Å edge; insulin fixed at (50, 50, 50)
     s = build_packmol_inp_content(
@@ -35,7 +35,7 @@ def test_packmol_inp_contains_shell_when_requested():
 
 def test_packmol_inp_bulk_has_no_outside_sphere():
     """Bulk mode fills the cell; shell radius is ignored for Packmol constraints."""
-    from insulin_ai.simulation.packmol_packer import build_packmol_inp_content
+    from biologix_ai.simulation.packmol_packer import build_packmol_inp_content
 
     s = build_packmol_inp_content(
         "/a/ins.pdb",
@@ -55,7 +55,7 @@ def test_packmol_inp_bulk_has_no_outside_sphere():
 
 
 def test_parse_pdb_extents(tmp_path):
-    from insulin_ai.simulation.packmol_packer import _parse_pdb_extents
+    from biologix_ai.simulation.packmol_packer import _parse_pdb_extents
 
     p = tmp_path / "t.pdb"
     p.write_text(
@@ -69,7 +69,7 @@ def test_parse_pdb_extents(tmp_path):
 
 
 def test_estimate_box_edge_angstrom(tmp_path):
-    from insulin_ai.simulation.packmol_packer import estimate_box_edge_angstrom
+    from biologix_ai.simulation.packmol_packer import estimate_box_edge_angstrom
 
     ins = tmp_path / "ins.pdb"
     poly = tmp_path / "poly.pdb"
@@ -96,7 +96,7 @@ def test_estimate_box_edge_angstrom(tmp_path):
 
 
 def test_pack_insulin_polymers_progressive_stops_when_increment_fails(monkeypatch):
-    import insulin_ai.simulation.packmol_packer as pp
+    import biologix_ai.simulation.packmol_packer as pp
 
     def fake_pack(insulin_pdb_path, polymer_pdb_path, n_polymers, output_path, **kw):
         if n_polymers <= 4:
@@ -130,7 +130,7 @@ def test_pack_insulin_polymers_progressive_stops_when_increment_fails(monkeypatc
 
 
 def test_pack_insulin_polymers_progressive_n_cap(monkeypatch):
-    import insulin_ai.simulation.packmol_packer as pp
+    import biologix_ai.simulation.packmol_packer as pp
 
     def fake_pack(insulin_pdb_path, polymer_pdb_path, n_polymers, output_path, **kw):
         return {
@@ -155,7 +155,7 @@ def test_pack_insulin_polymers_progressive_n_cap(monkeypatch):
 
 
 def test_pack_insulin_polymers_returns_dict():
-    from insulin_ai.simulation.packmol_packer import pack_insulin_polymers
+    from biologix_ai.simulation.packmol_packer import pack_insulin_polymers
 
     r = pack_insulin_polymers(
         "/nonexistent/ins.pdb",
@@ -171,7 +171,7 @@ def test_pack_insulin_polymers_returns_dict():
 
 
 def test_polymer_build_ensure_pdb_or_skip():
-    from insulin_ai.simulation.polymer_build import ensure_insulin_pdb
+    from biologix_ai.simulation.polymer_build import ensure_insulin_pdb
 
     try:
         p = ensure_insulin_pdb()

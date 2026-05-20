@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from insulin_ai.discovery_world import (
+from biologix_ai.discovery_world import (
     SCHEMA_VERSION,
     DEFAULT_WORLD_FILENAME,
     apply_patch,

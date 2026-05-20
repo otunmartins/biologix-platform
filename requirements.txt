@@ -1,7 +1,7 @@
 # pip-only fallback. OpenMM / RDKit / Packmol / pdbfixer / OpenFF are NOT installed
-# by this file alone — use environment-simulation.yml (env: insulin-ai-sim).
+# by this file alone — use environment-simulation.yml (env: biologix-ai-sim).
 #
-# Preferred: ./install  (or: bash scripts/install_insulin_ai_sim_lowmem.sh)
+# Preferred: ./install  (or: bash scripts/install_biologix_ai_sim_lowmem.sh)
 # One-shot YAML: ./install --conda-yml  or  mamba env create -f environment-simulation.yml
 #
 # If you insist on pip after conda binaries, install conda packages first, e.g.:

@@ -8,8 +8,8 @@ import time
 
 
 def benchmark_openmm_merged(psmiles: str) -> float:
-    from insulin_ai.simulation.openmm_compat import openmm_available
-    from insulin_ai.simulation.openmm_complex import run_openmm_relax_and_energy
+    from biologix_ai.simulation.openmm_compat import openmm_available
+    from biologix_ai.simulation.openmm_complex import run_openmm_relax_and_energy
 
     if not openmm_available():
         return -1.0

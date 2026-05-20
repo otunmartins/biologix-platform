@@ -61,7 +61,7 @@ After the user answers (or the mode is clearly stated in the first message), fol
 - Use the **read** tool on **`docs/PSMILES_GUIDE.md`** when you need stable definitions: repeat units, `[*]`, and why **material names do not automatically equal** a PSMILES string. That file is **not** injected into every model context automatically—you load it when needed (or the user can @-mention it).
 - When you pair a **human-readable material name** with a PSMILES, call **`validate_psmiles(psmiles, material_name="Exact name you used", crosscheck_web=true)`** so the server attaches **web search snippets** (`name_crosscheck`) for you to sanity-check the pairing. Snippets are **literature hints only**, not chemical proof.
 
-**Prerequisites:** **`mine_literature`** uses **Asta MCP** when the server has `ASTA_API_KEY`, else **Semantic Scholar** (no Ollama)—**you** read abstracts and propose PSMILES. In OpenCode you also have the **asta** MCP server: prefer **`search_papers_by_relevance`** / **`snippet_search`** for discovery, then **insulin-ai** **`validate_psmiles`** / **`openmm_evaluate_psmiles`** for screening. **`openmm_evaluate_psmiles`** requires **OpenMM** stack, **`packmol`** on PATH (matrix encapsulation), and `data/4F1C.pdb` (or bundled insulin PDB). See `docs/OPENMM_SCREENING.md`.
+**Prerequisites:** **`mine_literature`** uses **Asta MCP** when the server has `ASTA_API_KEY`, else **Semantic Scholar** (no Ollama)—**you** read abstracts and propose PSMILES. In OpenCode you also have the **asta** MCP server: prefer **`search_papers_by_relevance`** / **`snippet_search`** for discovery, then **biologix-ai** **`validate_psmiles`** / **`openmm_evaluate_psmiles`** for screening. **`openmm_evaluate_psmiles`** requires **OpenMM** stack, **`packmol`** on PATH (matrix encapsulation), and `data/4F1C.pdb` (or bundled insulin PDB). See `docs/OPENMM_SCREENING.md`.
 
 ## Discovery world model (shared session state)
 
@@ -185,17 +185,17 @@ For complex materials (chitosan, hyaluronic acid, collagen), use `lookup_materia
 
 ## MCP Tools
 
-**insulin-ai — Discovery:** `mine_literature` (Asta-backed if `ASTA_API_KEY` on server), `paper_qa`, `paper_qa_index_status`, `index_papers`
+**biologix-ai — Discovery:** `mine_literature` (Asta-backed if `ASTA_API_KEY` on server), `paper_qa`, `paper_qa_index_status`, `index_papers`
 
-**insulin-ai — Literature REST:** `semantic_scholar_search`, `pubmed_search`, `arxiv_search`, `web_search`, `lookup_material`
+**biologix-ai — Literature REST:** `semantic_scholar_search`, `pubmed_search`, `arxiv_search`, `web_search`, `lookup_material`
 
-**asta (remote) — corpus:** `search_papers_by_relevance`, `snippet_search`, `search_paper_by_title`, `get_paper`, `get_citations`, author tools — use for search/snippet context; **insulin-ai** for PSMILES and OpenMM screening.
+**asta (remote) — corpus:** `search_papers_by_relevance`, `snippet_search`, `search_paper_by_title`, `get_paper`, `get_citations`, author tools — use for search/snippet context; **biologix-ai** for PSMILES and OpenMM screening.
 
 **PSMILES:** `validate_psmiles` (**always pass `material_name`**; returns `functional_groups`, `name_consistency`, `pubchem_lookup`; optional `crosscheck_web`), `psmiles_canonicalize`, `psmiles_dimerize`, `psmiles_fingerprint`, `psmiles_similarity` — see **`docs/PSMILES_GUIDE.md`**. **Never** use mechanistic language in reports (e.g. "acid-mediated") unless `name_consistency.consistent` was true for that PSMILES; describe the **actual** functional groups instead.
 
 **Reporting (figures + PDF):** `render_psmiles_png`, **`compile_discovery_markdown_to_pdf`** (you write Markdown; the tool builds the PDF). Optional: `write_discovery_summary_report` (auto skeleton from JSON only). **Style:** **`docs/SUMMARY_REPORT_STYLE.md`** (research-paper tone, full citations, anti–AI-prose patterns). Dependencies: **`docs/DEPENDENCIES.md`** (psmiles, fpdf2, markdown).
 
-**Evaluation:** `openmm_evaluate_psmiles` — **per-candidate progress is default** in the JSON (`evaluation_progress`). Pass **`verbose=false`** or env **`INSULIN_AI_EVAL_QUIET=1`** to shrink output. Screening uses **Packmol packing + energy minimization + interaction energy** (requires **packmol**); not a multi-ns MD trajectory. See **`docs/OPENMM_SCREENING.md`** for matrix env vars. **`candidate_outcomes`** is always present in the response — a compact per-candidate list with status and verbatim failure reason (prescreen rejection, Packmol timeout, wall-clock limit, OpenMM error, etc.) that you should include in `save_discovery_state` feedback for cross-iteration diagnostics. **Use `response_format="concise"` during discovery iterations** (strips path lists and boilerplate, keeps energies and mechanisms — reduces response size ~3×). Use `response_format="full"` only when writing a SUMMARY_REPORT that needs PNG artifact paths.
+**Evaluation:** `openmm_evaluate_psmiles` — **per-candidate progress is default** in the JSON (`evaluation_progress`). Pass **`verbose=false`** or env **`BIOLOGIX_AI_EVAL_QUIET=1`** to shrink output. Screening uses **Packmol packing + energy minimization + interaction energy** (requires **packmol**); not a multi-ns MD trajectory. See **`docs/OPENMM_SCREENING.md`** for matrix env vars. **`candidate_outcomes`** is always present in the response — a compact per-candidate list with status and verbatim failure reason (prescreen rejection, Packmol timeout, wall-clock limit, OpenMM error, etc.) that you should include in `save_discovery_state` feedback for cross-iteration diagnostics. **Use `response_format="concise"` during discovery iterations** (strips path lists and boilerplate, keeps energies and mechanisms — reduces response size ~3×). Use `response_format="full"` only when writing a SUMMARY_REPORT that needs PNG artifact paths.
 
 **State:** `save_discovery_state`, `load_discovery_state`, `get_materials_status`
 

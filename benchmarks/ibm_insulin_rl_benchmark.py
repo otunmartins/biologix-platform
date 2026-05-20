@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-IBM Logical-Agent RL benchmark adapted for the insulin-ai evaluation pipeline.
+IBM Logical-Agent RL benchmark adapted for the biologix-ai evaluation pipeline.
 
 Trains and tests DQN or PPO policies from ``stable-baselines3`` on the
 ``LogicalInsulinPSMILESEnv`` Gym environment, which uses the **same**
@@ -287,12 +287,12 @@ def test_model(
 
     Metrics mirror IBM upstream ``test_model``:
     - avg_reward, avg_targets, avg_episode_length, avg_steps_to_first_target
-    Plus insulin-ai-specific:
+    Plus biologix-ai-specific:
     - best_discovery_score, best_interaction_energy_kj_mol,
       n_high_performers_found, all evaluated PSMILES
     """
     from benchmarks.ibm_insulin_env import LogicalInsulinPSMILESEnv
-    from insulin_ai.simulation.scoring import discovery_score
+    from biologix_ai.simulation.scoring import discovery_score
 
     env = LogicalInsulinPSMILESEnv(**env_kwargs)
 
@@ -555,7 +555,7 @@ def run_ibm_insulin_benchmark(
 def main() -> None:
     p = argparse.ArgumentParser(
         description=(
-            "IBM Logical-Agent RL benchmark adapted for insulin-ai evaluation.\n"
+            "IBM Logical-Agent RL benchmark adapted for biologix-ai evaluation.\n"
             "Uses MDSimulator + PropertyExtractor + discovery_score (same as MCP).\n"
             "Optimization loop: DQN / PPO with logical action-aware features (IBM)."
         ),

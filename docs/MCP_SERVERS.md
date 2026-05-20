@@ -1,6 +1,6 @@
 # MCP tool reference
 
-This page describes the insulin-ai MCP tools and what each one needs. For setup (install, Cursor config, Windows/WSL), go to [MCP Getting Started](MCP_GETTING_STARTED.md).
+This page describes the biologix-ai MCP tools and what each one needs. For setup (install, Cursor config, Windows/WSL), go to [MCP Getting Started](MCP_GETTING_STARTED.md).
 
 ---
 
@@ -9,7 +9,7 @@ This page describes the insulin-ai MCP tools and what each one needs. For setup 
 | Command | `bash scripts/run_mcp_server.sh` |
 |---------|----------------------------------|
 
-The launcher uses the `insulin-ai-sim` conda env. Session outputs go to `runs/<session_id>/`. Screening details: [OPENMM_SCREENING.md](OPENMM_SCREENING.md).
+The launcher uses the `biologix-ai-sim` conda env. Session outputs go to `runs/<session_id>/`. Screening details: [OPENMM_SCREENING.md](OPENMM_SCREENING.md).
 
 ---
 
@@ -56,7 +56,7 @@ Chat is not mirrored into `runs/` automatically; agents must call `save_session_
 | RetroSynAgent internal OpenAI | Optional (`RETRO_USE_INTERNAL_LLM=1` + `extern/RetroSynthesisAgent/.env`) |
 | AiZynthFinder | No (one-time model download via `scripts/setup_aizynthfinder.sh`) |
 
-Default MCP env: `RETRO_LLM_BACKEND=skip`, `INSULIN_AI_AIZYNTH_CONFIG=./data/aizynthfinder/config.yml`.
+Default MCP env: `RETRO_LLM_BACKEND=skip`, `BIOLOGIX_AI_AIZYNTH_CONFIG=./data/aizynthfinder/config.yml`.
 
 ---
 

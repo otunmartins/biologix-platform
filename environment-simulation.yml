@@ -8,7 +8,7 @@
 # One-shot YAML (needs more RAM): ./install --conda-yml
 #   or:  mamba env create -f environment-simulation.yml
 #        mamba env update -f environment-simulation.yml --prune
-name: insulin-ai-sim
+name: biologix-ai-sim
 channels:
   - conda-forge
 dependencies:

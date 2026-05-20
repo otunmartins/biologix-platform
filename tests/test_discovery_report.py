@@ -13,13 +13,13 @@ import pytest
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "src", "python"))
 
-from insulin_ai.discovery_report import (  # noqa: E402
+from biologix_ai.discovery_report import (  # noqa: E402
     collect_psmiles_entries_from_feedback,
     compile_markdown_to_pdf,
     gather_structure_visualizations,
     write_session_summary_reports,
 )
-from insulin_ai.psmiles_drawing import safe_filename_basename  # noqa: E402
+from biologix_ai.psmiles_drawing import safe_filename_basename  # noqa: E402
 
 # 1x1 transparent PNG (valid for fpdf image embedding)
 _MINI_PNG = base64.b64decode(
@@ -118,7 +118,7 @@ def test_write_session_summary_reports_with_mock_png(monkeypatch, tmp_path):
         Path(output_path).write_bytes(_MINI_PNG)
         return {"ok": True, "path": str(output_path)}
 
-    monkeypatch.setattr("insulin_ai.discovery_report.save_psmiles_png", _fake_save)
+    monkeypatch.setattr("biologix_ai.discovery_report.save_psmiles_png", _fake_save)
 
     out = write_session_summary_reports(sess, title="T", include_all_iterations=True)
     assert out.get("ok") is True
@@ -158,7 +158,7 @@ def test_write_session_summary_reports_embeds_evaluate_style_pngs(monkeypatch, t
         Path(output_path).write_bytes(_MINI_PNG)
         return {"ok": True, "path": str(output_path)}
 
-    monkeypatch.setattr("insulin_ai.discovery_report.save_psmiles_png", _fake_save)
+    monkeypatch.setattr("biologix_ai.discovery_report.save_psmiles_png", _fake_save)
 
     out = write_session_summary_reports(sess, title="T", include_all_iterations=True)
     assert out.get("ok") is True, out
@@ -195,7 +195,7 @@ def test_write_session_summary_reports_viz_under_matching_slug(monkeypatch, tmp_
         Path(output_path).write_bytes(_MINI_PNG)
         return {"ok": True, "path": str(output_path)}
 
-    monkeypatch.setattr("insulin_ai.discovery_report.save_psmiles_png", _fake_save)
+    monkeypatch.setattr("biologix_ai.discovery_report.save_psmiles_png", _fake_save)
 
     out = write_session_summary_reports(sess, title="T", include_all_iterations=True)
     assert out.get("ok") is True, out
@@ -205,9 +205,9 @@ def test_write_session_summary_reports_viz_under_matching_slug(monkeypatch, tmp_
 
 
 def test_save_psmiles_png_integration():
-    """Real psmiles ``savefig`` when package is available (e.g. insulin-ai-sim)."""
+    """Real psmiles ``savefig`` when package is available (e.g. biologix-ai-sim)."""
     pytest.importorskip("psmiles")
-    from insulin_ai.psmiles_drawing import save_psmiles_png
+    from biologix_ai.psmiles_drawing import save_psmiles_png
 
     p = Path(ROOT) / "tmp_test_psmiles_draw.png"
     try:

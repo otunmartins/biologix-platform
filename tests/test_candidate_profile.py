@@ -14,11 +14,11 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src", "python"
 def _import_mcp_server():
     import importlib
     spec = importlib.util.spec_from_file_location(
-        "insulin_ai_mcp_server",
-        os.path.join(os.path.dirname(__file__), "..", "insulin_ai_mcp_server.py"),
+        "biologix_ai_mcp_server",
+        os.path.join(os.path.dirname(__file__), "..", "biologix_ai_mcp_server.py"),
     )
     mod = importlib.util.module_from_spec(spec)
-    sys.modules["insulin_ai_mcp_server"] = mod
+    sys.modules["biologix_ai_mcp_server"] = mod
     try:
         from mcp.server.fastmcp import FastMCP
         orig = FastMCP.run
@@ -74,7 +74,7 @@ class TestGetCandidateProfile:
         assert "retrosynthesis" in parsed
 
     def test_run_dir_writes_audit(self, tmp_path):
-        from insulin_ai.discovery_world import ensure_world_for_session
+        from biologix_ai.discovery_world import ensure_world_for_session
         ensure_world_for_session(tmp_path, objective="unit")
         self.server.get_candidate_profile(
             psmiles="[*]OCC[*]",

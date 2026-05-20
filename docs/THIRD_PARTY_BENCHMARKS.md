@@ -1,6 +1,6 @@
 # Third-party benchmark systems (non–Bayesian optimization)
 
-These benchmarks are **independent of the MCP server** ([`insulin_ai_mcp_server.py`](../insulin_ai_mcp_server.py)) and of OpenCode tools. They live under [`extern/benchmarks/`](../extern/benchmarks/) (clones are gitignored); thin entry scripts are in [`benchmarks/`](../benchmarks/). Same separation as the in-repo Optuna PSMILES benchmark ([`benchmarks/optuna_psmiles_discovery.py`](../benchmarks/optuna_psmiles_discovery.py)).
+These benchmarks are **independent of the MCP server** ([`biologix_ai_mcp_server.py`](../biologix_ai_mcp_server.py)) and of OpenCode tools. They live under [`extern/benchmarks/`](../extern/benchmarks/) (clones are gitignored); thin entry scripts are in [`benchmarks/`](../benchmarks/). Same separation as the in-repo Optuna PSMILES benchmark ([`benchmarks/optuna_psmiles_discovery.py`](../benchmarks/optuna_psmiles_discovery.py)).
 
 ## 1. Polymer Generative Models Benchmark (Wisconsin)
 
@@ -15,7 +15,7 @@ These benchmarks are **independent of the MCP server** ([`insulin_ai_mcp_server.
 
 **Wrapper:** `python benchmarks/polymer_generative_models_benchmark.py` — verifies clone and MOSES layout.
 
-**Objective:** Metrics are **as defined in the paper**, not insulin-ai's `discovery_score` (PSMILES + OpenMM) unless you add a custom adapter later.
+**Objective:** Metrics are **as defined in the paper**, not biologix-ai's `discovery_score` (PSMILES + OpenMM) unless you add a custom adapter later.
 
 ## 2. IBM logical-agent-driven polymer discovery (upstream smoke check)
 
@@ -33,14 +33,14 @@ These benchmarks are **independent of the MCP server** ([`insulin_ai_mcp_server.
 
 **License:** Follow upstream `LICENSE` for redistribution.
 
-## 3. IBM RL adapted to insulin-ai evaluation (insulin-ai adapter)
+## 3. IBM RL adapted to biologix-ai evaluation (biologix-ai adapter)
 
-This is the primary benchmarking target: the IBM neuro-symbolic RL **optimization loop** (which PSMILES to try next) is retained intact, but the **evaluation** and **scoring** are replaced with insulin-ai's OpenMM pipeline — identical to the agentic MCP `openmm_evaluate_psmiles` tool.
+This is the primary benchmarking target: the IBM neuro-symbolic RL **optimization loop** (which PSMILES to try next) is retained intact, but the **evaluation** and **scoring** are replaced with biologix-ai's OpenMM pipeline — identical to the agentic MCP `openmm_evaluate_psmiles` tool.
 
 | Component | Source |
 |-----------|--------|
 | Optimization loop (which polymer next) | IBM DQN / PPO with logical action-aware features |
-| PSMILES proposal | `insulin_ai.mutation.feedback_guided_mutation` |
+| PSMILES proposal | `biologix_ai.mutation.feedback_guided_mutation` |
 | Evaluation | `MDSimulator.evaluate_candidates` (OpenMM Packmol matrix) |
 | Scoring | `scoring.composite_screening_score` + `scoring.discovery_score` |
 | Feedback | `PropertyExtractor.extract_feedback` |
@@ -81,9 +81,9 @@ SB3 pipeline tests in `tests/test_ibm_insulin_env.py` inject a stub evaluator so
 
 ### Reward structure
 
-IBM's 4-tier reward is mapped from insulin-ai's interaction energy:
+IBM's 4-tier reward is mapped from biologix-ai's interaction energy:
 
-| Tier | IBM reward | insulin-ai condition |
+| Tier | IBM reward | biologix-ai condition |
 |------|-----------|----------------------|
 | `target` | +1.0 | `interaction_energy_kj_mol < -5.0 kJ/mol` |
 | `valid` | -0.01 | evaluated, energy above threshold |
@@ -109,7 +109,7 @@ For a **fresh paper study** (separate from ad hoc rows in `comparison_results.ts
 
 ## Dependencies
 
-Heavy stacks (**PyTorch**, **stable-baselines3**, **GPy**, **gymnasium**) are not pinned in insulin-ai's base [`pyproject.toml`](../pyproject.toml). Install inside a dedicated venv or conda env if you run full training. See also [`docs/DEPENDENCIES.md`](DEPENDENCIES.md).
+Heavy stacks (**PyTorch**, **stable-baselines3**, **GPy**, **gymnasium**) are not pinned in biologix-ai's base [`pyproject.toml`](../pyproject.toml). Install inside a dedicated venv or conda env if you run full training. See also [`docs/DEPENDENCIES.md`](DEPENDENCIES.md).
 
 ## Optional: GLAS (genetic algorithm)
 

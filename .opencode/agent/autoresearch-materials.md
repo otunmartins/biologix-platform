@@ -36,10 +36,10 @@ This agent config is for the **scripted** `run_autonomous_discovery` subprocess,
 - Read the TSV and summarize: best scores, trends, any `crash` rows.
 - Optionally run **`mine_literature`** / **`openmm_evaluate_psmiles`** on the best PSMILES from saved state (`runs/<session_id>/autoresearch_iteration_*.json`).
 
-## MCP tools (insulin-ai)
+## MCP tools (biologix-ai)
 
 Same as materials-discovery: `mine_literature`, `openmm_evaluate_psmiles`, `mutate_psmiles`, `validate_psmiles`, `save_discovery_state`, `load_discovery_state`, **`run_autonomous_discovery`**, `get_materials_status`.
 
 ## Scalar score
 
-Higher **score** = more high performers and mechanisms, fewer problematic features (see `insulin_ai.simulation.scoring.discovery_score`). Use TSV scores to compare iterations.
+Higher **score** = more high performers and mechanisms, fewer problematic features (see `biologix_ai.simulation.scoring.discovery_score`). Use TSV scores to compare iterations.

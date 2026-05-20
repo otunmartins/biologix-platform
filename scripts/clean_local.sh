@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Remove temp run outputs and optional nested clones (safe; outputs regenerate).
-# Nested clones are gitignored and not required for insulin-ai MCP.
+# Nested clones are gitignored and not required for biologix-ai MCP.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 echo "Cleaning under $(pwd) ..."

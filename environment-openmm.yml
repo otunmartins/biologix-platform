@@ -1,7 +1,7 @@
 # Minimal OpenMM environment: protein (AMBER14) + ligand (GAFF + RDKit Gasteiger charges).
 # No antechamber/acpype. conda-forge only — see environment-simulation.yml header for omnia note.
 # Create: mamba env create -f environment-openmm.yml
-name: insulin-ai-openmm
+name: biologix-ai-openmm
 channels:
   - conda-forge
 dependencies:

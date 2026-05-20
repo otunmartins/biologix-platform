@@ -49,7 +49,7 @@ def _mock_target_eval(
     candidates: List[Dict[str, Any]], max_candidates: int
 ) -> Dict[str, Any]:
     """Mock: all candidates get favorable (target) energy."""
-    from insulin_ai.simulation.property_extractor import PropertyExtractor
+    from biologix_ai.simulation.property_extractor import PropertyExtractor
 
     extractor = PropertyExtractor()
     md_rows = [
@@ -75,7 +75,7 @@ def _mock_nontarget_eval(
     candidates: List[Dict[str, Any]], max_candidates: int
 ) -> Dict[str, Any]:
     """Mock: all candidates get unfavorable (valid) energy."""
-    from insulin_ai.simulation.property_extractor import PropertyExtractor
+    from biologix_ai.simulation.property_extractor import PropertyExtractor
 
     extractor = PropertyExtractor()
     md_rows = [
@@ -355,7 +355,7 @@ class TestCacheLookup:
 
     def test_cached_psmiles_bypasses_eval(self):
         """If PSMILES is in cache, evaluate_candidates_fn must NOT be called."""
-        from insulin_ai.material_mappings import validate_psmiles
+        from biologix_ai.material_mappings import validate_psmiles
 
         seed = "[*]OCC[*]"
         vr = validate_psmiles(seed)
@@ -475,7 +475,7 @@ def _stub_evaluate_candidates_for_benchmark(
     """Deterministic fake MD for SB3 pipeline tests (not live OpenMM)."""
     import hashlib
 
-    from insulin_ai.simulation.property_extractor import PropertyExtractor
+    from biologix_ai.simulation.property_extractor import PropertyExtractor
 
     extractor = PropertyExtractor()
 

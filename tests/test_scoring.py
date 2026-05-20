@@ -2,7 +2,7 @@
 
 import pytest
 
-from insulin_ai.simulation.scoring import composite_screening_score, discovery_score
+from biologix_ai.simulation.scoring import composite_screening_score, discovery_score
 
 
 def test_discovery_score_empty():

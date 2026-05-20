@@ -2,7 +2,7 @@
 
 import pytest
 
-from insulin_ai.retrosynthesis.models import (
+from biologix_ai.retrosynthesis.models import (
     ADMETFlag,
     MonomerInfo,
     MonomerSource,

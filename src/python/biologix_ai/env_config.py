@@ -1,0 +1,77 @@
+"""Centralized environment variable names for the Biologix-AI platform."""
+
+from __future__ import annotations
+
+import os
+from typing import Optional
+
+PREFIX = "BIOLOGIX_AI_"
+
+# Session / paths
+ENV_SESSION_DIR = "BIOLOGIX_AI_SESSION_DIR"
+ENV_ROOT = "BIOLOGIX_AI_ROOT"
+ENV_TARGET_PROTEIN_PDB = "BIOLOGIX_AI_TARGET_PROTEIN_PDB"
+ENV_CORS_ORIGINS = "BIOLOGIX_AI_CORS_ORIGINS"
+ENV_AIZYNTH_CONFIG = "BIOLOGIX_AI_AIZYNTH_CONFIG"
+ENV_DEMO = "BIOLOGIX_AI_DEMO"
+
+# OpenMM / evaluation
+ENV_OPENMM_N_REPEATS = "BIOLOGIX_AI_OPENMM_N_REPEATS"
+ENV_OPENMM_N_REPEATS_LEGACY = "BIOLOGIX_AI_GMX_N_REPEATS"
+ENV_OPENMM_MATRIX_PACKING_MODE = "BIOLOGIX_AI_OPENMM_MATRIX_PACKING_MODE"
+ENV_OPENMM_MATRIX_FIXED_MODE = "BIOLOGIX_AI_OPENMM_MATRIX_FIXED_MODE"
+ENV_OPENMM_MATRIX_DEFAULT_DENSITY = "BIOLOGIX_AI_OPENMM_MATRIX_DEFAULT_DENSITY_G_CM3"
+ENV_OPENMM_MATRIX_TARGET_DENSITY = "BIOLOGIX_AI_OPENMM_MATRIX_TARGET_DENSITY_G_CM3"
+ENV_OPENMM_MATRIX_N_POLYMERS = "BIOLOGIX_AI_OPENMM_MATRIX_N_POLYMERS"
+ENV_OPENMM_MATRIX_BOX_NM = "BIOLOGIX_AI_OPENMM_MATRIX_BOX_NM"
+ENV_OPENMM_MATRIX_DENSITY_N_MIN = "BIOLOGIX_AI_OPENMM_MATRIX_DENSITY_N_MIN"
+ENV_OPENMM_MATRIX_DENSITY_N_MAX = "BIOLOGIX_AI_OPENMM_MATRIX_DENSITY_N_MAX"
+ENV_OPENMM_MATRIX_SHELL_A = "BIOLOGIX_AI_OPENMM_MATRIX_SHELL_A"
+ENV_OPENMM_MAX_MINIMIZE_STEPS = "BIOLOGIX_AI_OPENMM_MAX_MINIMIZE_STEPS"
+ENV_OPENMM_MATRIX_NPT = "BIOLOGIX_AI_OPENMM_MATRIX_NPT"
+ENV_OPENMM_MATRIX_NPT_PS = "BIOLOGIX_AI_OPENMM_MATRIX_NPT_PS"
+ENV_OPENMM_MATRIX_WALL_CLOCK_S = "BIOLOGIX_AI_OPENMM_MATRIX_WALL_CLOCK_S"
+ENV_OPENMM_MATRIX_RESTRAIN_SHELL = "BIOLOGIX_AI_OPENMM_MATRIX_RESTRAIN_SHELL"
+ENV_OPENMM_MATRIX_BAROSTAT_INTERVAL_FS = "BIOLOGIX_AI_OPENMM_MATRIX_BAROSTAT_INTERVAL_FS"
+ENV_OPENMM_MATRIX_PROGRESSIVE_PACK = "BIOLOGIX_AI_OPENMM_MATRIX_PROGRESSIVE_PACK"
+ENV_OPENMM_MATRIX_PACK_PER_ATTEMPT_TIMEOUT_S = "BIOLOGIX_AI_OPENMM_MATRIX_PACK_PER_ATTEMPT_TIMEOUT_S"
+ENV_OPENMM_MATRIX_PACK_MAX_TOTAL_S = "BIOLOGIX_AI_OPENMM_MATRIX_PACK_MAX_TOTAL_S"
+ENV_OPENMM_MATRIX_PROGRESSIVE_N_MAX = "BIOLOGIX_AI_OPENMM_MATRIX_PROGRESSIVE_N_MAX"
+
+# Eval output control
+ENV_EVAL_QUIET = "BIOLOGIX_AI_EVAL_QUIET"
+ENV_EVAL_VERBOSE = "BIOLOGIX_AI_EVAL_VERBOSE"
+ENV_EVAL_MAX_WORKERS = "BIOLOGIX_AI_EVAL_MAX_WORKERS"
+ENV_EVAL_ARTIFACTS_DIR = "BIOLOGIX_AI_EVAL_ARTIFACTS_DIR"
+ENV_EVAL_NO_STRUCTURE_ARTIFACTS = "BIOLOGIX_AI_EVAL_NO_STRUCTURE_ARTIFACTS"
+
+
+def env(key: str, default: str = "") -> str:
+    """Read an environment variable with fallback."""
+    return os.environ.get(key, default).strip()
+
+
+def env_int(key: str, default: int = 0) -> int:
+    """Read an integer environment variable."""
+    raw = os.environ.get(key, "").strip()
+    return int(raw) if raw else default
+
+
+def env_float(key: str, default: float = 0.0) -> float:
+    """Read a float environment variable."""
+    raw = os.environ.get(key, "").strip()
+    return float(raw) if raw else default
+
+
+def env_bool(key: str, default: bool = False) -> bool:
+    """Read a boolean environment variable (truthy: 1, true, yes, on)."""
+    raw = os.environ.get(key, "").strip().lower()
+    if not raw:
+        return default
+    return raw in ("1", "true", "yes", "on")
+
+
+def env_optional_float(key: str) -> Optional[float]:
+    """Read an optional float env var; returns None if unset/empty."""
+    raw = os.environ.get(key, "").strip()
+    return float(raw) if raw else None

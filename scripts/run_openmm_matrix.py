@@ -3,8 +3,8 @@
 OpenMM matrix: insulin + polymers via Packmol (**shell** annulus or **bulk** full cell),
 minimize, then compute interaction energy.
 
-Requires: packmol (pip install packmol), insulin-ai-sim env (openmm, openff, rdkit).
-  mamba activate insulin-ai-sim
+Requires: packmol (pip install packmol), biologix-ai-sim env (openmm, openff, rdkit).
+  mamba activate biologix-ai-sim
   python scripts/run_openmm_matrix.py '[*]CC[*]'
 """
 import argparse
@@ -113,7 +113,7 @@ def main() -> None:
     ap.add_argument("-v", "--verbose", action="store_true")
     args = ap.parse_args()
 
-    from insulin_ai.simulation.openmm_complex import run_openmm_matrix_relax_and_energy
+    from biologix_ai.simulation.openmm_complex import run_openmm_matrix_relax_and_energy
 
     kw: dict = dict(
         n_repeats=args.n_repeats,

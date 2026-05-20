@@ -9,7 +9,7 @@ REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(REPO, "src", "python"))
 
 _HINT = """
-OpenMM stack not importable. Use insulin-ai-sim env or:
+OpenMM stack not importable. Use biologix-ai-sim env or:
   pip install -e '.[openmm]'
 Create env: mamba env create -f environment-simulation.yml
 """.strip()
@@ -23,7 +23,7 @@ def main() -> None:
         "--offset-nm",
         type=float,
         default=2.5,
-        help="Ligand offset along x (nm), same role as INSULIN_AI_GMX_OFFSET_NM",
+        help="Ligand offset along x (nm), same role as BIOLOGIX_AI_GMX_OFFSET_NM",
     )
     ap.add_argument(
         "--max-minimize-steps",
@@ -33,14 +33,14 @@ def main() -> None:
     )
     args = ap.parse_args()
 
-    from insulin_ai.simulation.openmm_compat import openmm_available
+    from biologix_ai.simulation.openmm_compat import openmm_available
 
     if not openmm_available():
         print("openmm + openmmforcefields + openff.toolkit: not all importable")
         print(_HINT)
         sys.exit(1)
 
-    from insulin_ai.simulation.openmm_complex import run_openmm_relax_and_energy
+    from biologix_ai.simulation.openmm_complex import run_openmm_relax_and_energy
 
     print("OpenMM screening stack: OK")
     r = run_openmm_relax_and_energy(

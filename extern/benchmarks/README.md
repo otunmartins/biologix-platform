@@ -1,6 +1,6 @@
 # External benchmark systems (non–Bayesian optimization)
 
-Third-party **cloneable** repositories live **only** under this tree. They are **not** part of `src/python/insulin_ai/` or [`insulin_ai_mcp_server.py`](../../insulin_ai_mcp_server.py). Same independence principle as [`benchmarks/optuna_psmiles_discovery.py`](../../benchmarks/optuna_psmiles_discovery.py) (MCP-free).
+Third-party **cloneable** repositories live **only** under this tree. They are **not** part of `src/python/biologix_ai/` or [`biologix_ai_mcp_server.py`](../../biologix_ai_mcp_server.py). Same independence principle as [`benchmarks/optuna_psmiles_discovery.py`](../../benchmarks/optuna_psmiles_discovery.py) (MCP-free).
 
 | Directory | Upstream | Role |
 |-----------|----------|------|

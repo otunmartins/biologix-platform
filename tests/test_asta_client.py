@@ -13,7 +13,7 @@ sys.path.insert(0, __import__("os").path.join(ROOT, "src", "python"))
 
 
 def test_papers_from_tool_result_json_list():
-    from insulin_ai.literature.asta_client import papers_from_tool_result
+    from biologix_ai.literature.asta_client import papers_from_tool_result
 
     payload = [
         {
@@ -35,7 +35,7 @@ def test_papers_from_tool_result_json_list():
 
 
 def test_papers_from_tool_result_wrapped_data():
-    from insulin_ai.literature.asta_client import papers_from_tool_result
+    from biologix_ai.literature.asta_client import papers_from_tool_result
 
     payload = {"data": [{"title": "PLGA study", "abstract": "chitosan blend", "url": "u"}]}
     result = SimpleNamespace(
@@ -48,7 +48,7 @@ def test_papers_from_tool_result_wrapped_data():
 
 
 def test_normalize_authors_list():
-    from insulin_ai.literature.asta_client import _normalize_paper
+    from biologix_ai.literature.asta_client import _normalize_paper
 
     p = _normalize_paper(
         {

@@ -3,8 +3,8 @@
 Random PSMILES baseline: cheminformatic mutation with **no** MD feedback loop.
 
 Each batch draws a random ``mutator_seed`` and calls
-:func:`insulin_ai.mutation.feedback_guided_mutation` with ``feedback_fraction=0``
-(pure :class:`~insulin_ai.mutation.generator.MaterialMutator` draws). Feedback state
+:func:`biologix_ai.mutation.feedback_guided_mutation` with ``feedback_fraction=0``
+(pure :class:`~biologix_ai.mutation.generator.MaterialMutator` draws). Feedback state
 is **not** updated from OpenMM results, so exploration is memoryless aside from the
 initial validated seed (used only for parity with other benchmarks).
 
@@ -63,17 +63,17 @@ def run_random_psmiles_baseline(
         library_size: Candidates proposed per batch (before validation).
         random_seed: RNG for choosing ``mutator_seed`` each batch.
         mutator_seed_high: Upper bound for mutator RNG (inclusive).
-        md_steps: Passed to :class:`~insulin_ai.simulation.md_simulator.MDSimulator`.
+        md_steps: Passed to :class:`~biologix_ai.simulation.md_simulator.MDSimulator`.
         verbose_eval: Forwarded to ``evaluate_candidates``.
         evaluate_candidates_fn: Inject mock for tests; default live OpenMM.
 
     Returns:
         JSON-serialisable dict including ``evaluation_trace`` and aggregate metrics.
     """
-    from insulin_ai.material_mappings import validate_psmiles
-    from insulin_ai.mutation import feedback_guided_mutation
-    from insulin_ai.simulation.openmm_compat import openmm_available
-    from insulin_ai.simulation.scoring import discovery_score
+    from biologix_ai.material_mappings import validate_psmiles
+    from biologix_ai.mutation import feedback_guided_mutation
+    from biologix_ai.simulation.openmm_compat import openmm_available
+    from biologix_ai.simulation.scoring import discovery_score
 
     vr = validate_psmiles(seed_psmiles.strip())
     if not vr.get("valid"):
@@ -93,7 +93,7 @@ def run_random_psmiles_baseline(
 
     sim: Any = None
     if use_openmm:
-        from insulin_ai.simulation import MDSimulator
+        from biologix_ai.simulation import MDSimulator
 
         sim = MDSimulator(n_steps=md_steps, random_seed=random_seed)
 

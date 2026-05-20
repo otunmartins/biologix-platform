@@ -1,13 +1,13 @@
 # Agentic experiments for the paper (Studies D–F)
 
-Non-agentic baselines are run via [`benchmarks/run_paper_study.sh`](../benchmarks/run_paper_study.sh) in the `insulin-ai-sim` environment. The studies below require the **LLM + MCP** autonomous discovery workflow (Cursor agent or equivalent).
+Non-agentic baselines are run via [`benchmarks/run_paper_study.sh`](../benchmarks/run_paper_study.sh) in the `biologix-ai-sim` environment. The studies below require the **LLM + MCP** autonomous discovery workflow (Cursor agent or equivalent).
 
 **Benchmark contract** (match `run_paper_study.sh` and IBM parity defaults):
 
 - **20 discovery iterations** × **up to 8 OpenMM evaluations per iteration** (target budget **160** successful evals, same as `--agentic-iterations 20 --evals-per-iteration 8` on `ibm_insulin_rl_benchmark.py`).
 - Seed PSMILES: `[*]OCC[*]`
 - Same OpenMM matrix settings as production (`openmm_evaluate_psmiles` / `MDSimulator`)
-- **INSULIN_AI_EVAL_MAX_WORKERS=1** recommended for reproducibility
+- **BIOLOGIX_AI_EVAL_MAX_WORKERS=1** recommended for reproducibility
 
 The historical session `runs/autonomous-25iter/` used **25** iterations; new paper runs should use **20** so curves and tables align with non-agentic baselines.
 
@@ -27,7 +27,7 @@ Run **two additional** full **20-iteration** campaigns with the same protocol as
 **Plotting** (after non-agentic JSONs exist under `results/`):
 
 ```bash
-mamba run -n insulin-ai-sim python benchmarks/plot_paper_comparison.py \
+mamba run -n biologix-ai-sim python benchmarks/plot_paper_comparison.py \
   --results-dir results \
   --agentic-session runs/autonomous-20iter runs/autonomous-20iter-rep2 runs/autonomous-20iter-rep3 \
   --output results/paper_comparison_running_best.png

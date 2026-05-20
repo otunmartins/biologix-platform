@@ -2,7 +2,7 @@
 
 import pytest
 
-from insulin_ai.material_mappings import (
+from biologix_ai.material_mappings import (
     name_to_psmiles,
     monomer_smiles_to_psmiles,
     _try_known_polymer_lookup,

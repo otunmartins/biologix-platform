@@ -60,7 +60,7 @@ else
 fi
 
 echo ""
-echo "=== Installing insulin-ai with retro + admet extras ==="
+echo "=== Installing biologix-ai with retro + admet extras ==="
 pip install -e ".[retro,admet,dev]"
 
 echo ""

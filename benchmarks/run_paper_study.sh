@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Run all non-agentic paper baselines (Study A + IBM reward ablations).
-# Requires: conda env ``insulin-ai-sim`` (OpenMM + Packmol + SB3 + Optuna).
+# Requires: conda env ``biologix-ai-sim`` (OpenMM + Packmol + SB3 + Optuna).
 #
 #   ./benchmarks/run_paper_study.sh
 #
@@ -22,7 +22,7 @@ cd "$REPO_ROOT"
 
 export PYTHONUNBUFFERED=1
 # Stream subprocess output; without this, nohup.out may stay nearly empty until exit.
-RUN="conda run -n insulin-ai-sim --no-capture-output"
+RUN="conda run -n biologix-ai-sim --no-capture-output"
 TSV="${PAPER_STUDY_TSV:-benchmarks/comparison_results_study.tsv}"
 SEEDS=(42 123 456)
 

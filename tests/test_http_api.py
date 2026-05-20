@@ -10,7 +10,7 @@ import pytest
 
 try:
     from fastapi.testclient import TestClient
-    from insulin_ai.http_api.app import app
+    from biologix_ai.http_api.app import app
 
     HAS_FASTAPI = True
 except ImportError:
@@ -259,7 +259,7 @@ class TestExperimentsEndpoints:
         (runs_dir / "exp-001" / "discovery_world.json").write_text(
             json.dumps(world), encoding="utf-8"
         )
-        import insulin_ai.http_api.routers.experiments as exp_module
+        import biologix_ai.http_api.routers.experiments as exp_module
         monkeypatch.setattr(exp_module, "_RUNS", runs_dir)
 
         resp = client.get("/api/experiments/exp-001")
@@ -282,7 +282,7 @@ class TestExperimentsEndpoints:
         (runs_dir / "exp-002" / "discovery_world.json").write_text(
             json.dumps(world), encoding="utf-8"
         )
-        import insulin_ai.http_api.routers.experiments as exp_module
+        import biologix_ai.http_api.routers.experiments as exp_module
         monkeypatch.setattr(exp_module, "_RUNS", runs_dir)
 
         resp = client.get("/api/experiments/exp-002/candidates")
@@ -298,7 +298,7 @@ class TestExperimentsEndpoints:
         (runs_dir / "exp-003" / "discovery_world.json").write_text(
             json.dumps(world), encoding="utf-8"
         )
-        import insulin_ai.http_api.routers.experiments as exp_module
+        import biologix_ai.http_api.routers.experiments as exp_module
         monkeypatch.setattr(exp_module, "_RUNS", runs_dir)
 
         resp = client.get("/api/experiments/exp-003/world")
@@ -309,7 +309,7 @@ class TestExperimentsEndpoints:
     def test_get_audit_empty_session(self, client, tmp_path, monkeypatch):
         runs_dir = tmp_path / "runs"
         (runs_dir / "exp-004").mkdir(parents=True)
-        import insulin_ai.http_api.routers.experiments as exp_module
+        import biologix_ai.http_api.routers.experiments as exp_module
         monkeypatch.setattr(exp_module, "_RUNS", runs_dir)
 
         resp = client.get("/api/experiments/exp-004/audit")
@@ -319,7 +319,7 @@ class TestExperimentsEndpoints:
     def test_get_funnel_empty_session(self, client, tmp_path, monkeypatch):
         runs_dir = tmp_path / "runs"
         (runs_dir / "exp-005").mkdir(parents=True)
-        import insulin_ai.http_api.routers.experiments as exp_module
+        import biologix_ai.http_api.routers.experiments as exp_module
         monkeypatch.setattr(exp_module, "_RUNS", runs_dir)
 
         resp = client.get("/api/experiments/exp-005/funnel")

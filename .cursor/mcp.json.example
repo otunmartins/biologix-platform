@@ -1,6 +1,6 @@
 {
   "mcpServers": {
-    "insulin-ai": {
+    "biologix-ai": {
       "command": "bash",
       "args": ["/ABSOLUTE/PATH/TO/insulin-ai/scripts/run_mcp_server.sh"],
       "env": {

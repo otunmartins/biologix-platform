@@ -13,7 +13,7 @@ END
 
 
 def test_compute_matrix_packing_metrics_two_protein_heavy(tmp_path):
-    from insulin_ai.simulation.matrix_packing_metrics import compute_matrix_packing_metrics
+    from biologix_ai.simulation.matrix_packing_metrics import compute_matrix_packing_metrics
 
     p = tmp_path / "m.pdb"
     p.write_text(MINI_PDB, encoding="utf-8")

@@ -14,7 +14,7 @@ sys.path.insert(0, ROOT)
 
 def test_blocks_import():
     """Blocks module exports expected functions."""
-    from insulin_ai.mutation.blocks import get_random_blocks, get_functional_groups, get_all_blocks
+    from biologix_ai.mutation.blocks import get_random_blocks, get_functional_groups, get_all_blocks
 
     blocks = get_random_blocks()
     assert len(blocks) >= 10
@@ -32,7 +32,7 @@ def test_blocks_import():
 
 def test_material_mutator_generate_library():
     """MaterialMutator.generate_library returns valid candidates."""
-    from insulin_ai.mutation import MaterialMutator
+    from biologix_ai.mutation import MaterialMutator
 
     mutator = MaterialMutator(random_seed=42)
     cands = mutator.generate_library(library_size=5)
@@ -49,7 +49,7 @@ def test_material_mutator_generate_library():
 
 def test_material_mutator_reproducible():
     """Same seed yields same library."""
-    from insulin_ai.mutation import MaterialMutator
+    from biologix_ai.mutation import MaterialMutator
 
     m1 = MaterialMutator(random_seed=123)
     m2 = MaterialMutator(random_seed=123)
@@ -61,7 +61,7 @@ def test_material_mutator_reproducible():
 
 def test_feedback_guided_mutation_random_only():
     """feedback_guided_mutation with empty feedback returns random-like candidates."""
-    from insulin_ai.mutation import feedback_guided_mutation
+    from biologix_ai.mutation import feedback_guided_mutation
 
     feedback = {}
     cands = feedback_guided_mutation(feedback, library_size=5, random_seed=42)
@@ -75,7 +75,7 @@ def test_feedback_guided_mutation_random_only():
 
 def test_feedback_guided_mutation_with_high_performers():
     """feedback_guided_mutation with high_performer_psmiles runs without error."""
-    from insulin_ai.mutation import feedback_guided_mutation
+    from biologix_ai.mutation import feedback_guided_mutation
 
     feedback = {"high_performer_psmiles": ["[*]OCC[*]", "[*]CC[*]"]}
     try:
@@ -90,15 +90,15 @@ def test_feedback_guided_mutation_with_high_performers():
 
 def test_mutation_candidates_compatible_with_mdsimulator():
     """Mutation output format compatible with MDSimulator.evaluate_candidates."""
-    from insulin_ai.mutation import MaterialMutator
-    from insulin_ai.simulation import MDSimulator
+    from biologix_ai.mutation import MaterialMutator
+    from biologix_ai.simulation import MDSimulator
 
     mutator = MaterialMutator(random_seed=42)
     cands = mutator.generate_library(library_size=2)
     assert all("chemical_structure" in c and "material_name" in c for c in cands)
 
-    from insulin_ai.simulation.openmm_compat import openmm_available
-    from insulin_ai.simulation.packmol_packer import _packmol_available
+    from biologix_ai.simulation.openmm_compat import openmm_available
+    from biologix_ai.simulation.packmol_packer import _packmol_available
 
     if not openmm_available():
         import pytest

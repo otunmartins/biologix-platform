@@ -10,7 +10,7 @@ import sys
 import time
 from pathlib import Path
 
-from insulin_ai.run_paths import ENV_SESSION
+from biologix_ai.run_paths import ENV_SESSION
 
 
 def main() -> int:
@@ -25,11 +25,11 @@ def main() -> int:
     ap.add_argument("--root", default="")
     args = ap.parse_args()
 
-    root = args.root or os.environ.get("INSULIN_AI_ROOT", os.getcwd())
+    root = args.root or os.environ.get("BIOLOGIX_AI_ROOT", os.getcwd())
     session_dir = Path(args.session_dir).resolve()
     session_dir.mkdir(parents=True, exist_ok=True)
 
-    from insulin_ai.autonomous_biologics import run_biologics_discovery_loop
+    from biologix_ai.autonomous_biologics import run_biologics_discovery_loop
 
     summary = run_biologics_discovery_loop(
         biologic_target=args.biologic_target,

@@ -5,13 +5,13 @@
     "mcp_timeout": 2147483647
   },
   "mcp": {
-    "insulin-ai": {
+    "biologix-ai": {
       "type": "local",
       "command": ["bash", "scripts/run_mcp_server.sh"],
       "environment": {
         "PAPER_DIRECTORY": "./papers",
         "RETRO_LLM_BACKEND": "skip",
-        "INSULIN_AI_AIZYNTH_CONFIG": "./data/aizynthfinder/config.yml"
+        "BIOLOGIX_AI_AIZYNTH_CONFIG": "./data/aizynthfinder/config.yml"
       },
       "enabled": true
     },

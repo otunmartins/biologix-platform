@@ -4,8 +4,8 @@ import pytest
 
 
 def test_mdsimulator_requires_openmm_stack():
-    from insulin_ai.simulation.openmm_compat import openmm_available
-    from insulin_ai.simulation import MDSimulator
+    from biologix_ai.simulation.openmm_compat import openmm_available
+    from biologix_ai.simulation import MDSimulator
 
     if not openmm_available():
         pytest.skip("OpenMM + openmmforcefields + openff.toolkit not installed")
@@ -13,13 +13,13 @@ def test_mdsimulator_requires_openmm_stack():
 
 
 def test_openmm_available_is_bool():
-    from insulin_ai.simulation.openmm_compat import openmm_available
+    from biologix_ai.simulation.openmm_compat import openmm_available
 
     assert isinstance(openmm_available(), bool)
 
 
 def test_merge_gro_roundtrip():
-    from insulin_ai.simulation.gro_pdb_io import write_gro, read_gro
+    from biologix_ai.simulation.gro_pdb_io import write_gro, read_gro
     import tempfile
     import os
 

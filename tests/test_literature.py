@@ -11,13 +11,13 @@ sys.path.insert(0, ROOT)
 
 
 def test_semantic_scholar_client_import():
-    from insulin_ai.literature.scholar_client import SemanticScholarClient
+    from biologix_ai.literature.scholar_client import SemanticScholarClient
 
     assert SemanticScholarClient is not None
 
 
 def test_semantic_scholar_client_init():
-    from insulin_ai.literature.scholar_client import SemanticScholarClient
+    from biologix_ai.literature.scholar_client import SemanticScholarClient
 
     client = SemanticScholarClient(api_key=None)
     assert client.base_url == "https://api.semanticscholar.org/graph/v1"
@@ -25,7 +25,7 @@ def test_semantic_scholar_client_init():
 
 
 def test_materials_literature_miner_no_ollama():
-    from insulin_ai.literature.mining_system import MaterialsLiteratureMiner
+    from biologix_ai.literature.mining_system import MaterialsLiteratureMiner
 
     m = MaterialsLiteratureMiner()
     assert m.ollama is None
@@ -33,7 +33,7 @@ def test_materials_literature_miner_no_ollama():
 
 
 def test_scholar_only_queries_and_seeds():
-    from insulin_ai.literature.literature_scholar_only import (
+    from biologix_ai.literature.literature_scholar_only import (
         generate_search_queries,
         seed_candidates_from_papers,
     )

@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from insulin_ai.retrosynthesis.models import (
+from biologix_ai.retrosynthesis.models import (
     MonomerInfo,
     MonomerSource,
     PolymerRoute,
@@ -14,18 +14,18 @@ from insulin_ai.retrosynthesis.models import (
     RetrosynthesisRequest,
     RetrosynthesisResult,
 )
-from insulin_ai.retrosynthesis.retro_adapter import (
+from biologix_ai.retrosynthesis.retro_adapter import (
     ensure_root_product_in_extractions,
     resolve_material_name,
     validate_extractions_for_tree,
     write_llm_res,
 )
-from insulin_ai.retrosynthesis.retro_report import (
+from biologix_ai.retrosynthesis.retro_report import (
     assemble_session_retrosynthesis_markdown,
     format_plan_result_markdown,
     load_cached_plan_artifact,
 )
-from insulin_ai.retrosynthesis.psmiles_bridge import resolve_retro_target
+from biologix_ai.retrosynthesis.psmiles_bridge import resolve_retro_target
 
 
 class TestPolyacrylamideResolution:
@@ -119,7 +119,7 @@ class TestRetroReportMarkdown:
 
 class TestLoadCachedPlan:
     def test_load_cached_plan_artifact(self, tmp_path):
-        from insulin_ai.services.retrosynthesis_service import load_cached_plan_result
+        from biologix_ai.services.retrosynthesis_service import load_cached_plan_result
 
         result = RetrosynthesisResult(
             request=RetrosynthesisRequest(

@@ -2,20 +2,20 @@
 """
 Optuna-driven PSMILES discovery benchmark (agent-free, MCP-free, LLM-free).
 
-**Environment:** Run with the repo's simulation conda env ``insulin-ai-sim`` (see
+**Environment:** Run with the repo's simulation conda env ``biologix-ai-sim`` (see
 ``environment-simulation.yml``) — the same stack as OpenMM screening and MCP, with Optuna
 included. Example::
 
-    mamba run -n insulin-ai-sim python benchmarks/optuna_psmiles_discovery.py --seed '[*]OCC[*]' --n-trials 5
+    mamba run -n biologix-ai-sim python benchmarks/optuna_psmiles_discovery.py --seed '[*]OCC[*]' --n-trials 5
 
 Using a bare system Python without OpenMM/RDKit/psmiles will fail real evaluation; the
 ``evaluate_candidates_fn`` hook is for tests only.
 
-This script optimizes the same scalar :func:`insulin_ai.simulation.scoring.discovery_score`
-used when screening candidates in the insulin-ai stack. Each Optuna trial proposes
-polymer candidates via cheminformatic mutation (:func:`insulin_ai.mutation.feedback_guided_mutation`),
+This script optimizes the same scalar :func:`biologix_ai.simulation.scoring.discovery_score`
+used when screening candidates in the biologix-ai stack. Each Optuna trial proposes
+polymer candidates via cheminformatic mutation (:func:`biologix_ai.mutation.feedback_guided_mutation`),
 validates PSMILES, runs OpenMM merged minimize + interaction energy
-(:class:`insulin_ai.simulation.md_simulator.MDSimulator`), then updates feedback state for
+(:class:`biologix_ai.simulation.md_simulator.MDSimulator`), then updates feedback state for
 the next trial. It does **not** use literature mining, MCP tools, or any language model.
 
 **Search space.** PSMILES live in a discrete/combinatorial space. Optuna does not embed
@@ -134,7 +134,7 @@ def run_optuna_benchmark(
     ] = None,
 ) -> Dict[str, Any]:
     """
-    Run an Optuna study maximizing :func:`insulin_ai.simulation.scoring.discovery_score`.
+    Run an Optuna study maximizing :func:`biologix_ai.simulation.scoring.discovery_score`.
 
     Args:
         seed_psmiles: Initial PSMILES (must contain ``[*]``); validated before the study.
@@ -143,7 +143,7 @@ def run_optuna_benchmark(
         random_seed: Optuna sampler seed.
         mutator_seed_high: Upper bound (inclusive) for ``trial.suggest_int("mutator_seed", ...)``.
         feedback_fractions: Categorical choices for ``feedback_guided_mutation``.
-        md_steps: Passed to :class:`~insulin_ai.simulation.md_simulator.MDSimulator`.
+        md_steps: Passed to :class:`~biologix_ai.simulation.md_simulator.MDSimulator`.
         verbose_eval: Forwarded to OpenMM evaluation when using the real simulator.
         evaluate_candidates_fn: Inject mock for tests; signature
             ``(candidates, max_candidates) -> md_result_dict``. If ``None``, uses ``MDSimulator``.
@@ -154,10 +154,10 @@ def run_optuna_benchmark(
     import optuna
     from optuna.samplers import TPESampler
 
-    from insulin_ai.material_mappings import validate_psmiles
-    from insulin_ai.mutation import feedback_guided_mutation
-    from insulin_ai.simulation.openmm_compat import openmm_available
-    from insulin_ai.simulation.scoring import discovery_score
+    from biologix_ai.material_mappings import validate_psmiles
+    from biologix_ai.mutation import feedback_guided_mutation
+    from biologix_ai.simulation.openmm_compat import openmm_available
+    from biologix_ai.simulation.scoring import discovery_score
 
     vr = validate_psmiles(seed_psmiles.strip())
     if not vr.get("valid"):
@@ -177,7 +177,7 @@ def run_optuna_benchmark(
 
     sim: Any = None
     if use_openmm:
-        from insulin_ai.simulation import MDSimulator
+        from biologix_ai.simulation import MDSimulator
 
         sim = MDSimulator(n_steps=md_steps, random_seed=random_seed)
 

@@ -17,7 +17,7 @@ def test_write_complex_preview_png_writes_file(tmp_path):
     except ImportError:
         pytest.skip("matplotlib not installed")
 
-    from insulin_ai.simulation.pdb_preview import write_complex_preview_png
+    from biologix_ai.simulation.pdb_preview import write_complex_preview_png
 
     pdb = tmp_path / "t.pdb"
     pdb.write_text(MINI_PDB, encoding="utf-8")
@@ -29,7 +29,7 @@ def test_write_complex_preview_png_writes_file(tmp_path):
 
 
 def test_write_complex_preview_png_missing_pdb(tmp_path):
-    from insulin_ai.simulation.pdb_preview import write_complex_preview_png
+    from biologix_ai.simulation.pdb_preview import write_complex_preview_png
 
     r = write_complex_preview_png(str(tmp_path / "nope.pdb"), str(tmp_path / "x.png"))
     assert r.get("ok") is False

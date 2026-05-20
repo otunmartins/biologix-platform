@@ -8,14 +8,14 @@ import pytest
 
 class TestResolveRetroTarget:
     def test_psmiles_resolves_to_material_name(self):
-        from insulin_ai.retrosynthesis.psmiles_bridge import resolve_retro_target
+        from biologix_ai.retrosynthesis.psmiles_bridge import resolve_retro_target
 
         r = resolve_retro_target("[*]CC([*])C(=O)O")
         assert r["material_name"] == "poly(acrylic acid)"
         assert r["monomer_smiles"]
 
     def test_name_resolves_to_psmiles(self):
-        from insulin_ai.retrosynthesis.psmiles_bridge import resolve_retro_target
+        from biologix_ai.retrosynthesis.psmiles_bridge import resolve_retro_target
 
         r = resolve_retro_target("poly(vinyl alcohol)")
         assert "[*]" in r["psmiles"]
@@ -24,7 +24,7 @@ class TestResolveRetroTarget:
 
 class TestRetroAdapter:
     def test_write_and_read_llm_res(self, tmp_path):
-        from insulin_ai.retrosynthesis.retro_adapter import (
+        from biologix_ai.retrosynthesis.retro_adapter import (
             normalize_extractions,
             session_has_extractions,
             write_llm_res,
@@ -49,7 +49,7 @@ class TestRetroAdapter:
 
 class TestPolymerTemplates:
     def test_lookup_paa_template(self):
-        from insulin_ai.retrosynthesis.polymer_templates import lookup_template
+        from biologix_ai.retrosynthesis.polymer_templates import lookup_template
 
         route = lookup_template("[*]CC([*])C(=O)O")
         assert route is not None

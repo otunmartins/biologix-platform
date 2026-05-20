@@ -5,7 +5,7 @@ import types
 
 import pytest
 
-from insulin_ai.material_mappings import validate_psmiles
+from biologix_ai.material_mappings import validate_psmiles
 
 
 def test_validate_rejects_empty():

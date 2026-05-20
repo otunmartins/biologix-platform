@@ -5,14 +5,14 @@ import pytest
 
 def test_evaluate_candidates_raises_without_packmol(monkeypatch):
     """Matrix evaluation requires packmol; no silent fallback."""
-    from insulin_ai.simulation import MDSimulator
-    from insulin_ai.simulation.openmm_compat import openmm_available
+    from biologix_ai.simulation import MDSimulator
+    from biologix_ai.simulation.openmm_compat import openmm_available
 
     if not openmm_available():
         pytest.skip("OpenMM stack required")
 
     monkeypatch.setattr(
-        "insulin_ai.simulation.packmol_packer._packmol_available",
+        "biologix_ai.simulation.packmol_packer._packmol_available",
         lambda: False,
     )
     sim = MDSimulator(n_steps=100)
@@ -26,9 +26,9 @@ def test_evaluate_candidates_raises_without_packmol(monkeypatch):
 
 def test_evaluate_candidates_matrix_smoke(tmp_path):
     """Full matrix path when packmol + OpenMM available (slow)."""
-    from insulin_ai.simulation import MDSimulator
-    from insulin_ai.simulation.openmm_compat import openmm_available
-    from insulin_ai.simulation.packmol_packer import _packmol_available
+    from biologix_ai.simulation import MDSimulator
+    from biologix_ai.simulation.openmm_compat import openmm_available
+    from biologix_ai.simulation.packmol_packer import _packmol_available
 
     if not openmm_available():
         pytest.skip("OpenMM stack required")
@@ -37,11 +37,11 @@ def test_evaluate_candidates_matrix_smoke(tmp_path):
 
     import os
 
-    os.environ["INSULIN_AI_OPENMM_MATRIX_NPT"] = "0"
-    os.environ["INSULIN_AI_OPENMM_MATRIX_FIXED_MODE"] = "1"
-    os.environ["INSULIN_AI_OPENMM_MATRIX_N_POLYMERS"] = "2"
-    os.environ["INSULIN_AI_OPENMM_MAX_MINIMIZE_STEPS"] = "300"
-    os.environ["INSULIN_AI_OPENMM_N_REPEATS"] = "2"
+    os.environ["BIOLOGIX_AI_OPENMM_MATRIX_NPT"] = "0"
+    os.environ["BIOLOGIX_AI_OPENMM_MATRIX_FIXED_MODE"] = "1"
+    os.environ["BIOLOGIX_AI_OPENMM_MATRIX_N_POLYMERS"] = "2"
+    os.environ["BIOLOGIX_AI_OPENMM_MAX_MINIMIZE_STEPS"] = "300"
+    os.environ["BIOLOGIX_AI_OPENMM_N_REPEATS"] = "2"
     try:
         sim = MDSimulator(n_steps=100, random_seed=42)
         ad = str(tmp_path / "structures")
@@ -53,11 +53,11 @@ def test_evaluate_candidates_matrix_smoke(tmp_path):
         )
     finally:
         for k in (
-            "INSULIN_AI_OPENMM_MATRIX_NPT",
-            "INSULIN_AI_OPENMM_MATRIX_FIXED_MODE",
-            "INSULIN_AI_OPENMM_MATRIX_N_POLYMERS",
-            "INSULIN_AI_OPENMM_MAX_MINIMIZE_STEPS",
-            "INSULIN_AI_OPENMM_N_REPEATS",
+            "BIOLOGIX_AI_OPENMM_MATRIX_NPT",
+            "BIOLOGIX_AI_OPENMM_MATRIX_FIXED_MODE",
+            "BIOLOGIX_AI_OPENMM_MATRIX_N_POLYMERS",
+            "BIOLOGIX_AI_OPENMM_MAX_MINIMIZE_STEPS",
+            "BIOLOGIX_AI_OPENMM_N_REPEATS",
         ):
             os.environ.pop(k, None)
 
@@ -75,10 +75,10 @@ def test_evaluate_candidates_matrix_smoke(tmp_path):
 
 
 def test_evaluate_stderr_heartbeat_when_verbose_false(capsys, tmp_path):
-    """verbose=False emits start/finish stderr lines unless INSULIN_AI_EVAL_QUIET is set."""
-    from insulin_ai.simulation import MDSimulator
-    from insulin_ai.simulation.openmm_compat import openmm_available
-    from insulin_ai.simulation.packmol_packer import _packmol_available
+    """verbose=False emits start/finish stderr lines unless BIOLOGIX_AI_EVAL_QUIET is set."""
+    from biologix_ai.simulation import MDSimulator
+    from biologix_ai.simulation.openmm_compat import openmm_available
+    from biologix_ai.simulation.packmol_packer import _packmol_available
 
     if not openmm_available():
         pytest.skip("OpenMM stack required")
@@ -87,13 +87,13 @@ def test_evaluate_stderr_heartbeat_when_verbose_false(capsys, tmp_path):
 
     import os
 
-    os.environ.pop("INSULIN_AI_EVAL_QUIET", None)
-    os.environ.pop("INSULIN_AI_EVAL_VERBOSE", None)
-    os.environ["INSULIN_AI_OPENMM_MATRIX_NPT"] = "0"
-    os.environ["INSULIN_AI_OPENMM_MATRIX_FIXED_MODE"] = "1"
-    os.environ["INSULIN_AI_OPENMM_MATRIX_N_POLYMERS"] = "2"
-    os.environ["INSULIN_AI_OPENMM_MAX_MINIMIZE_STEPS"] = "300"
-    os.environ["INSULIN_AI_OPENMM_N_REPEATS"] = "2"
+    os.environ.pop("BIOLOGIX_AI_EVAL_QUIET", None)
+    os.environ.pop("BIOLOGIX_AI_EVAL_VERBOSE", None)
+    os.environ["BIOLOGIX_AI_OPENMM_MATRIX_NPT"] = "0"
+    os.environ["BIOLOGIX_AI_OPENMM_MATRIX_FIXED_MODE"] = "1"
+    os.environ["BIOLOGIX_AI_OPENMM_MATRIX_N_POLYMERS"] = "2"
+    os.environ["BIOLOGIX_AI_OPENMM_MAX_MINIMIZE_STEPS"] = "300"
+    os.environ["BIOLOGIX_AI_OPENMM_N_REPEATS"] = "2"
     try:
         sim = MDSimulator(n_steps=100, random_seed=42)
         sim.evaluate_candidates(
@@ -104,11 +104,11 @@ def test_evaluate_stderr_heartbeat_when_verbose_false(capsys, tmp_path):
         )
     finally:
         for k in (
-            "INSULIN_AI_OPENMM_MATRIX_NPT",
-            "INSULIN_AI_OPENMM_MATRIX_FIXED_MODE",
-            "INSULIN_AI_OPENMM_MATRIX_N_POLYMERS",
-            "INSULIN_AI_OPENMM_MAX_MINIMIZE_STEPS",
-            "INSULIN_AI_OPENMM_N_REPEATS",
+            "BIOLOGIX_AI_OPENMM_MATRIX_NPT",
+            "BIOLOGIX_AI_OPENMM_MATRIX_FIXED_MODE",
+            "BIOLOGIX_AI_OPENMM_MATRIX_N_POLYMERS",
+            "BIOLOGIX_AI_OPENMM_MAX_MINIMIZE_STEPS",
+            "BIOLOGIX_AI_OPENMM_N_REPEATS",
         ):
             os.environ.pop(k, None)
 
@@ -131,9 +131,9 @@ def test_parallel_ordering_with_mock(monkeypatch):
     mocking is not possible — this test runs real OpenMM with minimal settings
     and skips if the stack is unavailable.
     """
-    from insulin_ai.simulation import MDSimulator
-    from insulin_ai.simulation.openmm_compat import openmm_available
-    from insulin_ai.simulation.packmol_packer import _packmol_available
+    from biologix_ai.simulation import MDSimulator
+    from biologix_ai.simulation.openmm_compat import openmm_available
+    from biologix_ai.simulation.packmol_packer import _packmol_available
 
     if not openmm_available():
         pytest.skip("OpenMM stack required")
@@ -143,11 +143,11 @@ def test_parallel_ordering_with_mock(monkeypatch):
     import os
 
     env_overrides = {
-        "INSULIN_AI_OPENMM_MATRIX_NPT": "0",
-        "INSULIN_AI_OPENMM_MATRIX_FIXED_MODE": "1",
-        "INSULIN_AI_OPENMM_MATRIX_N_POLYMERS": "2",
-        "INSULIN_AI_OPENMM_MAX_MINIMIZE_STEPS": "200",
-        "INSULIN_AI_OPENMM_N_REPEATS": "1",
+        "BIOLOGIX_AI_OPENMM_MATRIX_NPT": "0",
+        "BIOLOGIX_AI_OPENMM_MATRIX_FIXED_MODE": "1",
+        "BIOLOGIX_AI_OPENMM_MATRIX_N_POLYMERS": "2",
+        "BIOLOGIX_AI_OPENMM_MAX_MINIMIZE_STEPS": "200",
+        "BIOLOGIX_AI_OPENMM_N_REPEATS": "1",
     }
     for k, v in env_overrides.items():
         os.environ[k] = v
@@ -174,29 +174,29 @@ def test_parallel_ordering_with_mock(monkeypatch):
 
 
 def test_max_workers_env_var(monkeypatch):
-    """_env_max_workers reads INSULIN_AI_EVAL_MAX_WORKERS and clamps to >=1."""
-    from insulin_ai.simulation.md_simulator import _env_max_workers
+    """_env_max_workers reads BIOLOGIX_AI_EVAL_MAX_WORKERS and clamps to >=1."""
+    from biologix_ai.simulation.md_simulator import _env_max_workers
 
-    monkeypatch.setenv("INSULIN_AI_EVAL_MAX_WORKERS", "3")
+    monkeypatch.setenv("BIOLOGIX_AI_EVAL_MAX_WORKERS", "3")
     assert _env_max_workers() == 3
 
-    monkeypatch.setenv("INSULIN_AI_EVAL_MAX_WORKERS", "0")
+    monkeypatch.setenv("BIOLOGIX_AI_EVAL_MAX_WORKERS", "0")
     assert _env_max_workers() == 1
 
-    monkeypatch.delenv("INSULIN_AI_EVAL_MAX_WORKERS", raising=False)
+    monkeypatch.delenv("BIOLOGIX_AI_EVAL_MAX_WORKERS", raising=False)
     assert _env_max_workers() == 1
 
 
 def test_max_workers_argument_overrides_env(monkeypatch):
     """
     Explicit max_workers=1 argument uses the sequential path even when
-    INSULIN_AI_EVAL_MAX_WORKERS is set to a higher value in the environment.
+    BIOLOGIX_AI_EVAL_MAX_WORKERS is set to a higher value in the environment.
     ``evaluate_candidates`` always includes ``evaluation_progress`` in the return dict;
     we assert one completed row and a successful matrix result.
     """
-    from insulin_ai.simulation import MDSimulator
-    from insulin_ai.simulation.openmm_compat import openmm_available
-    from insulin_ai.simulation.packmol_packer import _packmol_available
+    from biologix_ai.simulation import MDSimulator
+    from biologix_ai.simulation.openmm_compat import openmm_available
+    from biologix_ai.simulation.packmol_packer import _packmol_available
 
     if not openmm_available():
         pytest.skip("OpenMM stack required")
@@ -206,12 +206,12 @@ def test_max_workers_argument_overrides_env(monkeypatch):
     import os
 
     env_overrides = {
-        "INSULIN_AI_EVAL_MAX_WORKERS": "4",
-        "INSULIN_AI_OPENMM_MATRIX_NPT": "0",
-        "INSULIN_AI_OPENMM_MATRIX_FIXED_MODE": "1",
-        "INSULIN_AI_OPENMM_MATRIX_N_POLYMERS": "2",
-        "INSULIN_AI_OPENMM_MAX_MINIMIZE_STEPS": "200",
-        "INSULIN_AI_OPENMM_N_REPEATS": "1",
+        "BIOLOGIX_AI_EVAL_MAX_WORKERS": "4",
+        "BIOLOGIX_AI_OPENMM_MATRIX_NPT": "0",
+        "BIOLOGIX_AI_OPENMM_MATRIX_FIXED_MODE": "1",
+        "BIOLOGIX_AI_OPENMM_MATRIX_N_POLYMERS": "2",
+        "BIOLOGIX_AI_OPENMM_MAX_MINIMIZE_STEPS": "200",
+        "BIOLOGIX_AI_OPENMM_N_REPEATS": "1",
     }
     for k, v in env_overrides.items():
         os.environ[k] = v
