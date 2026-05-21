@@ -529,7 +529,8 @@ def openmm_evaluate_psmiles(
 
         if not openmm_available():
             return _abort_install_json(
-                "OpenMM screening stack not importable (openmm, openmmforcefields, openff.toolkit)."
+                "OpenMM screening stack incomplete (openmm, openmmforcefields, openff.toolkit, "
+                "and AmberTools antechamber/parmchk2 on PATH). Run ./install."
             )
         from biologix_ai.simulation import MDSimulator
 

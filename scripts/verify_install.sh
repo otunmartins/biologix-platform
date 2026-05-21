@@ -52,10 +52,12 @@ import openmm
 from openff.toolkit import Molecule
 from rdkit.Chem import AllChem
 assert shutil.which('packmol'), 'packmol not on PATH'
+assert shutil.which('antechamber'), 'antechamber not on PATH (conda-forge ambertools)'
+assert shutil.which('parmchk2'), 'parmchk2 not on PATH (conda-forge ambertools)'
 " 2>/dev/null; then
-  pass "conda stack (openmm, packmol, openff, rdkit)"
+  pass "conda stack (openmm, packmol, openff, rdkit, ambertools)"
 else
-  fail "conda stack (openmm, packmol, openff, rdkit)"
+  fail "conda stack (openmm, packmol, openff, rdkit, ambertools)"
 fi
 
 if [[ "$CONDA_ONLY" == "true" ]]; then

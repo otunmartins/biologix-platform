@@ -26,7 +26,8 @@ If any tool returns `abort: true`, an import error, or a missing dependency:
 2. Show the user the exact error from the tool.
 3. Tell them: **Run `./install` from the repo root, then restart this session.**
 
-Do not suggest AmberTools, `RETRO_USE_INTERNAL_LLM`, manual pip steps, or partial workarounds.
+Do not suggest `RETRO_USE_INTERNAL_LLM`, manual pip steps, or partial workarounds.
+`./install` provides AmberTools (antechamber/parmchk2) for OpenMM GAFF screening.
 Do not read `src/`, `scripts/`, or config files to "understand the project" — call MCP tools only.
 
 ## Protocol

@@ -1,5 +1,5 @@
 # Minimal OpenMM environment: protein (AMBER14) + ligand (GAFF + RDKit Gasteiger charges).
-# No antechamber/acpype. conda-forge only — see environment-simulation.yml header for omnia note.
+# Requires ambertools (antechamber/parmchk2) for GAFF template generation. conda-forge only.
 # Create: mamba env create -f environment-openmm.yml
 name: biologix-ai-openmm
 channels:
@@ -12,6 +12,7 @@ dependencies:
   - packmol
   - openff-toolkit>=0.18.0       # conda-forge only
   - openff-units>=0.2            # conda-forge only
+  - ambertools
   - pip
 
   - pip:

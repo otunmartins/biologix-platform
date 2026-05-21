@@ -120,6 +120,13 @@ from rdkit.Chem import AllChem
 packmol = shutil.which('packmol')
 if not packmol:
     raise SystemExit('packmol not on PATH in conda env')
-print('conda stack OK (openmm', openmm.__version__, ', packmol', packmol, ')')
+for exe in ('antechamber', 'parmchk2'):
+    if not shutil.which(exe):
+        raise SystemExit(f'{exe} not on PATH in conda env (install ambertools via ./install)')
+print(
+    'conda stack OK (openmm', openmm.__version__,
+    ', packmol', packmol,
+    ', antechamber', shutil.which('antechamber'), ')',
+)
 "
 }

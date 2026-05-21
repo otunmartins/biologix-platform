@@ -20,6 +20,7 @@ dependencies:
   - packmol                      # molecular packing (binary on PATH)
   - openff-toolkit>=0.18.0       # conda-forge only (not on PyPI)
   - openff-units>=0.2            # conda-forge only
+  - ambertools                   # antechamber + parmchk2 (GAFF via openmmforcefields)
   - pip
 
   - pip:

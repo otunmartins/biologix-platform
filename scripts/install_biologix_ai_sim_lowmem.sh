@@ -38,7 +38,7 @@ check_conda_pkg() {
   conda list -n "${ENV_NAME}" "${pkg}" 2>/dev/null | grep -qE "^${pkg}[[:space:]]" || return 1
 }
 
-echo "Wave 1/4: openmm, pdbfixer, packmol..."
+echo "Wave 1/5: openmm, pdbfixer, packmol..."
 wave_install openmm pdbfixer packmol
 for pkg in openmm pdbfixer packmol; do
   if ! check_conda_pkg "${pkg}"; then
@@ -48,7 +48,7 @@ for pkg in openmm pdbfixer packmol; do
   fi
 done
 
-echo "Wave 2/4: rdkit (conda; remove pip rdkit first)..."
+echo "Wave 2/5: rdkit (conda; remove pip rdkit first)..."
 pip_in_env uninstall -y rdkit rdkit-pypi 2>/dev/null || true
 wave_install rdkit
 if ! check_conda_pkg rdkit; then
@@ -57,7 +57,7 @@ if ! check_conda_pkg rdkit; then
   exit 1
 fi
 
-echo "Wave 3/4: OpenFF toolkit + units..."
+echo "Wave 3/5: OpenFF toolkit + units..."
 if ! wave_install "openff-units>=0.2" "openff-toolkit-base>=0.18.0" 2>/dev/null; then
   echo "Retrying OpenFF wave with minimal packages..."
   wave_install "openff-units>=0.2" || {
@@ -77,7 +77,28 @@ if ! check_conda_pkg openff-toolkit-base && ! check_conda_pkg openff-toolkit; th
   exit 1
 fi
 
-echo "Wave 4/4: pip packages + editable biologix-ai..."
+echo "Wave 4/5: AmberTools (antechamber + parmchk2 for GAFF templates)..."
+echo "      Large conda solve — install fast solver first: bash scripts/install_micromamba.sh"
+if ! wave_install "ambertools>=24.8=*nompi*" 2>/dev/null; then
+  wave_install ambertools
+fi
+if ! check_conda_pkg ambertools; then
+  echo "ERROR: Wave 4 failed — ambertools not installed in ${ENV_NAME}" >&2
+  repair_hint
+  exit 1
+fi
+conda_run python -c "
+import shutil
+for exe in ('antechamber', 'parmchk2'):
+    if not shutil.which(exe):
+        raise SystemExit(f'{exe} not on PATH in conda env')
+" || {
+  echo "ERROR: Wave 4 failed — antechamber/parmchk2 not on PATH" >&2
+  repair_hint
+  exit 1
+}
+
+echo "Wave 5/5: pip packages + editable biologix-ai..."
 pip_in_env install -U pip setuptools wheel
 pip_in_env install -r "$REPO_ROOT/requirements.txt"
 pip_in_env install -e "$REPO_ROOT[retro,admet,dev]"
