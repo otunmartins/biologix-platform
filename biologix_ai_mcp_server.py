@@ -122,6 +122,18 @@ def _coerce_single_psmiles_string(value: Union[str, List[Any], None]) -> str:
     return s
 
 
+def _abort_install_json(error: str, *, extra: Optional[dict] = None) -> str:
+    """Structured failure when a required stack component is missing."""
+    payload: dict = {
+        "error": error,
+        "abort": True,
+        "fix": "./install",
+    }
+    if extra:
+        payload.update(extra)
+    return json.dumps(payload, indent=2)
+
+
 mcp = FastMCP(
     "biologics-ai",
     instructions=(
@@ -512,6 +524,12 @@ def openmm_evaluate_psmiles(
                     "received_value": repr(psmiles_list)[:120],
                 },
                 indent=2,
+            )
+        from biologix_ai.simulation.openmm_compat import openmm_available
+
+        if not openmm_available():
+            return _abort_install_json(
+                "OpenMM screening stack not importable (openmm, openmmforcefields, openff.toolkit)."
             )
         from biologix_ai.simulation import MDSimulator
 
@@ -1619,7 +1637,15 @@ def prepare_retrosynthesis(
     Returns material_name, pdf_paths, and extraction_schema for the OpenCode agent to
     fill via submit_retro_extractions before calling plan_retrosynthesis.
     """
-    from biologix_ai.services.retrosynthesis_service import prepare_retrosynthesis_workspace
+    from biologix_ai.services.retrosynthesis_service import (
+        _is_retrosynthesisagent_available,
+        prepare_retrosynthesis_workspace,
+    )
+
+    if not _is_retrosynthesisagent_available():
+        return _abort_install_json(
+            "RetroSynthesisAgent not installed. Run ./install (includes git submodules)."
+        )
 
     session = _optional_session_dir(run_dir)
     if session is None:
@@ -1698,9 +1724,8 @@ def plan_retrosynthesis(
     **Agent-backed path (default, no RetroSyn OpenAI key):** prepare_retrosynthesis →
     agent extracts reactions → submit_retro_extractions → plan_retrosynthesis (with run_dir).
 
-    **Engines:** RetroSynthesisAgent KG tree from session extractions; AiZynthFinder enriches
-    leaf monomers when models are installed (``data/aizynthfinder/``). Curated templates are
-    used only when no KG routes exist.
+    **Engines:** RetroSynthesisAgent KG tree from session extractions (via
+    ``submit_retro_extractions``); AiZynthFinder enriches leaf monomers when models are installed.
 
     When ``run_dir`` is set, uses session workspace and writes ``retrosynthesis/plan_*.json``.
 
@@ -1718,7 +1743,15 @@ def plan_retrosynthesis(
         RetrosynthesisRequest,
         PolymerizationType,
     )
-    from biologix_ai.services.retrosynthesis_service import plan_retrosynthesis as _plan
+    from biologix_ai.services.retrosynthesis_service import (
+        _is_retrosynthesisagent_available,
+        plan_retrosynthesis as _plan,
+    )
+
+    if not _is_retrosynthesisagent_available():
+        return _abort_install_json(
+            "RetroSynthesisAgent not installed. Run ./install (includes git submodules)."
+        )
 
     mechanisms = None
     if allowed_mechanisms.strip():
@@ -1797,7 +1830,15 @@ def check_monomers_batch(
     Pass a comma-separated string or JSON array of SMILES.
     With ``run_dir``, writes one artifact per SMILES under ``<session>/retrosynthesis/``.
     """
-    from biologix_ai.services.toxicity_service import screen_monomers_batch
+    from biologix_ai.services.toxicity_service import (
+        _is_admet_available,
+        screen_monomers_batch,
+    )
+
+    if not _is_admet_available():
+        return _abort_install_json(
+            "ADMET-AI not importable. Run ./install (includes ADMET-AI submodule)."
+        )
 
     parsed = _normalize_psmiles_list_for_eval(smiles_list)
     results = screen_monomers_batch(parsed)
@@ -2084,6 +2125,14 @@ def screen_candidate_library(
         max_candidates: Hard cap on library size.
         run_dir: Session directory for persistence.
     """
+    if run_admet:
+        from biologix_ai.services.toxicity_service import _is_admet_available
+
+        if not _is_admet_available():
+            return _abort_install_json(
+                "ADMET-AI not importable (run_admet=true). Run ./install."
+            )
+
     candidates = _normalize_psmiles_list_for_eval(psmiles_list)[:max_candidates]
     results = []
     for psmiles in candidates:

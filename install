@@ -103,27 +103,36 @@ install_conda_env() {
     return 0
   fi
 
-  local runner
-  if command -v mamba &>/dev/null; then
-    runner=mamba
-  else
-    runner=conda
-  fi
   if conda config --show channels 2>/dev/null | grep -qi omnia; then
     echo -e "${RED}Your conda channel list includes \"omnia\".${NC}"
     echo -e "${YELLOW}Run: bash scripts/fix_conda_channels_for_biologix_ai.sh${NC}"
     echo ""
   fi
-  local solver_args=()
-  if [[ "$runner" == "conda" ]]; then
-    solver_args=(--solver classic)
-  fi
-  if env_exists; then
-    echo -e "${YELLOW}Conda env ${ENV_NAME} exists — updating from environment-simulation.yml...${NC}"
-    "$runner" env update -f "$YML" --prune "${solver_args[@]}"
+  refresh_conda_prefix_path
+  remove_broken_micromamba
+  if micromamba_usable && [[ -n "${CONDA_PREFIX_PATH}" ]]; then
+    echo -e "${YELLOW}Updating ${ENV_NAME} via micromamba (libmamba 2.x)...${NC}"
+    if env_exists; then
+      micromamba env update -p "${CONDA_PREFIX_PATH}" -f "$YML" --prune -y
+    else
+      micromamba env create -p "${CONDA_PREFIX_PATH}" -f "$YML" -y
+    fi
+  elif command -v mamba &>/dev/null; then
+    echo -e "${YELLOW}Updating ${ENV_NAME} via mamba...${NC}"
+    if env_exists; then
+      mamba env update -f "$YML" --prune -y
+    else
+      mamba env create -f "$YML" -y
+    fi
   else
-    echo "Creating conda env ${ENV_NAME} from environment-simulation.yml..."
-    "$runner" env create -f "$YML" "${solver_args[@]}"
+    local solver_args=(--solver classic)
+    if env_exists; then
+      echo -e "${YELLOW}Conda env ${ENV_NAME} exists — updating from environment-simulation.yml (classic solver)...${NC}"
+      conda env update -f "$YML" --prune "${solver_args[@]}"
+    else
+      echo "Creating conda env ${ENV_NAME} from environment-simulation.yml (classic solver)..."
+      conda env create -f "$YML" "${solver_args[@]}"
+    fi
   fi
   refresh_conda_prefix_path
   verify_conda_stack
@@ -183,7 +192,7 @@ VERIFY_FULL=( )
 if [[ "$pip_only" == "true" ]]; then
   echo -e "${YELLOW}Skipping full verify (--pip-only); OpenMM stack not expected.${NC}"
 else
-  bash "$SCRIPT_DIR/scripts/verify_install.sh" "${VERIFY_FULL[@]}"
+  bash "$SCRIPT_DIR/scripts/verify_install.sh" ${VERIFY_FULL[@]+"${VERIFY_FULL[@]}"}
 fi
 
 # --- Launcher ---

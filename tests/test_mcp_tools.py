@@ -181,7 +181,8 @@ class TestNewMCPTools:
             )
         )
         assert comp.get("narrative") or comp.get("scorecards") is not None
-        assert "template" in str(comp.get("raw_data", {}).get("retro_metadata", {}))
+        prov = str(comp.get("raw_data", {}).get("retro_metadata", {}))
+        assert "session_agent_llm" in prov or "route_provenance" in prov
 
     def test_check_monomer_admet_returns_json(self):
         result = self.server.check_monomer_admet(smiles="CCO")

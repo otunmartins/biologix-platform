@@ -37,7 +37,6 @@ class TestHealthEndpoint:
         assert "retrosynthesis_agent_available" in data
         assert "aizynthfinder_available" in data
         assert "aizynthfinder_models_ready" in data
-        assert "retro_internal_llm_configured" in data
         assert "admet_available" in data
 
     def test_health_version_updated(self, client):

@@ -59,20 +59,21 @@ class TestRetrosynthesisService:
 
         request = RetrosynthesisRequest(target="some_unknown_polymer_xyz_12345")
         result = plan_retrosynthesis(request)
-        assert result.metadata.get("route_provenance") in ("none", "template")
-        if result.metadata.get("route_provenance") == "none":
-            assert len(result.polymer_routes) == 0
-            assert result.metadata.get("requires_agent_extractions") is True
+        assert result.metadata.get("route_provenance") == "none"
+        assert len(result.polymer_routes) == 0
+        assert result.metadata.get("requires_agent_extractions") is True
 
-    def test_plan_peg_uses_template_when_no_agent(self):
+    def test_plan_without_extractions_returns_none_provenance(self):
         from biologix_ai.services.retrosynthesis_service import plan_retrosynthesis
 
         request = RetrosynthesisRequest(target="PEG", constraints=RetrosynthesisConstraints(max_routes=1))
         result = plan_retrosynthesis(request)
-        assert len(result.polymer_routes) >= 1
-        assert result.metadata.get("route_provenance") in ("template", "retro_agent_llm", "session_agent_llm")
+        assert result.metadata.get("route_provenance") in ("none", "session_agent_llm")
+        if result.metadata.get("route_provenance") == "none":
+            assert len(result.polymer_routes) == 0
+            assert result.metadata.get("requires_agent_extractions") is True
 
-    def test_plan_with_session_extractions_uses_template_or_routes(self, tmp_path):
+    def test_plan_with_session_extractions_builds_routes_or_none(self, tmp_path):
         import json
 
         from biologix_ai.retrosynthesis.retro_adapter import write_llm_res
@@ -99,13 +100,9 @@ class TestRetrosynthesisService:
         )
         result = plan_retrosynthesis(request)
         assert result.metadata.get("session_extractions_present") is True
-        # RetroSynAgent may or may not be installed; template fallback still valid
-        assert result.metadata.get("route_provenance") in (
-            "session_agent_llm",
-            "retro_agent_llm",
-            "template",
-            "none",
-        )
+        assert result.metadata.get("route_provenance") in ("session_agent_llm", "none")
+        if result.metadata.get("route_provenance") == "session_agent_llm":
+            assert len(result.polymer_routes) >= 1
 
 
 class TestToxicityService:

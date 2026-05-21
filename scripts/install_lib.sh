@@ -50,22 +50,28 @@ pip_in_env() {
 
 wave_install() {
   remove_broken_micromamba
-  if command -v conda &>/dev/null; then
+  refresh_conda_prefix_path
+  # Prefer standalone micromamba (libmamba 2.x): fast solves into existing Miniforge envs.
+  # Fall back to conda --solver classic when micromamba is missing; avoid conda's default
+  # libmamba on conda 24.x (slow/hangy with strict channel_priority) and old mamba 1.5.x crashes.
+  if micromamba_usable && [[ -n "${CONDA_PREFIX_PATH}" ]] && [[ -d "${CONDA_PREFIX_PATH}" ]]; then
+    micromamba install -p "${CONDA_PREFIX_PATH}" --override-channels -c conda-forge -y "$@"
+  elif command -v conda &>/dev/null; then
     conda install -n "${ENV_NAME}" --override-channels -c conda-forge -y --solver classic "$@"
-  elif micromamba_usable && [[ -n "${CONDA_PREFIX_PATH}" ]]; then
-    micromamba install -p "${CONDA_PREFIX_PATH}" -c conda-forge -y "$@"
   else
-    echo "ERROR: need conda or working micromamba on PATH" >&2
+    echo "ERROR: need working micromamba or conda on PATH" >&2
     return 1
   fi
 }
 
 maybe_install_micromamba() {
   remove_broken_micromamba
-  if command -v conda &>/dev/null; then
+  if micromamba_usable; then
     return 0
   fi
-  if micromamba_usable; then
+  if command -v conda &>/dev/null; then
+    echo "Note: micromamba not on PATH — wave installs use conda --solver classic (slower)."
+    echo "      Install fast solver: bash scripts/install_micromamba.sh"
     return 0
   fi
   echo "micromamba not found — installing standalone binary to ~/.local/bin ..."

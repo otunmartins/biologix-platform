@@ -26,7 +26,6 @@ from biologix_ai.retrosynthesis.models import (
     SmallMolRoute,
     SmallMolStep,
 )
-from biologix_ai.retrosynthesis.polymer_templates import lookup_template
 from biologix_ai.retrosynthesis.psmiles_bridge import resolve_retro_target
 from biologix_ai.retrosynthesis.retro_adapter import session_has_extractions
 from biologix_ai.retrosynthesis.retro_workspace import ensure_workspace
@@ -48,17 +47,6 @@ def _is_retrosynthesisagent_available() -> bool:
         return True
     except ImportError:
         return False
-
-
-def _internal_llm_configured() -> bool:
-    if os.environ.get("RETRO_USE_INTERNAL_LLM") != "1":
-        return False
-    env_path = Path(__file__).resolve().parents[4] / "extern" / "RetroSynthesisAgent" / ".env"
-    if env_path.is_file():
-        for line in env_path.read_text(encoding="utf-8").splitlines():
-            if line.strip().startswith("API_KEY=") and len(line.split("=", 1)[1].strip()) > 0:
-                return True
-    return bool(os.environ.get("API_KEY") or os.environ.get("OPENAI_API_KEY"))
 
 
 def _is_runnable_smiles_for_aizynth(smiles: str) -> bool:
@@ -239,8 +227,7 @@ def _run_retrosynthesis_agent(
 ) -> Tuple[List[PolymerRoute], str]:
     """Run RetroSynthesisAgent for macromolecular retrosynthesis.
 
-    Returns (routes, route_provenance) where provenance is one of:
-    retro_agent_llm, session_agent_llm, none.
+    Returns (routes, route_provenance) where provenance is session_agent_llm or none.
     """
     if not _is_retrosynthesisagent_available():
         logger.warning("RetroSynthesisAgent not available; returning empty routes")
@@ -265,11 +252,9 @@ def _run_retrosynthesis_agent(
         had_session_extractions = False
 
     provenance = "none"
-    used_internal_llm = False
 
     try:
         from RetroSynAgent.entityAlignment import EntityAlignment
-        from RetroSynAgent.pdfDownloader import PDFDownloader
         from RetroSynAgent.pdfProcessor import PDFProcessor
         from RetroSynAgent.treeBuilder import Tree
 
@@ -285,26 +270,16 @@ def _run_retrosynthesis_agent(
             processor.load_existing_results()
 
             if processor.result_dict:
-                provenance = "session_agent_llm" if had_session_extractions else "retro_agent_llm"
+                provenance = "session_agent_llm"
                 logger.info(
                     "Using %d existing llm_res entries for %s",
                     len(processor.result_dict),
                     material_name,
                 )
-            elif os.environ.get("RETRO_USE_INTERNAL_LLM") == "1" and _internal_llm_configured():
-                downloader = PDFDownloader(
-                    material_name,
-                    pdf_folder_name=str(pdf_folder),
-                    num_results=num_results,
-                    n_thread=2,
-                )
-                downloader.main()
-                processor.process_pdfs_txt(save_batch_size=2)
-                used_internal_llm = True
-                provenance = "retro_agent_llm"
             else:
                 logger.warning(
-                    "No llm_res and RETRO_USE_INTERNAL_LLM not set; returning empty routes"
+                    "No llm_res in session workspace; returning empty routes "
+                    "(call submit_retro_extractions before plan_retrosynthesis)"
                 )
                 return [], "none"
 
@@ -318,7 +293,7 @@ def _run_retrosynthesis_agent(
             tree.construct_tree()
             routes = _routes_from_tree(tree, material_name)
             if routes and provenance == "none":
-                provenance = "retro_agent_llm" if used_internal_llm else "session_agent_llm"
+                provenance = "session_agent_llm"
             if processor.result_dict and not routes:
                 logger.warning(
                     "RetroSynAgent tree produced no paths for %s; "
@@ -437,11 +412,6 @@ def plan_retrosynthesis(request: RetrosynthesisRequest) -> RetrosynthesisResult:
     if route_provenance == "session_agent_llm":
         retro_stages.append("session_extractions")
         retro_stages.append("kg_tree")
-    elif route_provenance == "retro_agent_llm":
-        retro_stages.append("pdf_download")
-        retro_stages.append("internal_llm_extraction")
-        retro_stages.append("kg_tree")
-
     kg_empty_after_extractions = False
     if (
         not polymer_routes
@@ -456,21 +426,14 @@ def plan_retrosynthesis(request: RetrosynthesisRequest) -> RetrosynthesisResult:
             "precursors. Re-submit via submit_retro_extractions if needed."
         )
 
-    if not polymer_routes:
-        tmpl = lookup_template(target_psmiles or target)
-        if tmpl:
-            polymer_routes = [tmpl]
-            route_provenance = "template"
-            retro_stages.append("template_fallback")
-
     requires_agent_extractions = False
     if not polymer_routes:
         requires_agent_extractions = True
         route_provenance = "none"
         warnings.append(
-            "No polymer routes found. Either: (a) call prepare_retrosynthesis then "
-            "submit_retro_extractions before retrying plan_retrosynthesis, or "
-            "(b) set RETRO_USE_INTERNAL_LLM=1 with API_KEY in extern/RetroSynthesisAgent/.env"
+            "No polymer routes found. Call prepare_retrosynthesis, then "
+            "submit_retro_extractions (Products must include material_name), "
+            "then plan_retrosynthesis again."
         )
 
     if constraints.allowed_mechanisms:
@@ -553,7 +516,6 @@ def plan_retrosynthesis(request: RetrosynthesisRequest) -> RetrosynthesisResult:
         "retrosynthesis_agent_available": _is_retrosynthesisagent_available(),
         "aizynthfinder_available": aizynth_pkg,
         "aizynthfinder_models_ready": aizynth_models,
-        "retro_internal_llm_configured": _internal_llm_configured(),
         "route_provenance": route_provenance,
         "retro_stages_completed": retro_stages,
         "material_name_resolved": material_name,
@@ -570,7 +532,6 @@ def plan_retrosynthesis(request: RetrosynthesisRequest) -> RetrosynthesisResult:
         "kg_empty_after_session_extractions": kg_empty_after_extractions,
         "aizynth_monomers_attempted": aizynth_attempted,
         "aizynth_monomers_solved": aizynth_solved,
-        "agent_backed_retro_path": not _internal_llm_configured(),
     }
     if not aizynth_models and aizynth_pkg:
         meta["aizynth_setup_hint"] = "Run: bash scripts/setup_aizynthfinder.sh"
@@ -583,21 +544,17 @@ def plan_retrosynthesis(request: RetrosynthesisRequest) -> RetrosynthesisResult:
         meta["biologic_pdb_path"] = request.biologic_pdb_path
 
     prov = route_provenance
-    if prov in ("session_agent_llm", "retro_agent_llm"):
+    if prov == "session_agent_llm":
         meta["reporting_honesty"] = (
-            f"Provenance: {prov} (literature-derived RetroSyn KG routes)."
+            "Provenance: session_agent_llm (literature-derived RetroSyn KG routes)."
         )
-    elif prov == "template":
-        meta["reporting_honesty"] = (
-            "Provenance: template (curated fallback); not literature KG."
-        )
-        if session_dir and session_has_extractions(session_dir, material_name):
+    else:
+        meta["reporting_honesty"] = f"Provenance: {prov}; no polymer routes."
+        if prov == "none" and session_dir and session_has_extractions(session_dir, material_name):
             meta["recommended_next_action"] = (
                 f"Re-submit extractions with Products containing "
                 f"{material_name.strip().lower()!r}, then plan_retrosynthesis again."
             )
-    else:
-        meta["reporting_honesty"] = f"Provenance: {prov}; no polymer routes."
 
     return RetrosynthesisResult(
         request=request,

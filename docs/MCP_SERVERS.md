@@ -52,8 +52,7 @@ Chat is not mirrored into `runs/` automatically; agents must call `save_session_
 
 | Component | Extra API key? |
 |-----------|----------------|
-| OpenCode agent (extraction) | No (already configured) |
-| RetroSynAgent internal OpenAI | Optional (`RETRO_USE_INTERNAL_LLM=1` + `extern/RetroSynthesisAgent/.env`) |
+| OpenCode agent (retro extraction) | No (already configured) — `submit_retro_extractions` |
 | AiZynthFinder | No (one-time model download via `scripts/setup_aizynthfinder.sh`) |
 
 Default MCP env: `RETRO_LLM_BACKEND=skip`, `BIOLOGIX_AI_AIZYNTH_CONFIG=./data/aizynthfinder/config.yml`.

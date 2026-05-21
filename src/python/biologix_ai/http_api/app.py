@@ -99,7 +99,6 @@ class HealthResponse(BaseModel):
     retrosynthesis_agent_available: bool
     aizynthfinder_available: bool
     aizynthfinder_models_ready: bool
-    retro_internal_llm_configured: bool
     admet_available: bool
 
 
@@ -108,7 +107,6 @@ def health():
     """Liveness check with feature availability flags."""
     from biologix_ai.retrosynthesis.aizynth_config import models_ready
     from biologix_ai.services.retrosynthesis_service import (
-        _internal_llm_configured,
         _is_aizynthfinder_available,
         _is_retrosynthesisagent_available,
     )
@@ -119,6 +117,5 @@ def health():
         retrosynthesis_agent_available=_is_retrosynthesisagent_available(),
         aizynthfinder_available=aizynth_pkg,
         aizynthfinder_models_ready=models_ready() if aizynth_pkg else False,
-        retro_internal_llm_configured=_internal_llm_configured(),
         admet_available=_is_admet_available(),
     )

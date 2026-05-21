@@ -10,7 +10,7 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$REPO_ROOT"
 export PYTHONPATH="$REPO_ROOT/src/python${PYTHONPATH:+:$PYTHONPATH}"
 
-# RetroSynAgent: skip internal OpenAI unless explicitly enabled
+# RetroSynAgent: OpenCode agent supplies extractions via submit_retro_extractions
 export RETRO_LLM_BACKEND="${RETRO_LLM_BACKEND:-skip}"
 
 # AiZynthFinder config default
