@@ -22,12 +22,13 @@ Onboard biologic → resolve_biologic_target (PDB)
   → save_funnel_context (checkpoint for resumption)
   → save_pipeline_stage (per-candidate audit at every step)
   → SUMMARY_REPORT.md + compile_discovery_markdown_to_pdf
-  → import_chat_transcript_file (archive transcript)
+  → save_discovery_state + import_chat_transcript_file (archive transcript)
+  → **Iteration checkpoint (Step 7): ask user whether to run Iteration 2+** (mutate_psmiles / mine_literature with feedback)
 ```
 
 ### Primary agent
 
-**`biologics-delivery-discovery`** is the default OpenCode agent and owns the full pipeline above. It replaced the old `materials-discovery` (now a legacy redirect) and `biologics-retrosynthesis` (now a specialist legacy agent) as of May 2026. Clients connecting via MCP can also drive the pipeline tool-by-tool.
+**`biologics-delivery-discovery`** is the default OpenCode agent and owns the full pipeline above (Steps 1–6 per iteration, **Step 7 iteration checkpoint** before any Iteration 2+). The legacy `materials-discovery` agent was removed; **`biologics-retrosynthesis`** remains a specialist legacy agent. The platform is **human-in-the-loop only**. Clients connecting via MCP can also drive the pipeline tool-by-tool.
 
 ### NovoMCP-inspired MCP tools added (May 2026)
 
@@ -49,7 +50,7 @@ Onboard biologic → resolve_biologic_target (PDB)
 
 ### OpenCode sub-agent note
 
-OpenCode has **no sub-agent API**: there is no mechanism to programmatically invoke a second agent from within an agent tool call. Multi-step pipelines are coordinated via a **single session** using the `run_dir` / `BIOLOGIX_AI_SESSION_DIR` shared across all tool calls. The `biologics-delivery-discovery` agent orchestrates the full loop; specialist agents (`materials-discovery`, `biologics-retrosynthesis`) are legacy fallbacks.
+OpenCode has **no sub-agent API**: there is no mechanism to programmatically invoke a second agent from within an agent tool call. Multi-step pipelines are coordinated via a **single session** using the `run_dir` / `BIOLOGIX_AI_SESSION_DIR` shared across all tool calls. The **`biologics-delivery-discovery`** agent orchestrates the full loop; **`biologics-retrosynthesis`** is an optional specialist fallback.
 
 ## Chat transcripts vs `runs/` session folders
 

@@ -194,11 +194,12 @@ def retrosynthesis_submit(req: SubmitRetroExtractionsRequest):
         raise HTTPException(status_code=400, detail=f"session_dir not found: {session}")
     try:
         data = normalize_extractions(req.extractions)
-        llm_path = write_llm_res(session, req.material_name, data)
+        llm_path, parse_stats = write_llm_res(session, req.material_name, data)
         return {
             "ok": True,
             "llm_res_path": str(llm_path),
             "paper_count": len(data),
+            "parse_stats": parse_stats,
         }
     except Exception as exc:
         raise HTTPException(status_code=400, detail=str(exc))

@@ -1,6 +1,6 @@
 # PSMILES (polymer SMILES) — guide for agents and humans
 
-This file is the **canonical in-repo reference** for what PSMILES are, how `[*]` works, and how they relate (or do **not** relate) to material names like “PEG” or “PLA-PEG-PLA”. OpenCode agents using **materials-discovery** should treat this document as the definition to follow when proposing or checking structures.
+This file is the **canonical in-repo reference** for what PSMILES are, how `[*]` works, and how they relate (or do **not** relate) to material names like “PEG” or “PLA-PEG-PLA”. OpenCode agents using **`biologics-delivery-discovery`** should treat this document as the definition to follow when proposing or checking structures.
 
 ## What PSMILES is
 
@@ -48,7 +48,7 @@ Copolymers and block sequences usually need a **single repeat** that encodes you
 
 ## Persistence in OpenCode
 
-- This file lives in **`docs/PSMILES_GUIDE.md`**. It is **not** auto-injected into every model context; the **materials-discovery** agent is instructed to **read this file** when unsure. For a long session, the agent may re-read it or you can paste a short excerpt into the chat.
+- This file lives in **`docs/PSMILES_GUIDE.md`**. It is **not** auto-injected into every model context; the **`biologics-delivery-discovery`** agent should **read this file** when unsure. For a long session, the agent may re-read it or you can paste a short excerpt into the chat.
 
 ## Further reading
 

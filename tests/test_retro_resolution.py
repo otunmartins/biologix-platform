@@ -39,9 +39,9 @@ class TestRetroAdapter:
             ),
         }
         data = normalize_extractions(extractions)
-        path, used = write_llm_res(tmp_path, "poly(acrylic acid)", data)
+        path, stats = write_llm_res(tmp_path, "poly(acrylic acid)", data)
         assert path.is_file()
-        assert isinstance(used, bool)
+        assert stats["reactions_out"] >= 1
         assert session_has_extractions(tmp_path, "poly(acrylic acid)")
         loaded = json.loads(path.read_text(encoding="utf-8"))
         assert "test_paper" in loaded

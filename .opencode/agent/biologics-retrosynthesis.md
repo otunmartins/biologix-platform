@@ -26,7 +26,9 @@ If any tool returns `abort: true` or a dependency error: stop, show the error, t
 
 ### Onboard
 
-Ask once: biologic target, polymer target (PSMILES or name), mode (autonomous / HITL).
+Ask once: biologic target, polymer target (PSMILES or name).
+
+Platform is **human-in-the-loop (HITL)**: complete each step, stop on tool failure, wait for the user before a new campaign or major scope change.
 
 ### Session
 
@@ -36,12 +38,13 @@ Ask once: biologic target, polymer target (PSMILES or name), mode (autonomous / 
 ### Retrosynthesis (per target)
 
 1. `prepare_retrosynthesis(target, biologic_target, run_dir=<session>)`
-2. Extract reactions from PDFs/chemistry; `submit_retro_extractions(run_dir, material_name, extractions, target)`
-3. `plan_retrosynthesis(target, biologic_target, run_dir=<session>)`
-4. `check_monomers_batch(smiles_list from plan, run_dir=<session>)`
-5. `check_excipient_compliance(psmiles, jurisdiction="FDA,EMA")`
-6. `compile_results(target, biologic_target, run_dir=<session>, use_cached_plan=true)`
-7. `assemble_retrosynthesis_report(run_dir, targets=<psmiles>)`
+2. Extract reactions from PDFs/chemistry using **capitalized** field labels (`Reactants:`, `Products:`, `Conditions:`). The target polymer name must appear in at least one `Products:` line.
+3. `submit_retro_extractions(run_dir, material_name, extractions, target)` — `material_name` must be a human-readable polymer name (e.g. `poly(N-hydroxyethyl acrylamide)`), NOT a PSMILES. `target` is the PSMILES from discovery. Products lines should use just the polymer name without PSMILES suffix (system normalizes but clean input is better). Rejected if Products omit the polymer name.
+4. `plan_retrosynthesis(target, biologic_target, run_dir=<session>)`
+5. `check_monomers_batch(smiles_list from plan, run_dir=<session>)`
+6. `check_excipient_compliance(psmiles, jurisdiction="FDA,EMA")`
+7. `compile_results(target, biologic_target, run_dir=<session>, use_cached_plan=true)`
+8. `assemble_retrosynthesis_report(run_dir, targets=<psmiles>)`
 
 ### Report
 

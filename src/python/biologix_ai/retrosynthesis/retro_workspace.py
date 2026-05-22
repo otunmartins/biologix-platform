@@ -38,15 +38,47 @@ def extractions_manifest_path(session_dir: Path) -> Path:
 EXTRACTION_SCHEMA = {
     "description": (
         "JSON object mapping paper_name (str) -> reaction_text (str). "
-        "Each reaction_text uses RetroSynAgent prompt_reaction_extraction_cot format."
+        "Each reaction_text uses RetroSynAgent prompt_reaction_extraction_cot format. "
+        "Include at least 2 reactions when polymerization reactants are not commodity chemicals: "
+        "Reaction 001 = polymerization step (specialty monomer → polymer); "
+        "Reaction 002 = upstream synthesis (commodity → specialty monomer)."
     ),
-    "example_entry": {
-        "paper_title_here": (
+    "example_single_step": {
+        "Smith2020_acrylic": (
             "Reaction 001:\n"
             "Reactants: acrylic acid\n"
             "Products: poly(acrylic acid)\n"
             "Conditions: RAFT polymerization, Catalyst: AIBN, 60°C, 24h"
         ),
     },
-    "format_reference": "Reaction NNN:\\nReactants: ...\\nProducts: ...\\nConditions: ...",
+    "example_multi_step_plga": {
+        "Zhang2022_PLGA_synthesis": (
+            "Reaction 001:\n"
+            "Reactants: lactide, glycolide\n"
+            "Products: poly(lactic-co-glycolic acid)\n"
+            "Conditions: ring-opening polymerization, Catalyst: tin(II) 2-ethylhexanoate, "
+            "130°C, 6h, initiator: benzyl alcohol\n\n"
+            "Reaction 002:\n"
+            "Reactants: lactic acid\n"
+            "Products: lactide\n"
+            "Conditions: condensation and cyclization, 180°C, reduced pressure"
+        ),
+    },
+    "example_multi_step_chitosan": {
+        "Rinaudo2006_chitosan": (
+            "Reaction 001:\n"
+            "Reactants: chitin\n"
+            "Products: chitosan\n"
+            "Conditions: alkaline deacetylation, 50% NaOH, 100°C, 2h\n\n"
+            "Reaction 002:\n"
+            "Reactants: n-acetylglucosamine\n"
+            "Products: chitin\n"
+            "Conditions: enzymatic polymerization or biosynthesis"
+        ),
+    },
+    "format_reference": (
+        "Reaction NNN:\\nReactants: ...\\nProducts: ...\\nConditions: ... "
+        "(field labels must use capital R/P/C; Products in at least one reaction "
+        "must include the target polymer name; add upstream reactions for specialty intermediates)"
+    ),
 }

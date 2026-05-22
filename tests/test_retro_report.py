@@ -15,9 +15,7 @@ from biologix_ai.retrosynthesis.models import (
     RetrosynthesisResult,
 )
 from biologix_ai.retrosynthesis.retro_adapter import (
-    ensure_root_product_in_extractions,
     resolve_material_name,
-    validate_extractions_for_tree,
     write_llm_res,
 )
 from biologix_ai.retrosynthesis.retro_report import (
@@ -35,16 +33,16 @@ class TestPolyacrylamideResolution:
 
 
 class TestSubmitValidation:
-    def test_connector_uses_lowercase_product(self):
-        extractions, used = ensure_root_product_in_extractions(
-            {"paper": "Reaction 001:\nReactants: a\nProducts: b\nConditions: c"},
-            "poly(acrylic acid)",
+    def test_rejects_missing_root_product(self):
+        from biologix_ai.retrosynthesis.retro_adapter import (
+            require_root_product_in_extractions,
         )
-        assert used is True
-        assert "poly(acrylic acid)" in extractions["_root_connector"]
-        val = validate_extractions_for_tree(extractions, "poly(acrylic acid)", used_connector=used)
-        assert val["root_product_found"] is True
-        assert val["tree_root"] == "poly(acrylic acid)"
+
+        extractions = {
+            "paper": "Reaction 001:\nReactants: a\nProducts: b\nConditions: c",
+        }
+        with pytest.raises(ValueError, match="Products containing"):
+            require_root_product_in_extractions(extractions, "poly(acrylic acid)")
 
 
 class TestRetroReportMarkdown:

@@ -3,18 +3,95 @@
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
-from typing import Any, Dict, Tuple
+from typing import Any, Dict, Optional, Tuple
 
 from biologix_ai.retrosynthesis.retro_workspace import ensure_workspace, extractions_manifest_path
 
+_REACTION_HEADER = re.compile(r"^Reaction\s+\d+:\s*$", re.IGNORECASE)
+_PSMILES_SUFFIX = re.compile(r"\s+\[\*\]\S*")
 
-def resolve_material_name(target_or_name: str) -> str:
-    """Canonical searchable polymer name for workspace paths and RetroSyn tree root."""
+
+def resolve_material_name(target_or_name: str, agent_provided_name: str = "") -> str:
+    """Resolve polymer identity for workspace paths and RetroSyn tree root.
+
+    Priority: agent_provided_name > material_mappings lookup > target as-is.
+    Never returns raw PSMILES when a human name is available.
+    """
+    if agent_provided_name and "[*]" not in agent_provided_name:
+        return agent_provided_name.strip()
+
     from biologix_ai.retrosynthesis.psmiles_bridge import resolve_retro_target
 
     resolved = resolve_retro_target((target_or_name or "").strip())
-    return resolved["material_name"] or (target_or_name or "").strip()
+    name = resolved["material_name"] or (target_or_name or "").strip()
+
+    if "[*]" in name and "[*]" not in (target_or_name or ""):
+        return (target_or_name or "").strip()
+
+    return name
+
+
+def _looks_like_smiles(s: str) -> bool:
+    """Heuristic: SMILES has no spaces and contains chemistry characters."""
+    if " " in s:
+        return False
+    if not re.search(r"[CNOcno=\[\]#]", s):
+        return False
+    return True
+
+
+def _strip_trailing_smiles_parens(tok: str) -> str:
+    """Remove trailing parenthetical SMILES annotation from a token."""
+    tok = tok.strip()
+    while tok.endswith(")"):
+        idx = tok.rfind(" (")
+        if idx < 0:
+            break
+        inner = tok[idx + 2 : -1]
+        if _looks_like_smiles(inner):
+            tok = tok[:idx].strip()
+        else:
+            break
+    return tok
+
+
+def _strip_smiles_annotations(val: str) -> str:
+    """Strip parenthetical SMILES from comma-separated tokens."""
+    tokens = val.split(", ")
+    clean = [_strip_trailing_smiles_parens(tok) for tok in tokens]
+    return " " + ", ".join(clean)
+
+
+def normalize_for_tree_root(text: str, material_name: str) -> str:
+    """Normalize extraction text so product/reactant tokens are clean names.
+
+    - Strips PSMILES suffixes (e.g. ' [*]CC([*])...' after a name)
+    - Strips inline SMILES annotations (e.g. ' (C=CC(=O)Cl)' after a name)
+    - Ensures the final-product reaction uses material_name exactly
+    """
+    root = material_name.strip().lower()
+    lines: list[str] = []
+    for line in text.splitlines():
+        stripped = line.strip()
+        if stripped.lower().startswith("products:"):
+            val = stripped.split(":", 1)[1]
+            val = _PSMILES_SUFFIX.sub("", val)
+            val = _strip_smiles_annotations(val)
+            if root in val.lower():
+                tokens = [t.strip() for t in val.split(",")]
+                tokens = [material_name if root in t.lower() else t for t in tokens]
+                line = "Products: " + ", ".join(tokens)
+            else:
+                line = "Products:" + val
+        elif stripped.lower().startswith("reactants:"):
+            val = stripped.split(":", 1)[1]
+            val = _PSMILES_SUFFIX.sub("", val)
+            val = _strip_smiles_annotations(val)
+            line = "Reactants:" + val
+        lines.append(line)
+    return "\n".join(lines)
 
 
 def tree_root_name(material_name: str) -> str:
@@ -33,53 +110,135 @@ def _mentions_product(text: str, material_name: str) -> bool:
     return False
 
 
-def ensure_root_product_in_extractions(
+def require_root_product_in_extractions(
     extractions: Dict[str, str],
     material_name: str,
-) -> Tuple[Dict[str, str], bool]:
-    """Ensure at least one reaction lists the target polymer as a product (Tree root).
-
-    Returns (extractions, used_connector).
-    """
-    root = tree_root_name(material_name)
+) -> None:
+    """Raise ValueError when no reaction lists the target polymer in Products:."""
     if any(_mentions_product(text, material_name) for text in extractions.values()):
-        return extractions, False
-    connector = (
-        f"Reaction 001:\n"
-        f"Reactants: precursor monomer\n"
-        f"Products: {root}\n"
-        f"Conditions: polymerization (connector for tree root)"
+        return
+    root = tree_root_name(material_name)
+    raise ValueError(
+        f"No extraction lists Products containing {root!r}. "
+        "Each submit must include at least one reaction whose Products line "
+        "contains the target polymer name (case-insensitive)."
     )
-    out = dict(extractions)
-    out["_root_connector"] = connector
-    return out, True
 
 
 def validate_extractions_for_tree(
     extractions: Dict[str, str],
     material_name: str,
-    *,
-    used_connector: bool = False,
 ) -> Dict[str, Any]:
     root = tree_root_name(material_name)
     root_found = any(_mentions_product(text, material_name) for text in extractions.values())
     warnings: list[str] = []
-    if used_connector:
+    if not root_found:
         warnings.append(
-            f"No reaction listed {material_name!r} in Products:; injected _root_connector. "
-            "Re-extract with Products containing the polymer name for literature-KG routes."
+            f"No reaction lists Products containing {root!r}; submission will be rejected."
         )
-    elif not root_found:
-        warnings.append(
-            f"No reaction lists Products containing {root!r}; RetroSyn tree may return no paths."
+
+    # Leaf reachability pre-flight (non-blocking)
+    leaf_reachability: Dict[str, Any] = {}
+    blocking_reactants: list[str] = []
+    suggested_reaction_count = 0
+    try:
+        from biologix_ai.retrosynthesis.precursor_registry import (
+            collect_reactants_from_extractions,
+            diagnose_leaf_reachability,
         )
+
+        reactants = collect_reactants_from_extractions(extractions)
+        leaf_reachability = diagnose_leaf_reachability(reactants)
+        blocking_reactants = [n for n, s in leaf_reachability.items() if s["blocking"]]
+        if blocking_reactants:
+            suggested_reaction_count = len(blocking_reactants)
+            warnings.append(
+                f"Leaf coverage warning: {len(blocking_reactants)} reactant(s) not yet in "
+                f"purchasable database: {blocking_reactants}. Consider adding upstream "
+                "reaction steps or calling register_retro_precursors before plan_retrosynthesis."
+            )
+    except Exception:
+        pass
+
     return {
-        "root_product_found": root_found or used_connector,
+        "root_product_found": root_found,
         "tree_root": root,
-        "used_root_connector": used_connector,
         "paper_count": len(extractions),
         "warnings": warnings,
+        "leaf_reachability": leaf_reachability,
+        "blocking_reactants": blocking_reactants,
+        "suggested_reaction_count": suggested_reaction_count,
     }
+
+
+def _normalize_field_line(line: str, field: str) -> Tuple[str, bool]:
+    """Rewrite reactants/products/conditions line to RetroSyn canonical capitalization."""
+    stripped = line.strip()
+    prefix = f"{field}:"
+    if stripped.lower().startswith(prefix.lower()):
+        value = line.split(":", 1)[-1] if ":" in line else ""
+        return f"{field}:{value}", True
+    return line, False
+
+
+def normalize_reaction_text(text: str) -> Tuple[str, dict]:
+    """Per-paper normalization: fix field labels, ensure Conditions:, count reactions."""
+    stats: dict = {
+        "reactions_in": 0,
+        "reactions_out": 0,
+        "blocks_missing_conditions": 0,
+    }
+    lines = text.splitlines()
+    blocks: list[list[str]] = []
+    current: list[str] = []
+
+    for line in lines:
+        if _REACTION_HEADER.match(line.strip()):
+            if current:
+                blocks.append(current)
+            current = [line.strip()]
+            stats["reactions_in"] += 1
+        elif current:
+            current.append(line)
+        elif line.strip():
+            current = [line]
+
+    if current:
+        blocks.append(current)
+
+    if stats["reactions_in"] == 0 and blocks:
+        stats["reactions_in"] = len(blocks)
+
+    out_blocks: list[str] = []
+    for block in blocks:
+        normalized_lines: list[str] = []
+        has_reactants = has_products = has_conditions = False
+        for line in block:
+            new_line, matched = _normalize_field_line(line, "Reactants")
+            if matched:
+                has_reactants = True
+                normalized_lines.append(new_line)
+                continue
+            new_line, matched = _normalize_field_line(line, "Products")
+            if matched:
+                has_products = True
+                normalized_lines.append(new_line)
+                continue
+            new_line, matched = _normalize_field_line(line, "Conditions")
+            if matched:
+                has_conditions = True
+                normalized_lines.append(new_line)
+                continue
+            normalized_lines.append(line)
+
+        if has_reactants and has_products and not has_conditions:
+            normalized_lines.append("Conditions: not specified")
+            stats["blocks_missing_conditions"] += 1
+        if has_reactants and has_products:
+            stats["reactions_out"] += 1
+        out_blocks.append("\n".join(normalized_lines))
+
+    return "\n\n".join(out_blocks), stats
 
 
 def normalize_extractions(raw: Any) -> Dict[str, str]:
@@ -97,7 +256,8 @@ def normalize_extractions(raw: Any) -> Dict[str, str]:
         text = value.strip()
         if "Final Output:" in text:
             text = text.split("Final Output:")[-1].strip()
-        out[key.strip()] = text
+        normalized, _stats = normalize_reaction_text(text)
+        out[key.strip()] = normalized
     if not out:
         raise ValueError("extractions must contain at least one paper entry")
     return out
@@ -109,21 +269,32 @@ def write_llm_res(
     extractions: Dict[str, str],
     *,
     ensure_tree_root: bool = True,
-) -> Tuple[Path, bool]:
+    target_psmiles: str = "",
+) -> Tuple[Path, dict]:
     """Write llm_res.json and llm_res_modified.json for EntityAlignment fast-path.
 
-    Returns (path, used_connector).
+    Returns (path, parse_stats aggregated across papers).
     """
-    used_connector = False
+    aggregate_stats = {
+        "reactions_in": 0,
+        "reactions_out": 0,
+        "blocks_missing_conditions": 0,
+    }
+    normalized: Dict[str, str] = {}
+    for key, text in extractions.items():
+        norm_text, stats = normalize_reaction_text(text)
+        normalized[key] = normalize_for_tree_root(norm_text, material_name)
+        for k in aggregate_stats:
+            aggregate_stats[k] += stats.get(k, 0)
+
     if ensure_tree_root:
-        extractions, used_connector = ensure_root_product_in_extractions(
-            extractions, material_name
-        )
+        require_root_product_in_extractions(normalized, material_name)
+
     dirs = ensure_workspace(session_dir, material_name)
     result_folder = dirs["results"]
     llm_path = result_folder / "llm_res.json"
     modified_path = result_folder / "llm_res_modified.json"
-    payload = json.dumps(extractions, indent=4, ensure_ascii=False)
+    payload = json.dumps(normalized, indent=4, ensure_ascii=False)
     llm_path.write_text(payload, encoding="utf-8")
     modified_path.write_text(payload, encoding="utf-8")
 
@@ -139,14 +310,38 @@ def write_llm_res(
         manifest = []
     entry = {
         "material_name": material_name,
+        "target_psmiles": target_psmiles or None,
         "workspace": str(dirs["workspace"]),
         "llm_res": str(llm_path),
-        "paper_count": len(extractions),
+        "paper_count": len(normalized),
+        "parse_stats": aggregate_stats,
     }
     manifest = [e for e in manifest if e.get("material_name") != material_name]
     manifest.append(entry)
     manifest_path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
-    return llm_path, used_connector
+    return llm_path, aggregate_stats
+
+
+def infer_polymer_name_from_extractions(
+    extractions: Dict[str, str],
+    target_psmiles: str = "",
+) -> Optional[str]:
+    """Infer human polymer name from Products lines when target is unmapped PSMILES."""
+    psmiles_lower = (target_psmiles or "").strip().lower()
+    for text in extractions.values():
+        for line in text.splitlines():
+            if not line.strip().lower().startswith("products:"):
+                continue
+            val = line.split(":", 1)[1]
+            val_lower = val.lower()
+            if psmiles_lower and psmiles_lower not in val_lower and "[*]" not in val_lower:
+                continue
+            val_clean = _PSMILES_SUFFIX.sub("", val).strip()
+            for tok in val_clean.split(","):
+                tok = tok.strip()
+                if tok.lower().startswith("poly(") and "[*]" not in tok:
+                    return tok
+    return None
 
 
 def session_has_extractions(session_dir: Path, material_name: str) -> bool:

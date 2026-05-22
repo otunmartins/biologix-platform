@@ -83,11 +83,73 @@ if [[ "$SKIP_SUBMODULES" != "true" ]]; then
   if conda_run python -c "
 import sys
 sys.path.insert(0, '${REPO_ROOT}/extern/RetroSynthesisAgent')
-from RetroSynAgent.treeBuilder import Tree  # noqa: F401
+sys.path.insert(0, '${REPO_ROOT}/src/python')
+from biologix_ai.retrosynthesis.retrosyn_bootstrap import ensure_retrosyn_agent_ready
+ensure_retrosyn_agent_ready()
+from RetroSynAgent.treeBuilder import Tree
+result_dict = {
+    'test': (
+        'Reaction 001:\n'
+        'Reactants: acrylic acid\n'
+        'Products: poly(acrylic acid)\n'
+        'Conditions: RAFT'
+    ),
+}
+tree = Tree('poly(acrylic acid)', result_dict=result_dict)
+assert len(tree.reactions) >= 1, 'RetroSyn parse produced no reactions'
 " 2>/dev/null; then
-    pass "RetroSynthesisAgent"
+    pass "RetroSynthesisAgent (bootstrap + tree parse)"
   else
-    fail "RetroSynthesisAgent"
+    fail "RetroSynthesisAgent (bootstrap + tree parse)"
+  fi
+
+  # Precursor database smoke test: Tier 1+2 critical names
+  if conda_run python -c "
+import sys
+sys.path.insert(0, '${REPO_ROOT}/src/python')
+from biologix_ai.retrosynthesis.precursor_registry import (
+    get_bundled_precursors, reload_bundled_precursors
+)
+reload_bundled_precursors()
+bundled = get_bundled_precursors()
+missing = [n for n in ('lactide','glycolide','chitin','lactic acid','ethylene','carbon monoxide','aibn') if n not in bundled]
+assert not missing, f'Missing from precursor DB: {missing}'
+" 2>/dev/null; then
+    pass "Precursor database Tier 1+2 (lactide, glycolide, chitin, CO, AIBN)"
+  else
+    fail "Precursor database Tier 1+2 (run: python scripts/build_precursor_db.py --tiers 1,2)"
+  fi
+
+  # Tier 3: Molport InChIKey pkl
+  if [[ -f "${REPO_ROOT}/data/retrosynthesis/molport_inchikeys.pkl" ]]; then
+    if conda_run python -c "
+import sys, pickle
+sys.path.insert(0, '${REPO_ROOT}/src/python')
+with open('${REPO_ROOT}/data/retrosynthesis/molport_inchikeys.pkl','rb') as f:
+    keys = pickle.load(f)
+assert len(keys) > 10000, f'Expected >10k InChIKeys, got {len(keys)}'
+print(f'Molport InChIKey set: {len(keys):,} entries')
+" 2>/dev/null; then
+      pass "Precursor database Tier 3 (Molport InChIKey set)"
+    else
+      fail "Precursor database Tier 3 pkl corrupted (re-run: python scripts/build_precursor_db.py --tiers 3)"
+    fi
+  else
+    fail "Precursor database Tier 3 missing (run: python scripts/build_precursor_db.py --tiers 3)"
+  fi
+
+  # Tier 4: ZINC bridge (h5py + zinc_stock.hdf5)
+  # zinc_stock.hdf5 is a Pandas HDFStore; 'table/axis1' holds the row index
+  if conda_run python -c "
+import h5py, sys
+with h5py.File('${REPO_ROOT}/data/aizynthfinder/zinc_stock.hdf5', 'r') as f:
+    n = int(f['table']['axis1'].shape[0])
+assert n > 1_000_000, f'Expected >1M ZINC InChIKeys, got {n}'
+print(f'ZINC bridge: {n:,} InChIKeys')
+" 2>/dev/null; then
+    pass "Precursor database Tier 4 (ZINC InChIKey bridge, h5py)"
+  else
+    fail "Precursor database Tier 4 (run: pip install h5py && bash scripts/setup_aizynthfinder.sh)"
   fi
 
   if conda_run python -c "from aizynthfinder.aizynthfinder import AiZynthFinder" 2>/dev/null; then

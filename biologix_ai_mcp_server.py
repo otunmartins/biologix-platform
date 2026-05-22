@@ -683,14 +683,14 @@ def start_discovery_session(run_name: str = "") -> str:
     """
     Start a new discovery session. All subsequent saves and autonomous runs can use this folder.
     Returns session_dir path; pass it to save_discovery_state(run_dir=...) or set BIOLOGIX_AI_SESSION_DIR in shell.
-    Also snapshots the active agent instructions (materials-discovery.md) to
+    Also snapshots the active agent instructions (biologics-delivery-discovery.md) to
     agent_instructions_snapshot.md inside the session folder for reproducibility.
     """
     try:
         d = new_session_dir(Path(ROOT), name=run_name.strip() or None)
         os.environ[ENV_SESSION] = str(d)
         snapshot_note = ""
-        instructions_src = Path(ROOT) / ".opencode" / "agent" / "materials-discovery.md"
+        instructions_src = Path(ROOT) / ".opencode" / "agent" / "biologics-delivery-discovery.md"
         if instructions_src.exists():
             try:
                 shutil.copy2(str(instructions_src), str(d / "agent_instructions_snapshot.md"))
@@ -1098,7 +1098,7 @@ def save_session_transcript(
     run_dir: str = "",
 ) -> str:
     """
-    Save **text you provide** into the active discovery session. **Default materials-discovery protocol:**
+    Save **text you provide** into the active discovery session. **Default biologics-delivery-discovery protocol:**
     call this **every iteration** if ``import_chat_transcript_file`` cannot be used (unknown JSONL path
     or copy failure), with a **complete** Markdown recap (tool calls, decisions, results). OpenCode
     does not mirror chat into ``runs/`` automatically.
@@ -1689,12 +1689,14 @@ def submit_retro_extractions(
     if session is None:
         return json.dumps({"error": "run_dir is required"})
     try:
-        canonical = resolve_material_name(target or material_name)
+        canonical = resolve_material_name(target or material_name, agent_provided_name=material_name)
         data = normalize_extractions(extractions)
-        llm_path, used_connector = write_llm_res(session, canonical, data)
-        validation = validate_extractions_for_tree(
-            data, canonical, used_connector=used_connector
+        target_psmiles = target if target and "[*]" in target else ""
+        llm_path, parse_stats = write_llm_res(
+            session, canonical, data, target_psmiles=target_psmiles
         )
+        validation = validate_extractions_for_tree(data, canonical)
+        validation["parse_stats"] = parse_stats
         return json.dumps(
             {
                 "ok": True,
@@ -1703,6 +1705,20 @@ def submit_retro_extractions(
                 "paper_count": len(data),
                 "validation": validation,
                 "next_step": f"Call plan_retrosynthesis(target={target or material_name!r}, run_dir={run_dir!r})",
+            },
+            indent=2,
+        )
+    except ValueError as exc:
+        try:
+            canonical = resolve_material_name(target or material_name, agent_provided_name=material_name)
+        except Exception:
+            canonical = material_name
+        return json.dumps(
+            {
+                "ok": False,
+                "error": str(exc),
+                "material_name": canonical,
+                "validation": validate_extractions_for_tree({}, canonical),
             },
             indent=2,
         )
@@ -1790,6 +1806,219 @@ def plan_retrosynthesis(
         except Exception as exc:
             out["session_persist_warning"] = str(exc)
     return json.dumps(out, indent=2, default=str)
+
+
+@mcp.tool()
+def diagnose_retro_extractions(
+    run_dir: str,
+    material_name: str,
+    target: str = "",
+) -> str:
+    """Diagnose why retrosynthesis returned no routes for a candidate.
+
+    Analyses existing extraction files and reports per-reactant leaf-reachability
+    without running the full KG tree build.  Call this when ``plan_retrosynthesis``
+    returns ``kg_empty_after_session_extractions: true``.
+
+    Returns:
+        tree_root, reaction_count, parsed reactants, leaf_status per reactant
+        (purchasable, resolution_source, blocking), missing_steps suggestions,
+        and recommended_actions list.
+
+    Args:
+        run_dir: session directory (same as used for submit_retro_extractions).
+        material_name: polymer name (human-readable, not PSMILES).
+        target: optional PSMILES to help locate the workspace.
+    """
+    from biologix_ai.retrosynthesis.retro_adapter import (
+        resolve_material_name,
+        session_has_extractions,
+    )
+    from biologix_ai.retrosynthesis.retro_workspace import ensure_workspace
+    from biologix_ai.retrosynthesis.precursor_registry import (
+        collect_reactants_from_extractions,
+        diagnose_leaf_reachability,
+        seed_workspace_precursors,
+    )
+    from biologix_ai.services.retrosynthesis_service import _find_extractions_material_name
+
+    session = _optional_session_dir(run_dir)
+    if session is None:
+        return json.dumps({"error": "run_dir is required"})
+
+    try:
+        canonical = resolve_material_name(target or material_name, agent_provided_name=material_name)
+        ws_name = _find_extractions_material_name(session, canonical, target if "[*]" in target else "")
+
+        if not session_has_extractions(session, ws_name):
+            return json.dumps({
+                "ok": False,
+                "error": f"No extractions found for {material_name!r}. Call submit_retro_extractions first.",
+                "material_name": canonical,
+            }, indent=2)
+
+        dirs = ensure_workspace(session, ws_name)
+        llm_path = dirs["results"] / "llm_res.json"
+        results_dict: dict = {}
+        try:
+            results_dict = json.loads(llm_path.read_text(encoding="utf-8"))
+        except Exception:
+            pass
+
+        reactants = collect_reactants_from_extractions(results_dict)
+        # Seed to populate workspace caches
+        resolution_map = seed_workspace_precursors(dirs["workspace"], reactants)
+        leaf_status = diagnose_leaf_reachability(reactants)
+
+        blocking = [n for n, s in leaf_status.items() if s["blocking"]]
+        resolved = [n for n, s in leaf_status.items() if not s["blocking"]]
+
+        missing_steps: list = []
+        recommended_actions: list = []
+        for name in blocking:
+            missing_steps.append(
+                f"{name!r} not purchasable — add a reaction step showing its synthesis, "
+                f"or call register_retro_precursors(run_dir, {material_name!r}, "
+                f'[{{"name": "{name}"}}]) if it is commercially available.'
+            )
+        if blocking:
+            recommended_actions.append(
+                "Submit additional upstream reactions for: " + ", ".join(blocking)
+            )
+            recommended_actions.append(
+                "Or call register_retro_precursors to mark specialty monomers as purchasable"
+            )
+        else:
+            recommended_actions.append(
+                "All reactants resolve — re-run plan_retrosynthesis; check Products line matches "
+                f"tree root {canonical.strip().lower()!r}"
+            )
+
+        # Count parsed reactions
+        reaction_count = sum(
+            text.lower().count("reactants:") for text in results_dict.values()
+        )
+
+        return json.dumps({
+            "ok": True,
+            "material_name": canonical,
+            "tree_root": canonical.strip().lower(),
+            "reaction_count": reaction_count,
+            "reactants_found": sorted(reactants),
+            "leaf_status": leaf_status,
+            "blocking_count": len(blocking),
+            "blocking_reactants": blocking,
+            "resolved_reactants": resolved,
+            "missing_steps": missing_steps,
+            "recommended_actions": recommended_actions,
+            "hint": (
+                "Add upstream reactions for blocking reactants via submit_retro_extractions, "
+                "then plan_retrosynthesis again."
+            ),
+        }, indent=2)
+
+    except Exception as exc:
+        return json.dumps({"ok": False, "error": str(exc)}, indent=2)
+
+
+@mcp.tool()
+def register_retro_precursors(
+    run_dir: str,
+    material_name: str,
+    precursors: str,
+) -> str:
+    """Explicitly register specialty reagents as purchasable leaves for a campaign.
+
+    Use when a precursor is commercially available but PubChem or the bundled DB
+    cannot resolve it automatically (e.g. proprietary NCA reagents, specialty monomers).
+    Must be called BEFORE plan_retrosynthesis for the registration to take effect.
+
+    Args:
+        run_dir: session directory.
+        material_name: polymer target name (human-readable).
+        precursors: JSON array of objects: [{\"name\": str, \"smiles\": str (optional)}]
+
+    Returns:
+        registered count, names added, workspace registry path.
+    """
+    from biologix_ai.retrosynthesis.retro_adapter import resolve_material_name
+    from biologix_ai.retrosynthesis.retro_workspace import ensure_workspace
+    from biologix_ai.retrosynthesis.precursor_registry import (
+        _workspace_precursors,
+        get_bundled_precursors,
+    )
+    from biologix_ai.services.retrosynthesis_service import _find_extractions_material_name
+
+    session = _optional_session_dir(run_dir)
+    if session is None:
+        return json.dumps({"error": "run_dir is required"})
+
+    try:
+        prec_list = json.loads(precursors) if isinstance(precursors, str) else precursors
+        if not isinstance(prec_list, list):
+            return json.dumps({"error": "precursors must be a JSON array"})
+    except json.JSONDecodeError as exc:
+        return json.dumps({"error": f"Invalid JSON for precursors: {exc}"})
+
+    try:
+        canonical = resolve_material_name(material_name, agent_provided_name=material_name)
+        ws_name = _find_extractions_material_name(session, canonical)
+        dirs = ensure_workspace(session, ws_name)
+        ws = dirs["workspace"]
+        registry_path = ws / "precursor_registry.json"
+
+        registry: list = []
+        if registry_path.is_file():
+            try:
+                registry = json.loads(registry_path.read_text(encoding="utf-8"))
+                if not isinstance(registry, list):
+                    registry = []
+            except Exception:
+                registry = []
+
+        # Load workspace-level substance_query_result
+        substance_result_path = ws / "substance_query_result.json"
+        substance_result: dict = {}
+        if substance_result_path.is_file():
+            try:
+                substance_result = json.loads(substance_result_path.read_text(encoding="utf-8"))
+            except Exception:
+                pass
+
+        added: list = []
+        for item in prec_list:
+            if not isinstance(item, dict):
+                continue
+            name = (item.get("name") or "").strip().lower()
+            smiles = (item.get("smiles") or "").strip() or None
+            if not name:
+                continue
+
+            # Mark purchasable in module-level set (immediate effect)
+            _workspace_precursors.add(name)
+            substance_result[name] = True
+
+            registry.append({
+                "name": name,
+                "smiles": smiles,
+                "source": "agent_registered",
+            })
+            added.append(name)
+
+        registry_path.write_text(json.dumps(registry, indent=2), encoding="utf-8")
+        substance_result_path.write_text(json.dumps(substance_result, indent=2), encoding="utf-8")
+
+        return json.dumps({
+            "ok": True,
+            "material_name": canonical,
+            "registered_count": len(added),
+            "registered_names": added,
+            "registry_path": str(registry_path),
+            "next_step": f"Call plan_retrosynthesis(target={material_name!r}, run_dir={run_dir!r})",
+        }, indent=2)
+
+    except Exception as exc:
+        return json.dumps({"ok": False, "error": str(exc)}, indent=2)
 
 
 @mcp.tool()

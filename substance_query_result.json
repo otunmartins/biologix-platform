@@ -1,0 +1,7 @@
+{
+    "poly(n-hydroxyethyl acrylamide)": false,
+    "n-hydroxyethyl acrylamide (c=cc(=o)ncco)": false,
+    "acryloyl chloride (c=cc(=o)cl)": false,
+    "ethanolamine (ncco)": false,
+    "n-hydroxyethyl acrylamide": true
+}

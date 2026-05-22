@@ -104,8 +104,79 @@ class TestRetrosynthesisService:
         if result.metadata.get("route_provenance") == "session_agent_llm":
             assert len(result.polymer_routes) >= 1
 
+    def test_plan_with_lowercase_extraction_fields(self, tmp_path):
+        from biologix_ai.retrosynthesis.retro_adapter import write_llm_res
+        from biologix_ai.services.retrosynthesis_service import plan_retrosynthesis
 
-class TestToxicityService:
+        extractions = {
+            "test_paper": (
+                "Reaction 001:\n"
+                "reactants: acrylic acid\n"
+                "products: poly(acrylic acid)\n"
+                "conditions: RAFT, 70°C"
+            ),
+        }
+        write_llm_res(tmp_path, "poly(acrylic acid)", extractions)
+
+        request = RetrosynthesisRequest(
+            target="[*]CC([*])C(=O)O",
+            session_dir=str(tmp_path),
+            constraints=RetrosynthesisConstraints(
+                max_routes=3,
+                enrich_monomers_with_aizynth=False,
+            ),
+        )
+        result = plan_retrosynthesis(request)
+        assert result.metadata.get("session_extractions_present") is True
+        if result.metadata.get("retro_agent_error"):
+            pytest.skip(f"RetroSyn runtime error: {result.metadata['retro_agent_error']}")
+        assert result.metadata.get("extractions_reaction_count", 0) >= 1
+
+    def test_hea_routes_without_material_mappings(self, tmp_path):
+        """Unmapped PSMILES works when agent provides human material_name."""
+        from biologix_ai.retrosynthesis.retro_adapter import write_llm_res
+        from biologix_ai.services.retrosynthesis_service import plan_retrosynthesis
+
+        hea_psmiles = "[*]CC([*])C(=O)NCCO"
+        material = "poly(N-hydroxyethyl acrylamide)"
+        extractions = {
+            "Acryloyl chloride ethanolamine amidation": (
+                "Reaction 001:\n"
+                "Reactants: acryloyl chloride (C=CC(=O)Cl), ethanolamine (NCCO)\n"
+                "Products: N-hydroxyethyl acrylamide (C=CC(=O)NCCO), HCl\n"
+                "Conditions: Schotten-Baumann, 0-5°C"
+            ),
+            "N-hydroxyethyl acrylamide RAFT polymerization": (
+                "Reaction 002:\n"
+                "Reactants: N-hydroxyethyl acrylamide (C=CC(=O)NCCO)\n"
+                "Products: poly(N-hydroxyethyl acrylamide) [*]CC([*])C(=O)NCCO\n"
+                "Conditions: RAFT, AIBN, 60°C"
+            ),
+        }
+        write_llm_res(
+            tmp_path,
+            material,
+            extractions,
+            target_psmiles=hea_psmiles,
+        )
+
+        request = RetrosynthesisRequest(
+            target=hea_psmiles,
+            biologic_target="insulin",
+            session_dir=str(tmp_path),
+            constraints=RetrosynthesisConstraints(
+                max_routes=3,
+                enrich_monomers_with_aizynth=False,
+            ),
+        )
+        result = plan_retrosynthesis(request)
+        assert result.metadata.get("session_extractions_present") is True
+        if result.metadata.get("retro_agent_error"):
+            pytest.skip(f"RetroSyn runtime error: {result.metadata['retro_agent_error']}")
+        assert result.metadata.get("material_name_resolved") == material
+        assert result.metadata.get("route_provenance") == "session_agent_llm"
+        assert len(result.polymer_routes) >= 1
+
     def test_screen_monomer_returns_result(self):
         from biologix_ai.services.toxicity_service import screen_monomer
 

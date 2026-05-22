@@ -7,11 +7,13 @@ Two engines:
 
 from __future__ import annotations
 
+import json
 import logging
 import os
+import re
 import tempfile
 from pathlib import Path
-from typing import List, Optional, Set, Tuple
+from typing import Dict, List, Optional, Set, Tuple
 
 from biologix_ai.retrosynthesis.aizynth_config import get_configfile, models_ready
 from biologix_ai.retrosynthesis.models import (
@@ -27,8 +29,12 @@ from biologix_ai.retrosynthesis.models import (
     SmallMolStep,
 )
 from biologix_ai.retrosynthesis.psmiles_bridge import resolve_retro_target
-from biologix_ai.retrosynthesis.retro_adapter import session_has_extractions
-from biologix_ai.retrosynthesis.retro_workspace import ensure_workspace
+from biologix_ai.retrosynthesis.retro_adapter import (
+    infer_polymer_name_from_extractions,
+    normalize_for_tree_root,
+    session_has_extractions,
+)
+from biologix_ai.retrosynthesis.retro_workspace import ensure_workspace, material_slug
 
 logger = logging.getLogger(__name__)
 
@@ -158,6 +164,115 @@ def _run_aizynthfinder(target_smiles: str) -> Optional[SmallMolRoute]:
         return None
 
 
+def _inject_product_aliases(tree: object, tree_root: str) -> None:
+    """Register tree_root in product_dict if any existing key contains it.
+
+    Handles composite product names like 'poly(name) [*]CC...' when normalization
+    missed a case — the tree can still connect.
+    """
+    product_dict = tree.product_dict  # type: ignore[attr-defined]
+    if tree_root in product_dict:
+        return
+
+    for key, rxn_indices in list(product_dict.items()):
+        if tree_root in key:
+            product_dict[tree_root] = rxn_indices
+            return
+
+    if "[*]" not in tree_root:
+        for key, rxn_indices in list(product_dict.items()):
+            if "[*]" in key:
+                name_part = re.sub(r"\s+\[\*\].*", "", key).strip()
+                if name_part and tree_root == name_part:
+                    product_dict[tree_root] = rxn_indices
+                    return
+
+
+def _load_session_extractions(session_dir: Path, material_name: str) -> Dict[str, str]:
+    """Load llm_res.json for a material workspace."""
+    dirs = ensure_workspace(session_dir, material_name)
+    llm_path = dirs["results"] / "llm_res.json"
+    if not llm_path.is_file():
+        return {}
+    try:
+        data = json.loads(llm_path.read_text(encoding="utf-8"))
+        return data if isinstance(data, dict) else {}
+    except json.JSONDecodeError:
+        return {}
+
+
+def _resolve_material_name_for_plan(
+    session_dir: Optional[Path],
+    target: str,
+    target_psmiles: str,
+    resolved_material_name: str,
+) -> str:
+    """Pick the best polymer name for tree building (manifest > inference > mapping)."""
+    material_name = resolved_material_name
+    if "[*]" not in material_name or session_dir is None:
+        return material_name
+
+    manifest_name = _lookup_manifest_name(session_dir, target_psmiles or target)
+    if manifest_name and "[*]" not in manifest_name:
+        return manifest_name
+
+    psmiles_slug = material_slug(resolved_material_name)
+    for entry in _read_manifest(session_dir):
+        ws = entry.get("workspace", "")
+        if psmiles_slug not in ws:
+            continue
+        extractions = _load_session_extractions(
+            session_dir,
+            entry.get("material_name", resolved_material_name),
+        )
+        inferred = infer_polymer_name_from_extractions(extractions, target_psmiles or target)
+        if inferred:
+            return inferred
+
+    extractions = _load_session_extractions(session_dir, material_name)
+    inferred = infer_polymer_name_from_extractions(extractions, target_psmiles or target)
+    if inferred:
+        return inferred
+
+    return material_name
+
+
+def _read_manifest(session_dir: Path) -> list:
+    manifest_path = session_dir / "retrosynthesis" / "extractions_manifest.json"
+    if not manifest_path.is_file():
+        return []
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        return manifest if isinstance(manifest, list) else []
+    except Exception:
+        return []
+
+
+def _lookup_manifest_name(session_dir: Path, target_psmiles: str) -> Optional[str]:
+    """Find material_name from extractions manifest that matches a PSMILES target."""
+    manifest_path = session_dir / "retrosynthesis" / "extractions_manifest.json"
+    if not manifest_path.is_file():
+        return None
+    try:
+        from biologix_ai.retrosynthesis.retro_workspace import material_slug
+
+        target_slug = material_slug(target_psmiles)
+        for entry in _read_manifest(session_dir):
+            entry_psmiles = entry.get("target_psmiles") or ""
+            if entry_psmiles and entry_psmiles.strip() == target_psmiles.strip():
+                name = entry.get("material_name", "")
+                if name and "[*]" not in name:
+                    return name
+            ws = entry.get("workspace", "")
+            name = entry.get("material_name", "")
+            if target_slug in ws or material_slug(name) == target_slug:
+                if name and "[*]" not in name:
+                    return name
+    except Exception:
+        pass
+    return None
+
+
 def _routes_from_tree(
     tree: object,
     material_name: str,
@@ -220,27 +335,64 @@ def _routes_from_tree(
     return routes
 
 
+def _find_extractions_material_name(
+    session_dir: Path,
+    material_name: str,
+    target_psmiles: str = "",
+) -> str:
+    """Return manifest/workspace key that actually holds llm_res for this target."""
+    if session_has_extractions(session_dir, material_name):
+        return material_name
+
+    target_slug = material_slug(target_psmiles or material_name)
+    for entry in _read_manifest(session_dir):
+        ws = entry.get("workspace", "")
+        entry_name = entry.get("material_name", "")
+        entry_psmiles = (entry.get("target_psmiles") or "").strip()
+        if target_psmiles and entry_psmiles == target_psmiles.strip():
+            if session_has_extractions(session_dir, entry_name):
+                return entry_name
+        if target_slug in ws and session_has_extractions(session_dir, entry_name):
+            return entry_name
+    return material_name
+
+
 def _run_retrosynthesis_agent(
     material_name: str,
     num_results: int = 5,
     session_dir: Optional[Path] = None,
-) -> Tuple[List[PolymerRoute], str]:
+    target_psmiles: str = "",
+) -> Tuple[List[PolymerRoute], str, Optional[str]]:
     """Run RetroSynthesisAgent for macromolecular retrosynthesis.
 
-    Returns (routes, route_provenance) where provenance is session_agent_llm or none.
+    Returns (routes, route_provenance, error_message).
     """
     if not _is_retrosynthesisagent_available():
         logger.warning("RetroSynthesisAgent not available; returning empty routes")
-        return [], "none"
+        return [], "none", "RetroSynthesisAgent not installed"
+
+    from biologix_ai.retrosynthesis.retrosyn_bootstrap import ensure_retrosyn_agent_ready
+
+    try:
+        ensure_retrosyn_agent_ready()
+    except Exception as exc:
+        logger.error("RetroSyn bootstrap failed for %s: %s", material_name, exc)
+        return [], "none", f"RetroSyn bootstrap failed: {exc}"
 
     cleanup_tmp = False
+    workspace_material_name = material_name
     if session_dir is not None:
-        dirs = ensure_workspace(session_dir, material_name)
+        workspace_material_name = _find_extractions_material_name(
+            session_dir, material_name, target_psmiles
+        )
+        dirs = ensure_workspace(session_dir, workspace_material_name)
         ws = dirs["workspace"]
         pdf_folder = dirs["pdfs"]
         result_folder = dirs["results"]
         tree_folder = dirs["trees"]
-        had_session_extractions = session_has_extractions(session_dir, material_name)
+        had_session_extractions = session_has_extractions(
+            session_dir, workspace_material_name
+        )
     else:
         ws = Path(tempfile.mkdtemp())
         cleanup_tmp = True
@@ -281,15 +433,34 @@ def _run_retrosynthesis_agent(
                     "No llm_res in session workspace; returning empty routes "
                     "(call submit_retro_extractions before plan_retrosynthesis)"
                 )
-                return [], "none"
+                return [], "none", None
 
             ea = EntityAlignment()
             results_dict = ea.alignRootNode(
                 str(result_folder), "llm_res", material_name
             )
+            results_dict = {
+                key: normalize_for_tree_root(text, material_name)
+                for key, text in results_dict.items()
+            }
+
+            # Seed workspace precursors BEFORE tree construction so that all
+            # reactant names from the extractions are registered as purchasable
+            # leaves (bundled DB + PubChem + ZINC bridge).
+            try:
+                from biologix_ai.retrosynthesis.precursor_registry import (
+                    collect_reactants_from_extractions,
+                    seed_workspace_precursors,
+                )
+
+                reactants = collect_reactants_from_extractions(results_dict)
+                seed_workspace_precursors(ws, reactants)
+            except Exception as seed_exc:
+                logger.warning("Precursor seeding skipped: %s", seed_exc)
 
             tree_root = material_name.strip().lower()
             tree = Tree(tree_root, result_dict=results_dict)
+            _inject_product_aliases(tree, tree_root)
             tree.construct_tree()
             routes = _routes_from_tree(tree, material_name)
             if routes and provenance == "none":
@@ -301,12 +472,12 @@ def _run_retrosynthesis_agent(
                     material_name,
                     tree_root,
                 )
-            return routes, provenance
+            return routes, provenance, None
         finally:
             os.chdir(prev_cwd)
     except Exception as exc:
         logger.error("RetroSynthesisAgent failed for %s: %s", material_name, exc)
-        return [], "none"
+        return [], "none", str(exc)
     finally:
         if cleanup_tmp:
             import shutil
@@ -395,6 +566,17 @@ def plan_retrosynthesis(request: RetrosynthesisRequest) -> RetrosynthesisResult:
     if request.session_dir:
         session_dir = Path(request.session_dir).expanduser().resolve()
 
+    if session_dir:
+        material_name = _resolve_material_name_for_plan(
+            session_dir, target, target_psmiles, material_name
+        )
+        if material_name != resolved["material_name"]:
+            logger.info(
+                "Using resolved material_name=%r for target=%r",
+                material_name,
+                target,
+            )
+
     logger.info(
         "Planning retrosynthesis for target=%r material_name=%r biologic_target=%r",
         target,
@@ -402,11 +584,38 @@ def plan_retrosynthesis(request: RetrosynthesisRequest) -> RetrosynthesisResult:
         request.biologic_target,
     )
 
-    polymer_routes, route_provenance = _run_retrosynthesis_agent(
+    polymer_routes, route_provenance, retro_agent_error = _run_retrosynthesis_agent(
         material_name=material_name,
         num_results=constraints.max_routes,
         session_dir=session_dir,
+        target_psmiles=target_psmiles,
     )
+
+    extractions_reaction_count: Optional[int] = None
+    if session_dir is not None:
+        manifest_path = session_dir / "retrosynthesis" / "extractions_manifest.json"
+        if manifest_path.is_file():
+            try:
+                import json as _json
+
+                manifest = _json.loads(manifest_path.read_text(encoding="utf-8"))
+                workspace_name = (
+                    _find_extractions_material_name(
+                        session_dir, material_name, target_psmiles
+                    )
+                    if session_dir
+                    else material_name
+                )
+                for entry in manifest if isinstance(manifest, list) else []:
+                    if entry.get("material_name") in (material_name, workspace_name):
+                        stats = entry.get("parse_stats") or {}
+                        extractions_reaction_count = stats.get("reactions_out")
+                        break
+            except Exception:
+                pass
+
+    if retro_agent_error:
+        errors.append(retro_agent_error)
 
     retro_stages: List[str] = []
     if route_provenance == "session_agent_llm":
@@ -416,14 +625,23 @@ def plan_retrosynthesis(request: RetrosynthesisRequest) -> RetrosynthesisResult:
     if (
         not polymer_routes
         and session_dir
-        and session_has_extractions(session_dir, material_name)
+        and (
+            session_has_extractions(session_dir, material_name)
+            or session_has_extractions(
+                session_dir,
+                _find_extractions_material_name(
+                    session_dir, material_name, target_psmiles
+                ),
+            )
+        )
     ):
         kg_empty_after_extractions = True
         warnings.append(
             f"Session extractions exist for {material_name!r} but RetroSynAgent "
-            f"built no routes. Ensure reaction Products include the polymer name "
-            f"({material_name!r}, case-insensitive) and reactants chain to purchasable "
-            "precursors. Re-submit via submit_retro_extractions if needed."
+            f"built no routes. KG leaf coverage may be incomplete for specialty "
+            f"precursors. Call diagnose_retro_extractions(run_dir, {material_name!r}) "
+            "to identify blocking reactants, then add upstream reaction steps or call "
+            "register_retro_precursors to mark them purchasable."
         )
 
     requires_agent_extractions = False
@@ -524,12 +742,22 @@ def plan_retrosynthesis(request: RetrosynthesisRequest) -> RetrosynthesisResult:
         "biologic_target": request.biologic_target,
         "requires_agent_extractions": requires_agent_extractions,
         "session_extractions_present": (
-            session_has_extractions(session_dir, material_name)
+            (
+                session_has_extractions(session_dir, material_name)
+                or session_has_extractions(
+                    session_dir,
+                    _find_extractions_material_name(
+                        session_dir, material_name, target_psmiles
+                    ),
+                )
+            )
             if session_dir
             else False
         ),
         "retro_workspace_ready": session_dir is not None,
         "kg_empty_after_session_extractions": kg_empty_after_extractions,
+        "retro_agent_error": retro_agent_error,
+        "extractions_reaction_count": extractions_reaction_count,
         "aizynth_monomers_attempted": aizynth_attempted,
         "aizynth_monomers_solved": aizynth_solved,
     }
@@ -550,10 +778,20 @@ def plan_retrosynthesis(request: RetrosynthesisRequest) -> RetrosynthesisResult:
         )
     else:
         meta["reporting_honesty"] = f"Provenance: {prov}; no polymer routes."
-        if prov == "none" and session_dir and session_has_extractions(session_dir, material_name):
+        if prov == "none" and session_dir and (
+            session_has_extractions(session_dir, material_name)
+            or session_has_extractions(
+                session_dir,
+                _find_extractions_material_name(
+                    session_dir, material_name, target_psmiles
+                ),
+            )
+        ):
             meta["recommended_next_action"] = (
-                f"Re-submit extractions with Products containing "
-                f"{material_name.strip().lower()!r}, then plan_retrosynthesis again."
+                f"Call diagnose_retro_extractions(run_dir, {material_name.strip().lower()!r}) "
+                "to identify blocking precursors. Add upstream reaction steps for specialty "
+                "intermediates (e.g. lactide synthesis, chitin deacetylation) or call "
+                "register_retro_precursors to mark them purchasable, then re-submit."
             )
 
     return RetrosynthesisResult(

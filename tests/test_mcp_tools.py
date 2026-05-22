@@ -121,6 +121,25 @@ class TestNewMCPTools:
         assert "polymer_routes" in plan_data
         assert plan_data["metadata"].get("session_extractions_present") is True
 
+    def test_submit_rejects_missing_root_product(self, tmp_path):
+        sub = self.server.submit_retro_extractions(
+            run_dir=str(tmp_path),
+            material_name="poly(acrylic acid)",
+            extractions=json.dumps(
+                {
+                    "bad_paper": (
+                        "Reaction 001:\n"
+                        "Reactants: a\n"
+                        "Products: b\n"
+                        "Conditions: c"
+                    ),
+                }
+            ),
+        )
+        sub_data = json.loads(sub)
+        assert sub_data.get("ok") is False
+        assert "Products containing" in sub_data.get("error", "")
+
     def test_assemble_retrosynthesis_report(self, tmp_path):
         sub = self.server.submit_retro_extractions(
             run_dir=str(tmp_path),
