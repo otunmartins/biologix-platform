@@ -182,10 +182,10 @@ bash scripts/setup_aizynthfinder.sh   # ~800MB models
 
 | Paper | Description | Build |
 |-------|-------------|-------|
-| [arXiv:2605.18831](https://arxiv.org/abs/2605.18831) | Physics-grounded agentic discovery benchmark (insulin, RL/BO comparison) | `cd paper && ./compile_main.sh` |
+| [arXiv:2605.18831](https://arxiv.org/abs/2605.18831) | Physics-grounded agentic discovery benchmark (insulin, RL/BO comparison) | `cd paper/insulin && ./compile_main.sh` |
 | Biologics AI showcase (preprint) | End-to-end platform demo: any biologic + agent-backed retrosynthesis (insulin + adalimumab, 5 iterations each) | `cd paper/biologics && ./compile_main.sh` |
 
-Source: [`paper/main.tex`](paper/main.tex) (benchmark), [`paper/biologics/main.tex`](paper/biologics/main.tex) (showcase). Shared bibliography: [`paper/references.bib`](paper/references.bib).
+Source: [`paper/insulin/main.tex`](paper/insulin/main.tex) (benchmark), [`paper/biologics/main.tex`](paper/biologics/main.tex) (showcase). Shared bibliography: [`paper/shared/references.bib`](paper/shared/references.bib). Layout: [`paper/README.md`](paper/README.md).
 
 Copy structure figures from local runs before building the showcase PDF: `paper/biologics/copy_figures.sh`.
 
