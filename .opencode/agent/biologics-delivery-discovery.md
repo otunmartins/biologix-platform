@@ -70,6 +70,12 @@ Never call `openmm_evaluate_psmiles` without `psmiles_list`.
 
 For each candidate PSMILES with `library_disposition="pass"`:
 
+**CTA / reagent rule:** Chain transfer agents (CTAs), initiators, and other small-molecule
+synthesis reagents must **NOT** be submitted as targets to `prepare_retrosynthesis` or
+`plan_retrosynthesis`. Register them directly via `register_retro_precursors` and run
+retrosynthesis only on the **polymer** target (human-readable name or mapped PSMILES that
+resolves to a polymer name).
+
 1. `prepare_retrosynthesis(target, biologic_target, run_dir=<session>)` → save `material_name`
 
 2. Read returned `pdf_paths` and literature; write reaction extraction JSON (you are the extractor).

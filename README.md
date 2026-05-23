@@ -2,6 +2,8 @@
 
 AI-driven discovery of **formulation and delivery materials for any biologic** (insulin, mAbs, enzymes, vaccines, peptides). A single discovery campaign produces: candidate polymer screening, retrosynthesis routes, residual-monomer ADMET, regulatory excipient compliance (EMA/FDA/GRAS), and an immutable GxP audit trail — all in one session via MCP (OpenCode) or FastAPI.
 
+See [Publications](#publications) for preprints.
+
 ### One session, one biologic
 
 Start with the **`biologics-delivery-discovery`** OpenCode agent (default). It guides you through:
@@ -173,6 +175,19 @@ Manual repair only if `./install` was skipped or interrupted:
 bash scripts/install_submodules.sh
 bash scripts/setup_aizynthfinder.sh   # ~800MB models
 ```
+
+---
+
+## Publications
+
+| Paper | Description | Build |
+|-------|-------------|-------|
+| [arXiv:2605.18831](https://arxiv.org/abs/2605.18831) | Physics-grounded agentic discovery benchmark (insulin, RL/BO comparison) | `cd paper && ./compile_main.sh` |
+| Biologics AI showcase (preprint) | End-to-end platform demo: any biologic + agent-backed retrosynthesis (insulin + adalimumab, 5 iterations each) | `cd paper/biologics && ./compile_main.sh` |
+
+Source: [`paper/main.tex`](paper/main.tex) (benchmark), [`paper/biologics/main.tex`](paper/biologics/main.tex) (showcase). Shared bibliography: [`paper/references.bib`](paper/references.bib).
+
+Copy structure figures from local runs before building the showcase PDF: `paper/biologics/copy_figures.sh`.
 
 ---
 

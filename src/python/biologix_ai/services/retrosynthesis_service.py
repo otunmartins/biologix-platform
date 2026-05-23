@@ -7,13 +7,16 @@ Two engines:
 
 from __future__ import annotations
 
+import concurrent.futures
 import json
 import logging
+import multiprocessing
 import os
 import re
+import signal
 import tempfile
 from pathlib import Path
-from typing import Dict, List, Optional, Set, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 from biologix_ai.retrosynthesis.aizynth_config import get_configfile, models_ready
 from biologix_ai.retrosynthesis.models import (
@@ -37,6 +40,81 @@ from biologix_ai.retrosynthesis.retro_adapter import (
 from biologix_ai.retrosynthesis.retro_workspace import ensure_workspace, material_slug
 
 logger = logging.getLogger(__name__)
+
+# Tokens indicating an unresolved PSMILES/SMILES string rather than a polymer name.
+_SMILES_TOKENS = re.compile(r"\[\*\]|\[C|=O|=S|#N|\(C\)|\(=")
+
+_PDF_DOWNLOAD_TIMEOUT = int(os.environ.get("BIOLOGIX_PDF_TIMEOUT", "60"))
+_TREE_CONSTRUCT_TIMEOUT = int(os.environ.get("BIOLOGIX_TREE_TIMEOUT", "120"))
+
+
+def _is_smiles_like(name: str) -> bool:
+    """Return True if *name* looks like a SMILES/PSMILES string, not a polymer name."""
+    return bool(_SMILES_TOKENS.search(name))
+
+
+def _pdf_download_worker(
+    material_name: str,
+    workspace: str,
+    pdf_folder: str,
+    max_pdfs: int,
+    result_queue: "multiprocessing.Queue[Any]",
+) -> None:
+    """Run PDFDownloader in a subprocess (may spawn geckodriver via scholarly)."""
+    try:
+        os.setpgrp()
+    except OSError:
+        pass
+    os.chdir(workspace)
+    try:
+        from RetroSynAgent.pdfDownloader import PDFDownloader
+
+        downloader = PDFDownloader(
+            material_name,
+            pdf_folder_name=pdf_folder,
+            num_results=max_pdfs,
+            n_thread=2,
+        )
+        result_queue.put(downloader.main())
+    except Exception:
+        result_queue.put([])
+
+
+def _download_pdfs_with_timeout(
+    material_name: str,
+    workspace: Path,
+    pdf_folder: Path,
+    max_pdfs: int,
+    timeout: int = _PDF_DOWNLOAD_TIMEOUT,
+) -> List[str]:
+    """Download PDFs with a hard timeout; kill child process group on expiry."""
+    ctx = multiprocessing.get_context("spawn")
+    result_queue: multiprocessing.Queue[Any] = ctx.Queue()
+    proc = ctx.Process(
+        target=_pdf_download_worker,
+        args=(material_name, str(workspace), str(pdf_folder), max_pdfs, result_queue),
+    )
+    proc.start()
+    proc.join(timeout=timeout)
+    if proc.is_alive():
+        try:
+            os.killpg(os.getpgid(proc.pid), signal.SIGTERM)
+        except (ProcessLookupError, PermissionError, OSError):
+            proc.terminate()
+        proc.join(5)
+        if proc.is_alive():
+            proc.kill()
+            proc.join(2)
+        logger.warning(
+            "PDF download killed after %ds timeout for %r",
+            timeout,
+            material_name,
+        )
+        return []
+    if not result_queue.empty():
+        names = result_queue.get_nowait()
+        return names if isinstance(names, list) else []
+    return []
 
 
 def _is_aizynthfinder_available() -> bool:
@@ -461,7 +539,25 @@ def _run_retrosynthesis_agent(
             tree_root = material_name.strip().lower()
             tree = Tree(tree_root, result_dict=results_dict)
             _inject_product_aliases(tree, tree_root)
-            tree.construct_tree()
+            executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+            future = executor.submit(tree.construct_tree)
+            try:
+                future.result(timeout=_TREE_CONSTRUCT_TIMEOUT)
+            except concurrent.futures.TimeoutError:
+                logger.warning(
+                    "RetroSynAgent tree.construct_tree() timed out after %ds for %r",
+                    _TREE_CONSTRUCT_TIMEOUT,
+                    material_name,
+                )
+                executor.shutdown(wait=False, cancel_futures=True)
+                raise RuntimeError(
+                    f"Tree construction timed out after {_TREE_CONSTRUCT_TIMEOUT}s"
+                ) from None
+            finally:
+                if future.done():
+                    executor.shutdown(wait=True)
+                else:
+                    executor.shutdown(wait=False, cancel_futures=True)
             routes = _routes_from_tree(tree, material_name)
             if routes and provenance == "none":
                 provenance = "session_agent_llm"
@@ -498,28 +594,35 @@ def prepare_retrosynthesis_workspace(
     material_name = resolved["material_name"]
     dirs = ensure_workspace(session_dir, material_name)
     pdf_paths: List[str] = []
+    pdf_skip_reason = ""
 
-    if _is_retrosynthesisagent_available():
+    if _is_smiles_like(material_name):
+        pdf_skip_reason = (
+            "PDF download skipped: target resolved to a SMILES/PSMILES string, not a "
+            "polymer name. Use a polymer name as target (e.g. 'poly(lactic-co-glycolic "
+            "acid)') or register CTA/reagents via register_retro_precursors."
+        )
+        logger.info("Skipping PDF download for SMILES-like material_name=%r", material_name)
+    elif _is_retrosynthesisagent_available():
         try:
-            from RetroSynAgent.pdfDownloader import PDFDownloader
-
-            prev_cwd = os.getcwd()
-            try:
-                os.chdir(dirs["workspace"])
-                downloader = PDFDownloader(
-                    material_name,
-                    pdf_folder_name=str(dirs["pdfs"]),
-                    num_results=max_pdfs,
-                    n_thread=2,
-                )
-                pdf_names = downloader.main()
-                pdf_paths = [str(dirs["pdfs"] / f"{n}.pdf") for n in pdf_names]
-            finally:
-                os.chdir(prev_cwd)
+            pdf_names = _download_pdfs_with_timeout(
+                material_name,
+                dirs["workspace"],
+                dirs["pdfs"],
+                max_pdfs,
+            )
+            pdf_paths = [str(dirs["pdfs"] / f"{n}.pdf") for n in pdf_names]
         except Exception as exc:
             logger.warning("PDF download failed for %s: %s", material_name, exc)
 
     from biologix_ai.retrosynthesis.retro_workspace import EXTRACTION_SCHEMA
+
+    next_step = (
+        "Read PDFs or session literature, extract reactions, then call "
+        "submit_retro_extractions(run_dir=..., material_name=..., extractions=<JSON>)"
+    )
+    if pdf_skip_reason:
+        next_step = f"{pdf_skip_reason} Then: {next_step}"
 
     return {
         "material_name": material_name,
@@ -530,10 +633,8 @@ def prepare_retrosynthesis_workspace(
         "pdf_count": len(pdf_paths),
         "extraction_schema": EXTRACTION_SCHEMA,
         "session_extractions_present": session_has_extractions(session_dir, material_name),
-        "next_step": (
-            "Read PDFs or session literature, extract reactions, then call "
-            "submit_retro_extractions(run_dir=..., material_name=..., extractions=<JSON>)"
-        ),
+        "pdf_skip_reason": pdf_skip_reason or None,
+        "next_step": next_step,
     }
 
 
@@ -576,6 +677,26 @@ def plan_retrosynthesis(request: RetrosynthesisRequest) -> RetrosynthesisResult:
                 material_name,
                 target,
             )
+
+    if "[*]" in material_name:
+        return RetrosynthesisResult(
+            request=request,
+            polymer_routes=[],
+            errors=[
+                f"Target resolved to raw PSMILES '{material_name}' — cannot build "
+                "a retrosynthesis KG tree from a SMILES string. "
+                "Provide a polymer name (e.g. 'poly(lactic-co-glycolic acid)') as the target, "
+                "or register CTA/reagent precursors via register_retro_precursors."
+            ],
+            warnings=[],
+            metadata={
+                "recommended_next_action": "register_retro_precursors",
+                "material_name_resolved": material_name,
+                "target_psmiles": target_psmiles,
+                "route_provenance": "none",
+                "requires_agent_extractions": False,
+            },
+        )
 
     logger.info(
         "Planning retrosynthesis for target=%r material_name=%r biologic_target=%r",

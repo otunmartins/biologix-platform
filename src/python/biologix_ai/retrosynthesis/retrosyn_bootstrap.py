@@ -115,4 +115,44 @@ def ensure_retrosyn_agent_ready() -> Path:
         tb.CommonSubstanceDB.get_added_database = _patched_get_added_database  # type: ignore[method-assign]
         _BOOTSTRAPPED = True
 
+        _patch_pubchempy_timeout()
+
     return emol_dest
+
+
+def _patch_pubchempy_timeout(timeout_seconds: int = 8) -> None:
+    """Wrap pubchempy.get_compounds with a per-call timeout (tree leaf checks)."""
+    try:
+        import pubchempy as pcp
+    except ImportError:
+        logger.debug("pubchempy not installed; skip timeout patch")
+        return
+
+    if getattr(pcp.get_compounds, "_biologix_timed", False):
+        return
+
+    import concurrent.futures as cf
+
+    original = pcp.get_compounds
+
+    def _timed_get_compounds(*args: object, **kwargs: object) -> list:
+        executor = cf.ThreadPoolExecutor(max_workers=1)
+        future = executor.submit(original, *args, **kwargs)
+        try:
+            return future.result(timeout=timeout_seconds)
+        except cf.TimeoutError:
+            logger.debug(
+                "pubchempy.get_compounds timed out after %ds",
+                timeout_seconds,
+            )
+            executor.shutdown(wait=False, cancel_futures=True)
+            return []
+        finally:
+            if not future.done():
+                executor.shutdown(wait=False, cancel_futures=True)
+            else:
+                executor.shutdown(wait=True)
+
+    _timed_get_compounds._biologix_timed = True  # type: ignore[attr-defined]
+    pcp.get_compounds = _timed_get_compounds  # type: ignore[assignment]
+    logger.debug("Patched pubchempy.get_compounds with %ds timeout", timeout_seconds)

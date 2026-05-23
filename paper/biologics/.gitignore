@@ -1,0 +1,11 @@
+# LaTeX intermediate files
+*.aux
+*.log
+*.bbl
+*.blg
+*.toc
+*.out
+*.fls
+*.fdb_latexmk
+*.synctex.gz
+main.pdf
