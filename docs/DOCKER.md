@@ -132,6 +132,10 @@ This starts the container, activates `biologix-ai-sim`, and gives you a prompt f
 
 ## Pull a pre-built image (GHCR)
 
+Images are published to **`ghcr.io/otunmartins/biologix-ai`** on version tags (e.g. `v0.3.0` → tags `0.3.0`, `0.3`, `latest`).
+
+After the first publish, the package owner must set visibility to **Public** once: GitHub → **Packages** → **biologix-ai** → **Package settings** → **Change visibility**.
+
 When a tagged release is published:
 
 ```bash
