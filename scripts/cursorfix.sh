@@ -18,11 +18,11 @@
 set -euo pipefail
 
 REPO_URL="${1:-}"
-TARGET_NAME="${TARGET_NAME:-$(git config --global --get user.name 2>/dev/null || true)}"
-TARGET_EMAIL="${TARGET_EMAIL:-$(git config --global --get user.email 2>/dev/null || true)}"
-CURSOR_EMAILS="${CURSOR_EMAILS:-cursoragent@users.noreply.github.com,cursoragent@cursor.com}"
-CURSOR_NAMES="${CURSOR_NAMES:-cursoragent,Cursor Agent,Cursoragent}"
-CURSOR_SUBSTRINGS="${CURSOR_SUBSTRINGS:-cursoragent,cursor agent,@cursor.com}"
+TARGET_NAME="${TARGET_NAME:-$(git config --local --get user.name 2>/dev/null || git config --global --get user.name 2>/dev/null || true)}"
+TARGET_EMAIL="${TARGET_EMAIL:-$(git config --local --get user.email 2>/dev/null || git config --global --get user.email 2>/dev/null || true)}"
+CURSOR_EMAILS="${CURSOR_EMAILS:-cursoragent@users.noreply.github.com,cursoragent@cursor.com,mh7373@nyu.edu,61993073+muhammadhasyim@users.noreply.github.com,muhammadhasyim@github.com}"
+CURSOR_NAMES="${CURSOR_NAMES:-cursoragent,Cursor Agent,Cursoragent,Muhammad Hasyim,Muhammad R. Hasyim,Muhammad Risyad Hasyim,muhammadhasyim}"
+CURSOR_SUBSTRINGS="${CURSOR_SUBSTRINGS:-cursoragent,cursor agent,@cursor.com,muhammadhasyim,hasyim}"
 
 if [[ -z "$REPO_URL" ]]; then
   echo "ERROR: Missing repository URL."

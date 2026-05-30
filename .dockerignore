@@ -1,0 +1,49 @@
+# ---- Virtual envs and build artefacts ----
+.venv-optuna/
+.venv/
+__pycache__/
+**/__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+
+# ---- Conda/mamba binaries (installed inside image) ----
+miniforge*/
+micromamba
+
+# ---- Heavy data rebuilt inside image ----
+data/aizynthfinder/
+
+# ---- User session outputs (volume-mounted at runtime) ----
+runs/
+papers/
+logs/
+results/
+session/
+sessions.txt
+nohup.out
+smiles_cache.json
+substance_query_result.json
+
+# ---- Publications / PDFs ----
+paper/
+*.pdf
+page_pngs/
+
+# ---- Local scratch / debug ----
+SUMMARY_REPORT_fixed.md
+plan.md
+insulin_AB_debug.pdb
+*.pdb
+*.log
+
+# ---- Git objects (keep .git itself for submodule resolve; exclude objects blob) ----
+.git/objects/pack/
+.git/objects/info/
+
+# ---- CI / OS cruft ----
+.DS_Store
+Thumbs.db
+*.swp
+*.swo

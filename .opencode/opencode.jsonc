@@ -18,7 +18,9 @@
     "asta": {
       "type": "remote",
       "url": "https://asta-tools.allen.ai/mcp/v1",
-      "enabled": true,
+      // Set enabled to true here OR set ASTA_API_KEY in your .env to activate.
+      // Disabled by default so the container starts cleanly without the key.
+      "enabled": false,
       "oauth": false,
       "headers": {
         "x-api-key": "{env:ASTA_API_KEY}"

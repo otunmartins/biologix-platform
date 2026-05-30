@@ -1,0 +1,40 @@
+# Explicit project name — avoids defaulting to the clone folder name (e.g. insulin-ai).
+name: biologix-ai
+
+services:
+  biologix:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      # ambertools and several other conda-forge packages have no linux/aarch64
+      # builds.  Force amd64 so the image works on both Apple Silicon (via
+      # Rosetta 2) and any x86 Linux host.
+      platforms:
+        - linux/amd64
+      args:
+        # Set SLIM=1 to build a smaller image that downloads models on first run
+        SLIM: ${SLIM:-0}
+    image: biologix-ai:local
+    stdin_open: true   # keeps STDIN open for the TUI
+    tty: true          # allocates a TTY (required for OpenCode TUI)
+    env_file:
+      # Copy .env.example → .env and fill in your LLM key before running.
+      # Missing file is silently ignored so direct -e flags still work.
+      - path: .env
+        required: false
+    environment:
+      # Pass through provider keys from host env if not already in .env
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
+      - ASTA_API_KEY=${ASTA_API_KEY:-}
+    volumes:
+      # Session outputs persisted to the host so nothing is lost on container exit
+      - ./runs:/app/runs
+      # Papers / PDFs used by mine_literature
+      - ./papers:/app/papers
+      # OpenCode auth state (opencode auth login) persisted across runs
+      - opencode-auth:/root/.local/share/opencode
+
+volumes:
+  opencode-auth:

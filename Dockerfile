@@ -1,0 +1,106 @@
+# Biologix AI Platform — Docker image
+#
+# Build (full, ~8-12 GB with models + precursor DB):
+#   docker build -t biologix-ai:local .
+#
+# Build (slim — defers ~800 MB AiZynth models + precursor DB to first run):
+#   docker build --build-arg SLIM=1 -t biologix-ai:slim .
+#
+# Run (via compose — recommended):
+#   docker compose run --rm biologix
+#
+# Run (direct):
+#   docker run -it --rm -e ANTHROPIC_API_KEY=sk-ant-... biologix-ai:local
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Stage: base OS + conda
+# ─────────────────────────────────────────────────────────────────────────────
+# Pin to amd64: ambertools, openmm, and several other conda-forge packages
+# have no linux/aarch64 builds.  On Apple Silicon, Docker Desktop runs this
+# image via Rosetta 2 emulation transparently.
+FROM --platform=linux/amd64 condaforge/miniforge3:24.11.3-0 AS base
+
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+
+# System dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        git \
+        curl \
+        ca-certificates \
+        unzip \
+        build-essential \
+        libgl1-mesa-glx \
+        libglib2.0-0 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Disable the "omnia" channel if it somehow appears in the base image
+RUN conda config --remove channels omnia 2>/dev/null || true
+
+WORKDIR /app
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Stage: conda env (cached layer — only invalidated when env YML changes)
+# ─────────────────────────────────────────────────────────────────────────────
+FROM base AS conda-env
+
+# Copy only the env spec first for maximum cache re-use
+COPY environment-simulation.yml ./
+
+# -e . requires pyproject.toml, which is not copied until the app stage.
+# install_submodules.sh already runs: pip install -e ".[retro,admet,dev]"
+RUN sed '/^[[:space:]]*- -e \.$/d' environment-simulation.yml > /tmp/environment-docker.yml \
+    && mamba env create -f /tmp/environment-docker.yml \
+    && mamba clean --all --yes
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Stage: full application
+# ─────────────────────────────────────────────────────────────────────────────
+FROM conda-env AS app
+
+# Build arg: set SLIM=1 to skip AiZynth model download + precursor DB build
+ARG SLIM=0
+
+# Copy the full repo (after .dockerignore is applied)
+COPY . .
+
+# Ensure submodules are present. During `docker build` the build context already
+# contains the checked-out submodule directories (user runs
+# `git submodule update --init --recursive` before building), so this is a
+# no-op if they're there, or a fallback clone if not.
+RUN git submodule update --init --recursive 2>/dev/null || true
+
+# Environment wiring
+ENV CONDA_ENV=biologix-ai-sim
+ENV PYTHONPATH=/app/src/python
+ENV RETRO_LLM_BACKEND=skip
+ENV BIOLOGIX_AI_AIZYNTH_CONFIG=/app/data/aizynthfinder/config.yml
+ENV PATH="/opt/conda/envs/biologix-ai-sim/bin:/root/.opencode/bin:${PATH}"
+ENV CONDA_DEFAULT_ENV=biologix-ai-sim
+# Make conda activate work inside RUN steps
+ENV BASH_ENV=/opt/conda/etc/profile.d/conda.sh
+
+# Install submodules, torch, precursor DB, and the project package into the env
+RUN source /opt/conda/etc/profile.d/conda.sh && conda activate biologix-ai-sim \
+    && bash scripts/install_submodules.sh
+
+# Download AiZynth models and build precursor DB (skipped when SLIM=1)
+RUN if [ "$SLIM" = "0" ]; then \
+      source /opt/conda/etc/profile.d/conda.sh && conda activate biologix-ai-sim \
+      && bash scripts/setup_aizynthfinder.sh; \
+    else \
+      echo "SLIM build: skipping AiZynthFinder model download"; \
+    fi
+
+# Install OpenCode CLI
+RUN curl -fsSL https://opencode.ai/install | bash \
+    && /root/.opencode/bin/opencode --version
+
+# Create runtime directories (volume mount points)
+RUN mkdir -p /app/runs /app/papers /app/data/aizynthfinder
+
+# Strip Windows CRLF line-endings that a Windows clone may have introduced,
+# then make the entrypoint executable.
+RUN sed -i 's/\r$//' /app/docker/entrypoint.sh /app/scripts/*.sh 2>/dev/null || true \
+    && chmod +x /app/docker/entrypoint.sh
+
+ENTRYPOINT ["/app/docker/entrypoint.sh"]

@@ -1,0 +1,18 @@
+# Ensure consistent line endings across all platforms.
+# Shell scripts must have LF so the Linux container can execute them even if
+# the repo was cloned on Windows with core.autocrlf=true.
+* text=auto eol=lf
+*.sh text eol=lf
+docker/entrypoint.sh text eol=lf
+
+# Binary assets — never mangle these
+*.png binary
+*.pdf binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.whl binary
+*.pkl binary
+*.npy binary
+*.npz binary

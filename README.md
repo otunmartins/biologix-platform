@@ -54,7 +54,26 @@ If your shell shows a different env (for example `biologix-ai`), either activate
 
 ---
 
-## Quick start
+## Run with Docker (recommended)
+
+The fastest way to get started — no conda, no path setup, no `./install`. The image runs identically on Windows, macOS, and Linux; Docker handles the OS difference for you.
+
+```bash
+# 1. Put your LLM key in .env
+cp .env.example .env          # then edit .env and fill in ANTHROPIC_API_KEY
+
+# 2. Build the image (first build: ~20-40 min; subsequent builds are cached)
+docker compose build
+
+# 3. Launch — OpenCode opens immediately
+docker compose run --rm biologix
+```
+
+Session outputs are saved to `./runs/` on your host. See [docs/DOCKER.md](docs/DOCKER.md) for credentials, slim builds, Apple Silicon, and troubleshooting.
+
+---
+
+## Quick start (without Docker)
 
 1. Clone this repo and run the installer from the repo root:
 
@@ -183,7 +202,7 @@ bash scripts/setup_aizynthfinder.sh   # ~800MB models
 | Paper | Description | Build |
 |-------|-------------|-------|
 | [arXiv:2605.18831](https://arxiv.org/abs/2605.18831) | Physics-grounded agentic discovery benchmark (insulin, RL/BO comparison) | `cd paper/insulin && ./compile_main.sh` |
-| Biologics AI showcase (preprint) | End-to-end platform demo: any biologic + agent-backed retrosynthesis (insulin + adalimumab, 5 iterations each) | [biologics-ai-paper](https://github.com/otunmartins/biologics-ai-paper) |
+| Biologics AI showcase (preprint) | End-to-end platform demo: any biologic + agent-backed retrosynthesis (insulin + adalimumab, 5 iterations each) | [biologix-paper](https://github.com/muhammadhasyim/biologix-paper) |
 
 Insulin benchmark source: [`paper/insulin/main.tex`](paper/insulin/main.tex). Biologics showcase: standalone repo (Overleaf-ready). Shared bibliography for insulin: [`paper/shared/references.bib`](paper/shared/references.bib). Layout: [`paper/README.md`](paper/README.md).
 
