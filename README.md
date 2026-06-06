@@ -15,7 +15,7 @@ monomer ADMET → excipient compliance → compiled report + audit trail
 
 Session state is persisted to `runs/<session_id>/` via `discovery_world.json`, funnel-context checkpoints, and an append-only JSONL audit trail. If the chat disconnects mid-pipeline, `get_funnel_context` resumes from the last checkpoint.
 
-### New MCP tools (May 2026, NovoMCP-inspired)
+### New MCP tools (May 2026)
 
 | Tool | What it does |
 |------|-------------|
