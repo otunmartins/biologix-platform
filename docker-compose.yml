@@ -15,6 +15,7 @@ services:
         # Set SLIM=1 to build a smaller image that downloads models on first run
         SLIM: ${SLIM:-0}
     image: biologix-ai:local
+    init: true         # tini as PID 1 — better signal forwarding for the OpenCode TUI
     stdin_open: true   # keeps STDIN open for the TUI
     tty: true          # allocates a TTY (required for OpenCode TUI)
     env_file:
@@ -35,6 +36,9 @@ services:
       - ./papers:/app/papers
       # OpenCode auth state (opencode auth login) persisted across runs
       - opencode-auth:/root/.local/share/opencode
+      # Retrosynthesis + AiZynth data (precursor DB, Molport cache, models)
+      - biologix-data:/app/data
 
 volumes:
   opencode-auth:
+  biologix-data:

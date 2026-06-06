@@ -10,6 +10,9 @@ set -euo pipefail
 source /opt/conda/etc/profile.d/conda.sh
 conda activate biologix-ai-sim
 
+# Headless matplotlib + RDKit drawing (psmiles savefig may otherwise write SVG to .png paths)
+export MPLBACKEND=Agg
+
 # ── LLM key check ────────────────────────────────────────────────────────────
 HAS_KEY=false
 for var in ANTHROPIC_API_KEY OPENAI_API_KEY OPENROUTER_API_KEY; do
@@ -30,16 +33,36 @@ if [[ "$HAS_KEY" == "false" ]]; then
   echo ""
 fi
 
-# ── SLIM: initialise data on first run ───────────────────────────────────────
+# ── Data: seed from image when /app/data is an empty volume mount ─────────────
+PRECURSOR_DB=/app/data/retrosynthesis/precursors.json
+MOLPORT_DB=/app/data/retrosynthesis/molport_inchikeys.pkl
+SEED=/app/.data-seed
+
+if [[ -d "$SEED" ]]; then
+  if [[ ! -f "$PRECURSOR_DB" && -f "$SEED/retrosynthesis/precursors.json" ]]; then
+    echo "Seeding precursor database from image …"
+    mkdir -p /app/data/retrosynthesis
+    cp -a "$SEED/retrosynthesis/." /app/data/retrosynthesis/
+  fi
+  if [[ ! -f /app/data/aizynthfinder/config.yml && -f "$SEED/aizynthfinder/config.yml" ]]; then
+    echo "Seeding AiZynthFinder models from image …"
+    mkdir -p /app/data/aizynthfinder
+    cp -a "$SEED/aizynthfinder/." /app/data/aizynthfinder/
+  fi
+fi
+
+# ── SLIM / first run: initialise data when not baked into the image ───────────
 if [[ ! -f /app/data/aizynthfinder/config.yml ]]; then
   echo "First run: downloading AiZynthFinder models (~800 MB) …"
   bash /app/scripts/setup_aizynthfinder.sh
 fi
 
-PRECURSOR_DB=/app/src/python/biologix_ai/data/precursors.json
 if [[ ! -f "$PRECURSOR_DB" ]]; then
   echo "First run: building precursor database (needs network) …"
   python /app/scripts/build_precursor_db.py --tiers 1,2,3,4
+elif [[ ! -f "$MOLPORT_DB" ]]; then
+  echo "First run: building Molport InChIKey cache (tier 3, needs network) …"
+  python /app/scripts/build_precursor_db.py --tiers 3
 fi
 
 # ── Debug override ────────────────────────────────────────────────────────────

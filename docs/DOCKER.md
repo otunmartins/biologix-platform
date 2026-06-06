@@ -49,7 +49,7 @@ ANTHROPIC_API_KEY=sk-ant-...
 You can also pass it directly without a `.env` file:
 
 ```bash
-docker run -it --rm -e ANTHROPIC_API_KEY=sk-ant-... biologix-ai:local
+docker run -it --rm --init -e ANTHROPIC_API_KEY=sk-ant-... biologix-ai:local
 ```
 
 Or authenticate interactively inside the container:
@@ -72,6 +72,7 @@ Set `ASTA_API_KEY` in `.env` and change `"enabled": false` to `"enabled": true` 
 | `./runs/` | Discovery session outputs (reports, structures, audit trails) |
 | `./papers/` | PDFs used by the literature mining tool |
 | `opencode-auth` (named volume) | OpenCode auth state |
+| `biologix-data` (named volume) | Precursor DB, Molport cache, AiZynth models (survives `--rm`) |
 
 Compose uses project name `biologix-ai` (set in `docker-compose.yml`), so Docker resources are named `biologix-ai_*` — not the clone folder name.
 
@@ -117,7 +118,7 @@ If you ever need to pass the platform flag explicitly (e.g. running `docker buil
 
 ```bash
 docker build --platform linux/amd64 -t biologix-ai:local .
-docker run --platform linux/amd64 -it --rm biologix-ai:local
+docker run --platform linux/amd64 -it --rm --init biologix-ai:local
 ```
 
 ## Debug shell
@@ -141,18 +142,22 @@ When a tagged release is published:
 ```bash
 # macOS / Linux
 docker pull ghcr.io/otunmartins/biologix-ai:latest
-docker run -it --rm \
+docker run --platform linux/amd64 -it --rm --init \
   -e ANTHROPIC_API_KEY=sk-ant-... \
   -v "$(pwd)/runs:/app/runs" \
+  -v "$(pwd)/papers:/app/papers" \
+  -v biologix-data:/app/data \
   ghcr.io/otunmartins/biologix-ai:latest
 ```
 
 ```powershell
 # Windows PowerShell
 docker pull ghcr.io/otunmartins/biologix-ai:latest
-docker run -it --rm `
+docker run --platform linux/amd64 -it --rm --init `
   -e ANTHROPIC_API_KEY=sk-ant-... `
   -v "${PWD}/runs:/app/runs" `
+  -v "${PWD}/papers:/app/papers" `
+  -v biologix-data:/app/data `
   ghcr.io/otunmartins/biologix-ai:latest
 ```
 
@@ -169,3 +174,6 @@ docker run -it --rm `
 | `mamba: command not found` inside container | `/opt/conda/bin` should be on PATH; rebuild with `--no-cache` |
 | `does not appear to be a Python project: neither 'setup.py' nor 'pyproject.toml' found` during build | The conda-env stage runs before the repo is copied; the Dockerfile strips `-e .` from the env YAML for this reason. Rebuild with the current Dockerfile — the project is installed later by `install_submodules.sh`. |
 | `bad interpreter: ...bash^M: no such file or directory` on startup | Windows CRLF in shell scripts. The bundled `.gitattributes` prevents this on fresh clones. If already affected: `git config core.autocrlf false` then re-checkout, or rebuild the image — the Dockerfile strips CRs automatically. |
+| OpenCode TUI frozen — cannot type or Ctrl+C (common in **Cursor** integrated terminal) | The session may still be running in the background. Open **Terminal.app** or **iTerm** for `docker compose run` / `docker run -it`. Add **`--init`** (Compose sets `init: true`). To stop a stuck container: second shell → `docker ps` → `docker kill <container_id>`. |
+| Precursor DB rebuilds for 30–90+ minutes on every `docker run --rm` | Fixed in images built after the entrypoint path correction (`data/retrosynthesis/precursors.json`). Mount **`biologix-data:/app/data`** (Compose does this) so Molport/AiZynth data persists across `--rm`. |
+| `monomer.png` files are SVG / PIL cannot open them | Headless `psmiles` may write SVG to `.png` paths. Rebuild the image after the `psmiles_drawing` fix, or upgrade to a tagged release that includes it. |

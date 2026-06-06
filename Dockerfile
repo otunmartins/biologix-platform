@@ -10,7 +10,7 @@
 #   docker compose run --rm biologix
 #
 # Run (direct):
-#   docker run -it --rm -e ANTHROPIC_API_KEY=sk-ant-... biologix-ai:local
+#   docker run -it --rm --init -e ANTHROPIC_API_KEY=sk-ant-... biologix-ai:local
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Stage: base OS + conda
@@ -97,6 +97,9 @@ RUN curl -fsSL https://opencode.ai/install | bash \
 
 # Create runtime directories (volume mount points)
 RUN mkdir -p /app/runs /app/papers /app/data/aizynthfinder
+
+# Snapshot baked-in data so entrypoint can seed an empty /app/data volume mount
+RUN if [ -d /app/data ]; then cp -a /app/data /app/.data-seed; fi
 
 # Strip Windows CRLF line-endings that a Windows clone may have introduced,
 # then make the entrypoint executable.

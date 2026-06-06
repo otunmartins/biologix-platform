@@ -12,6 +12,43 @@ from pathlib import Path
 from typing import Any, Dict, Optional, Union
 
 
+def _psmiles_output_is_svg(path: Path) -> bool:
+    head = path.read_bytes()[:256].lstrip()
+    return head.startswith(b"<?xml") or head.startswith(b"<svg") or head.startswith(b"<SVG")
+
+
+def _svg_to_png_via_rdkit(path: Path, ps: Any) -> Optional[str]:
+    """When psmiles writes SVG to a .png path, re-render with RDKit."""
+    try:
+        from rdkit import Chem
+        from rdkit.Chem import Draw
+    except ImportError as e:
+        return f"psmiles wrote SVG; RDKit unavailable for PNG fallback: {e}"
+
+    smi: Optional[str] = None
+    try:
+        if hasattr(ps, "dimer"):
+            smi = str(ps.dimer(0))
+        elif hasattr(ps, "dimerize"):
+            smi = str(ps.dimerize(star_index=0))
+    except Exception as e:
+        return f"psmiles wrote SVG; could not dimerize for PNG fallback: {e}"
+
+    if not smi:
+        return "psmiles wrote SVG; could not derive SMILES for PNG fallback"
+
+    mol = Chem.MolFromSmiles(smi)
+    if mol is None:
+        return f"psmiles wrote SVG; invalid dimer SMILES for PNG fallback: {smi[:120]}"
+
+    try:
+        img = Draw.MolToImage(mol, size=(480, 480))
+        img.save(str(path), format="PNG")
+    except Exception as e:
+        return f"psmiles wrote SVG; RDKit PNG conversion failed: {e}"
+    return None
+
+
 def safe_filename_basename(name: str, max_len: int = 80) -> str:
     """Filesystem-safe slug for PNG filenames."""
     s = re.sub(r"[^\w.\-]+", "_", name.strip(), flags=re.UNICODE)
@@ -64,4 +101,10 @@ def save_psmiles_png(
 
     if not path.is_file():
         return {"ok": False, "error": f"expected PNG not written: {path}"}
+
+    if _psmiles_output_is_svg(path):
+        conv_err = _svg_to_png_via_rdkit(path, ps)
+        if conv_err:
+            return {"ok": False, "error": conv_err}
+
     return {"ok": True, "path": str(path.resolve())}

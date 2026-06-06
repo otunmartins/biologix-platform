@@ -15,6 +15,18 @@ monomer ADMET → excipient compliance → compiled report + audit trail
 
 Session state is persisted to `runs/<session_id>/` via `discovery_world.json`, funnel-context checkpoints, and an append-only JSONL audit trail. If the chat disconnects mid-pipeline, `get_funnel_context` resumes from the last checkpoint.
 
+### OpenMM screening is expensive — skip it for quick iterations
+
+**`openmm_evaluate_psmiles`** runs Packmol matrix packing plus energy minimization (and optional short NPT) per candidate. That is the slowest step in the pipeline: on CPU or emulated `linux/amd64` (Docker on Apple Silicon), **one candidate can take minutes to hours**.
+
+For **fast iteration** — literature mining, PSMILES validation, library screening, ADMET, retrosynthesis, excipient compliance — you can **optionally skip OpenMM** and still move the discovery loop forward:
+
+- In OpenCode, tell the agent explicitly: *skip `openmm_evaluate_psmiles` this iteration* and run validate → `screen_candidate_library` → ADMET / retro / compliance only.
+- Use **`get_candidate_profile`** or **`screen_candidate_library`** on a small batch without calling OpenMM.
+- Re-run OpenMM on a shortlist once candidates look promising.
+
+The default **`biologics-delivery-discovery`** agent includes OpenMM in its fixed Steps 1–6; steering it to omit that step is intentional and supported. See [docs/OPENMM_SCREENING.md](docs/OPENMM_SCREENING.md) when you want full physics-based ranking (and env vars to shorten smoke tests).
+
 ### New MCP tools (May 2026)
 
 | Tool | What it does |
@@ -64,9 +76,9 @@ Pre-built images are published to **GHCR** — no conda, no `./install`, no loca
    - [Docker Desktop](https://www.docker.com/products/docker-desktop/) on Windows or Mac (includes Compose).
    - Linux: Docker Engine + [Compose plugin](https://docs.docker.com/compose/install/linux/).
 2. **Disk space** — ~10–15 GB for the pulled image.
-3. **A terminal** — the container launches the **OpenCode TUI** in your shell (`stdin` + TTY required).
+3. **A terminal** — the container launches the **OpenCode TUI** in your shell (`stdin` + TTY required). Prefer **Terminal.app** or **iTerm** over the Cursor integrated terminal; some IDE terminals do not forward keyboard input to Docker TUIs reliably.
 4. **OpenCode familiarity** — you should already know how to authenticate (`opencode auth login`), pick/switch models, and use the agent UI. This README does not teach OpenCode; see [opencode.ai](https://opencode.ai) docs.
-5. **Network on first run** — the container may build the retrosynthesis precursor database (tiers 1–4, including a large Molport fetch). First startup can take **30–90+ minutes** on Apple Silicon; later runs are faster once data is written inside the container layer.
+5. **Network on first run** — slim images or missing data volumes may build the retrosynthesis precursor database (tiers 1–4). Full GHCR images already include this; Compose persists it in the `biologix-data` volume so later runs start immediately.
 6. **Platform flag on ARM Macs** — the image is `linux/amd64` only. On Apple Silicon (and other ARM hosts) you **must** pass `--platform linux/amd64` on `docker pull` and `docker run` (Docker Desktop runs it under emulation).
 
 No Anthropic (or other) API key is required before you start — configure the LLM inside OpenCode after the TUI opens.
@@ -80,9 +92,10 @@ mkdir -p runs papers
 
 docker pull --platform linux/amd64 ghcr.io/otunmartins/biologix-ai:latest
 
-docker run --platform linux/amd64 -it --rm \
+docker run --platform linux/amd64 -it --rm --init \
   -v "$(pwd)/runs:/app/runs" \
   -v "$(pwd)/papers:/app/papers" \
+  -v biologix-data:/app/data \
   ghcr.io/otunmartins/biologix-ai:latest
 ```
 
@@ -91,9 +104,10 @@ docker run --platform linux/amd64 -it --rm \
 ```powershell
 mkdir runs, papers -Force
 docker pull --platform linux/amd64 ghcr.io/otunmartins/biologix-ai:latest
-docker run --platform linux/amd64 -it --rm `
+docker run --platform linux/amd64 -it --rm --init `
   -v "${PWD}/runs:/app/runs" `
   -v "${PWD}/papers:/app/papers" `
+  -v biologix-data:/app/data `
   ghcr.io/otunmartins/biologix-ai:latest
 ```
 
