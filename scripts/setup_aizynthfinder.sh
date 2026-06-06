@@ -42,7 +42,8 @@ download_file() {
 
   while (( attempt <= max_attempts )); do
     echo "Downloading ${name} (attempt ${attempt}/${max_attempts}) ..."
-    if curl -fL --retry 5 --retry-delay 5 --retry-all-errors \
+    # Do not use --retry-all-errors: curl in condaforge/miniforge3 base is too old for it.
+    if curl -fL --retry 5 --retry-delay 5 \
       --connect-timeout 30 --max-time 7200 \
       -o "$dest" "$url"; then
       return 0
