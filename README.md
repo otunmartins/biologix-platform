@@ -56,20 +56,67 @@ If your shell shows a different env (for example `biologix-ai`), either activate
 
 ## Run with Docker (recommended)
 
-The fastest way to get started — no conda, no path setup, no `./install`. The image runs identically on Windows, macOS, and Linux; Docker handles the OS difference for you.
+Pre-built images are published to **GHCR** — no conda, no `./install`, no local build unless you want one. The image runs on **Windows, macOS, and Linux**; Docker handles the OS difference.
+
+### Prerequisites
+
+1. **Docker installed and running**
+   - [Docker Desktop](https://www.docker.com/products/docker-desktop/) on Windows or Mac (includes Compose).
+   - Linux: Docker Engine + [Compose plugin](https://docs.docker.com/compose/install/linux/).
+2. **Disk space** — ~10–15 GB for the pulled image.
+3. **A terminal** — the container launches the **OpenCode TUI** in your shell (`stdin` + TTY required).
+4. **OpenCode familiarity** — you should already know how to authenticate (`opencode auth login`), pick/switch models, and use the agent UI. This README does not teach OpenCode; see [opencode.ai](https://opencode.ai) docs.
+5. **Network on first run** — the container may build the retrosynthesis precursor database (tiers 1–4, including a large Molport fetch). First startup can take **30–90+ minutes** on Apple Silicon; later runs are faster once data is written inside the container layer.
+6. **Platform flag on ARM Macs** — the image is `linux/amd64` only. On Apple Silicon (and other ARM hosts) you **must** pass `--platform linux/amd64` on `docker pull` and `docker run` (Docker Desktop runs it under emulation).
+
+No Anthropic (or other) API key is required before you start — configure the LLM inside OpenCode after the TUI opens.
+
+### Pull the pre-built image and run
+
+From any directory where you want session folders (or clone this repo and use it as the working directory):
 
 ```bash
-# 1. Put your LLM key in .env
-cp .env.example .env          # then edit .env and fill in ANTHROPIC_API_KEY
+mkdir -p runs papers
 
-# 2. Build the image (first build: ~20-40 min; subsequent builds are cached)
-docker compose build
+docker pull --platform linux/amd64 ghcr.io/otunmartins/biologix-ai:latest
 
-# 3. Launch — OpenCode opens immediately
+docker run --platform linux/amd64 -it --rm \
+  -v "$(pwd)/runs:/app/runs" \
+  -v "$(pwd)/papers:/app/papers" \
+  ghcr.io/otunmartins/biologix-ai:latest
+```
+
+**Windows (PowerShell)** — same flow; use `${PWD}` instead of `$(pwd)`:
+
+```powershell
+mkdir runs, papers -Force
+docker pull --platform linux/amd64 ghcr.io/otunmartins/biologix-ai:latest
+docker run --platform linux/amd64 -it --rm `
+  -v "${PWD}/runs:/app/runs" `
+  -v "${PWD}/papers:/app/papers" `
+  ghcr.io/otunmartins/biologix-ai:latest
+```
+
+Pin a release tag instead of `latest`, e.g. `ghcr.io/otunmartins/biologix-ai:0.3.0`.
+
+**What happens:** the entrypoint activates the conda env, runs first-run data setup if needed, then starts **OpenCode** with the default **`biologics-delivery-discovery`** agent. Discovery outputs land in `./runs/` on your host.
+
+**LLM access:** sign in or attach a provider from inside OpenCode (`opencode auth login`, or your usual model/provider switch). Optional: pass a key at launch with `-e OPENAI_API_KEY=...` / `-e OPENROUTER_API_KEY=...` / `-e ANTHROPIC_API_KEY=...` if you prefer env-based auth.
+
+### Alternative: build locally with Compose
+
+If you are developing the image or GHCR is unreachable:
+
+```bash
+git clone https://github.com/otunmartins/biologix-platform.git
+cd biologix-platform
+docker compose build    # first build: ~20–40 min
 docker compose run --rm biologix
 ```
 
-Session outputs are saved to `./runs/` on your host. See [docs/DOCKER.md](docs/DOCKER.md) for credentials, slim builds, Apple Silicon, and troubleshooting.
+On Apple Silicon, Compose already targets `linux/amd64`; you may still see a platform warning — that is expected.
+
+More detail: [docs/DOCKER.md](docs/DOCKER.md) (credentials, slim builds, troubleshooting, maintainer publish notes).
 
 ---
 
