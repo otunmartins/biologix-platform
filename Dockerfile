@@ -83,10 +83,11 @@ ENV BASH_ENV=/opt/conda/etc/profile.d/conda.sh
 RUN source /opt/conda/etc/profile.d/conda.sh && conda activate biologix-ai-sim \
     && bash scripts/install_submodules.sh
 
-# Download AiZynth models and build precursor DB (skipped when SLIM=1)
+# Download AiZynth models (skipped when SLIM=1); then refresh precursor tier 4 (ZINC stock).
 RUN if [ "$SLIM" = "0" ]; then \
       source /opt/conda/etc/profile.d/conda.sh && conda activate biologix-ai-sim \
-      && bash scripts/setup_aizynthfinder.sh; \
+      && bash scripts/setup_aizynthfinder.sh \
+      && python scripts/build_precursor_db.py --tiers 4; \
     else \
       echo "SLIM build: skipping AiZynthFinder model download"; \
     fi
