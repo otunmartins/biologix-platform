@@ -111,7 +111,12 @@ If `plan_retrosynthesis` returns no routes after the retry loop: stop and report
 ### Step 6 — Report
 
 - `assemble_retrosynthesis_report(run_dir, targets=<comma-separated pass PSMILES>)`
-- Write `SUMMARY_REPORT.md` in the session (research paper format; paste retrosynthesis tables verbatim)
+- `write_discovery_summary_report(run_dir=<session>, title="Discovery Campaign: <biologic>", include_all_iterations=true)`
+  This MCP tool builds the full SUMMARY_REPORT.md skeleton (tables, PNGs, candidate blocks) from
+  saved session data. Do **not** use the native `write` or `edit` tool to write this file — it
+  causes slow LLM generation at high context and unnecessary file edits.
+  After the tool returns, you may append a brief (≤3 sentence) narrative conclusion using `edit`
+  if the skeleton needs interpretation text — but do not rewrite the whole file.
 - `compile_discovery_markdown_to_pdf(run_dir=<session>)`
 - `save_funnel_context(stage="post_iteration_<N>", checkpoint_data=<JSON summary of top candidates, OpenMM scores, retro disposition>, run_dir=<session>)`
 
