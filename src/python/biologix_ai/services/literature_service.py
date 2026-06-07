@@ -191,11 +191,25 @@ def arxiv_search(query: str, max_results: int = 20) -> Dict[str, Any]:
 
 
 def web_search_results(query: str, max_results: int = 5) -> List[Dict[str, Any]]:
-    """DuckDuckGo web search results."""
+    """DuckDuckGo web search results.
+
+    A hard 20-second deadline prevents DDGS from stalling when DuckDuckGo
+    rate-limits or the connection hangs mid-stream.
+    """
+    import concurrent.futures
+
     try:
         from duckduckgo_search import DDGS
+    except ImportError:
+        return []
 
-        return list(DDGS().text(query, max_results=min(max_results, 10)))
+    def _fetch() -> List[Dict[str, Any]]:
+        return list(DDGS(timeout=10).text(query, max_results=min(max_results, 10)))
+
+    try:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as ex:
+            future = ex.submit(_fetch)
+            return future.result(timeout=20.0)
     except Exception:
         return []
 

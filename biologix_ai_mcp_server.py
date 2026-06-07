@@ -1444,12 +1444,26 @@ def arxiv_search(query: str, max_results: int = 20) -> str:
         return f"Error: {e}"
 
 
-def _ddg_text_results(query: str, max_results: int = 5) -> list:
-    """Return raw DuckDuckGo text results, or empty list on failure."""
+def _ddg_text_results(query: str, max_results: int = 5, timeout: float = 20.0) -> list:
+    """Return raw DuckDuckGo text results, or empty list on failure.
+
+    A hard per-call timeout (default 20 s) prevents DDGS from silently stalling
+    when DuckDuckGo rate-limits or the connection hangs mid-stream.
+    """
+    import concurrent.futures
+
     try:
         from duckduckgo_search import DDGS
+    except ImportError:
+        return []
 
-        return list(DDGS().text(query, max_results=min(max_results, 10)))
+    def _fetch() -> list:
+        return list(DDGS(timeout=10).text(query, max_results=min(max_results, 10)))
+
+    try:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as ex:
+            future = ex.submit(_fetch)
+            return future.result(timeout=timeout)
     except Exception:
         return []
 
