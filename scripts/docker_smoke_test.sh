@@ -1,10 +1,38 @@
 #!/usr/bin/env bash
 # Lightweight in-container smoke test — run before publishing Docker images.
+# No LLM/API keys required. Invoked with --entrypoint bash (not via OpenCode).
 set -euo pipefail
 
 source /opt/conda/etc/profile.d/conda.sh
 conda activate biologix-ai-sim
 cd /app
+export MPLBACKEND=Agg
+
+echo "=== Smoke: MCP server import ==="
+python - <<'PY'
+import importlib.util
+import sys
+from pathlib import Path
+
+spec = importlib.util.spec_from_file_location(
+    "biologix_ai_mcp_server",
+    Path("/app/biologix_ai_mcp_server.py"),
+)
+mod = importlib.util.module_from_spec(spec)
+sys.modules["biologix_ai_mcp_server"] = mod
+try:
+    from mcp.server.fastmcp import FastMCP
+    _orig = FastMCP.run
+    FastMCP.run = lambda self, *a, **kw: None
+    spec.loader.exec_module(mod)
+    FastMCP.run = _orig
+except Exception:
+    spec.loader.exec_module(mod)
+
+for name in ("get_retrosynthesis_templates", "get_personas", "plan_retrosynthesis"):
+    assert hasattr(mod, name), f"missing MCP tool: {name}"
+print("MCP server import OK")
+PY
 
 echo "=== Smoke: baked-in data ==="
 if [[ ! -f /app/data/retrosynthesis/precursors.json ]]; then
@@ -45,8 +73,8 @@ assert (sess / "SUMMARY_REPORT.pdf").is_file()
 print("PDF OK:", r.get("pdf_render_mode"), r.get("warnings"))
 PY
 
-echo "=== Smoke: OpenMM matrix (tiny settings) ==="
-export BIOLOGIX_AI_OPENMM_CANDIDATE_TIMEOUT_S="${BIOLOGIX_AI_OPENMM_CANDIDATE_TIMEOUT_S:-180}"
+echo "=== Smoke: OpenMM matrix (tiny settings, hard cap 5 min) ==="
+export BIOLOGIX_AI_OPENMM_CANDIDATE_TIMEOUT_S="${BIOLOGIX_AI_OPENMM_CANDIDATE_TIMEOUT_S:-120}"
 export BIOLOGIX_AI_OPENMM_MATRIX_FIXED_MODE=1
 export BIOLOGIX_AI_OPENMM_MATRIX_N_POLYMERS=2
 export BIOLOGIX_AI_OPENMM_N_REPEATS=1
@@ -54,7 +82,8 @@ export BIOLOGIX_AI_OPENMM_MAX_MINIMIZE_STEPS=50
 export BIOLOGIX_AI_EVAL_NO_STRUCTURE_ARTIFACTS=1
 export BIOLOGIX_AI_OPENMM_MATRIX_NPT=0
 
-python - <<'PY'
+if command -v timeout >/dev/null 2>&1; then
+  timeout 300 python - <<'PY'
 import json
 from biologix_ai.simulation.openmm_compat import openmm_available
 
@@ -76,5 +105,8 @@ status = progress[0].get("status") if progress else None
 if status not in ("completed", "failed", "rejected", "skipped"):
     raise SystemExit(f"unexpected OpenMM smoke status: {status}")
 PY
+else
+  echo "WARN: timeout(1) unavailable; skipping OpenMM smoke"
+fi
 
 echo "=== Docker smoke test passed ==="

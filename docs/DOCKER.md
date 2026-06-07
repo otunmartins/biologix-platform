@@ -165,8 +165,8 @@ docker run --platform linux/amd64 -it --rm --init `
 
 | Symptom | Fix |
 |---------|-----|
-| `No LLM provider key found` banner on start | Fill in `ANTHROPIC_API_KEY` (or another key) in `.env` |
-| OpenCode exits immediately | Run with `OPENCODE_DISABLE=1` and check the error; likely a missing key |
+| OpenCode asks for a provider / LLM errors inside a session | Run `opencode auth login` inside the container, or set a key in `.env` if you use one — **not required at container start** |
+| OpenCode exits immediately | Run with `OPENCODE_DISABLE=1` and check logs; MCP tools work without any cloud API key |
 | `opencode: command not found` | Rebuild the image (`docker compose build --no-cache`) |
 | AiZynth model download fails | Network issue during first run; retry or set `SLIM=0` and rebuild |
 | `Error response from daemon: no space left` | Docker has run out of disk space; run `docker system prune` |
@@ -195,7 +195,7 @@ The entrypoint sets conservative interactive defaults (override with `docker run
 
 ```bash
 docker compose build
-docker run --rm biologix-ai:local bash /app/scripts/docker_smoke_test.sh
+docker run --rm --entrypoint bash biologix-ai:local /app/scripts/docker_smoke_test.sh
 ```
 
-CI runs the same script before pushing to GHCR.
+CI runs the same script (no API keys; 15-minute job timeout) before pushing to GHCR.

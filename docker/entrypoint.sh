@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # Biologix AI container entrypoint.
 # - Activates biologix-ai-sim conda env.
-# - Warns if no LLM provider key is set (still opens OpenCode — user can auth inside).
-# - Handles SLIM-mode first-run data initialisation.
-# - Execs opencode . (or bash if OPENCODE_DISABLE=1 for debugging).
+# - Custom command (e.g. CI smoke test): exec "$@" — no OpenCode, no API keys.
+# - Default: SLIM/first-run data init, then opencode . (MCP; auth via opencode auth login).
+# - OPENCODE_DISABLE=1 drops to bash for debugging.
 
 set -euo pipefail
 
@@ -18,24 +18,10 @@ export BIOLOGIX_AI_OPENMM_CANDIDATE_TIMEOUT_S="${BIOLOGIX_AI_OPENMM_CANDIDATE_TI
 export BIOLOGIX_AI_OPENMM_MAX_MINIMIZE_STEPS="${BIOLOGIX_AI_OPENMM_MAX_MINIMIZE_STEPS:-1500}"
 export BIOLOGIX_AI_EVAL_MAX_WORKERS="${BIOLOGIX_AI_EVAL_MAX_WORKERS:-1}"
 
-# ── LLM key check ────────────────────────────────────────────────────────────
-HAS_KEY=false
-for var in ANTHROPIC_API_KEY OPENAI_API_KEY OPENROUTER_API_KEY; do
-  if [[ -n "${!var:-}" ]]; then
-    HAS_KEY=true
-    break
-  fi
-done
-
-if [[ "$HAS_KEY" == "false" ]]; then
-  echo ""
-  echo "╔════════════════════════════════════════════════════════════════════╗"
-  echo "║  No LLM provider key found.                                       ║"
-  echo "║  Set one in your .env file (see .env.example) or pass it with:   ║"
-  echo "║    docker run -e ANTHROPIC_API_KEY=sk-ant-...                     ║"
-  echo "║  You can also run  opencode auth login  inside this session.      ║"
-  echo "╚════════════════════════════════════════════════════════════════════╝"
-  echo ""
+# Non-interactive / CI / custom command: run the requested command, not OpenCode.
+if [[ $# -gt 0 ]]; then
+  cd /app
+  exec "$@"
 fi
 
 # ── Data: seed from image when /app/data is an empty volume mount ─────────────
@@ -76,6 +62,7 @@ if [[ "${OPENCODE_DISABLE:-0}" == "1" ]]; then
   exec bash
 fi
 
-# ── Launch OpenCode with the biologics-delivery-discovery agent ───────────────
+# ── Launch OpenCode (MCP tools; no API keys required at container start) ───────
+# Configure a provider inside the session when needed: opencode auth login
 cd /app
 exec opencode .

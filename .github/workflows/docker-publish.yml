@@ -86,8 +86,10 @@ jobs:
           cache-to: type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:buildcache,mode=max
 
       - name: Docker smoke test
+        timeout-minutes: 15
         run: |
-          docker run --rm biologix-ai:smoke bash /app/scripts/docker_smoke_test.sh
+          # Bypass OpenCode entrypoint; smoke must not require any LLM API keys.
+          docker run --rm --entrypoint bash biologix-ai:smoke /app/scripts/docker_smoke_test.sh
 
       - name: Tag and push to GHCR
         if: github.event_name == 'push' || inputs.push == 'true'
