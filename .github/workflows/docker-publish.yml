@@ -70,17 +70,30 @@ jobs:
             echo "value=0" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Build (and push) Docker image
+      - name: Build Docker image (load locally for smoke test)
         uses: docker/build-push-action@v6
         with:
           context: .
           file: Dockerfile
           platforms: linux/amd64
-          push: ${{ github.event_name == 'push' || inputs.push == 'true' }}
-          tags: ${{ steps.meta.outputs.tags }}
+          push: false
+          load: true
+          tags: biologix-ai:smoke
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |
             SLIM=${{ steps.slim.outputs.value }}
-          # Cache layers in GHCR to speed up re-builds
           cache-from: type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:buildcache
           cache-to: type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:buildcache,mode=max
+
+      - name: Docker smoke test
+        run: |
+          docker run --rm biologix-ai:smoke bash /app/scripts/docker_smoke_test.sh
+
+      - name: Tag and push to GHCR
+        if: github.event_name == 'push' || inputs.push == 'true'
+        run: |
+          while IFS= read -r tag; do
+            [[ -z "$tag" ]] && continue
+            docker tag biologix-ai:smoke "${tag}"
+            docker push "${tag}"
+          done <<< "${{ steps.meta.outputs.tags }}"

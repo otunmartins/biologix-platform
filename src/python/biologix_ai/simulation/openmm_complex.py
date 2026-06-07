@@ -10,6 +10,8 @@ from __future__ import annotations
 
 import math
 import logging
+import os
+import sys
 import tempfile
 import time
 from pathlib import Path
@@ -18,6 +20,18 @@ from typing import Any, Dict, List, Optional, Tuple
 import numpy as np
 
 logger = logging.getLogger(__name__)
+
+
+def _stage_heartbeat(stage: str, msg: str) -> None:
+    """Emit stage progress to stderr unless the user opted out via BIOLOGIX_AI_EVAL_QUIET."""
+    if os.environ.get("BIOLOGIX_AI_EVAL_QUIET", "").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+    ):
+        return
+    print(f"[biologix-ai] stage={stage} {msg}", file=sys.stderr, flush=True)
+
 
 # OpenMM
 import openmm
@@ -566,6 +580,7 @@ def run_openmm_matrix_relax_and_energy(
         if packing_mode == "bulk":
             shell_only_angstrom = None
 
+        _stage_heartbeat("oligomer_build", f"building oligomer for {psmiles[:48]}")
         capped, actual_repeats = build_polymer_oligomer_smiles(psmiles, n_repeats)
         if not capped:
             return _fail("build_polymer_oligomer_smiles returned empty (bad PSMILES or n_repeats)", "oligomer_build")
@@ -595,6 +610,7 @@ def run_openmm_matrix_relax_and_energy(
             shell_only_angstrom=shell_only_angstrom,
             packing_mode=packing_mode,
         )
+        _stage_heartbeat("packmol", f"packing insulin + {n_polymers} polymer chain(s)")
         if progressive_pack:
             _log(
                 f"[matrix] Progressive pack: start={n_polymers}, "
@@ -658,6 +674,7 @@ def run_openmm_matrix_relax_and_energy(
         )
         box_vec_omm = [unit.Quantity(v, unit.nanometers) for v in box_vectors]
 
+        _stage_heartbeat("openmm_system_build", "creating combined protein+polymer OpenMM system")
         lig_top, lig_sys = create_ligand_system(lig_mol, box_vectors=None)
         combined_top = _merge_topology_protein_n_ligands(protein_top, lig_top, n_polymers)
         combined_top.setPeriodicBoxVectors(box_vec_omm)
@@ -718,6 +735,7 @@ def run_openmm_matrix_relax_and_energy(
         ctx = openmm.Context(combined_sys, integ, platform)
         ctx.setPeriodicBoxVectors(box_vec_omm[0], box_vec_omm[1], box_vec_omm[2])
         ctx.setPositions(combined_pos)
+        _stage_heartbeat("minimize", f"LocalEnergyMinimizer maxIterations={max_minimize_steps}")
         _log("[matrix] Minimizing ...")
         openmm.LocalEnergyMinimizer.minimize(ctx, maxIterations=max_minimize_steps)
         state = ctx.getState(getEnergy=True, getPositions=True)
@@ -761,6 +779,7 @@ def run_openmm_matrix_relax_and_energy(
         e_int_std: Optional[float] = None
         n_frames_averaged: Optional[int] = None
 
+        _stage_heartbeat("energy_eval", "computing interaction energy")
         if run_npt:
             # Build NPT system (no shell restraint); barostat every 10 fs
             combined_sys_npt = protein_ff.createSystem(

@@ -42,6 +42,7 @@ from biologix_ai.discovery_world import (
     touch_meta_after_iteration,
     world_path_for_session,
 )
+from biologix_ai.mcp_tool_guard import run_guarded_tool
 
 
 def _normalize_psmiles_list_for_eval(psmiles_list: Union[str, List[Any], None]) -> List[str]:
@@ -507,34 +508,40 @@ def openmm_evaluate_psmiles(
     system in RAM — start conservatively. Parallel runs may differ slightly from sequential
     unless per-candidate seeds are fixed (they are: seed = base + candidate index).
     """
-    try:
+    session = _optional_session_dir(run_dir) or session_dir_from_env(Path(ROOT))
+
+    def _run() -> Dict[str, Any]:
         parts = _normalize_psmiles_list_for_eval(psmiles_list)
         if not parts:
-            return json.dumps(
-                {
-                    "error": "psmiles_list is empty or was not provided",
-                    "hint": (
-                        "You must pass psmiles_list as a comma-separated string or JSON array, e.g. "
-                        "psmiles_list=\"[*]OCC[*],[*]CC(O)[*]\". "
-                        "Build this list from the 'psmiles' field of screen_candidate_library results "
-                        "where library_disposition='pass'. "
-                        "Do NOT retry with only max_workers or response_format — psmiles_list is required."
-                    ),
-                    "received_type": type(psmiles_list).__name__,
-                    "received_value": repr(psmiles_list)[:120],
-                },
-                indent=2,
-            )
+            return {
+                "ok": False,
+                "error": "psmiles_list is empty or was not provided",
+                "hint": (
+                    "You must pass psmiles_list as a comma-separated string or JSON array, e.g. "
+                    "psmiles_list=\"[*]OCC[*],[*]CC(O)[*]\". "
+                    "Build this list from the 'psmiles' field of screen_candidate_library results "
+                    "where library_disposition='pass'. "
+                    "Do NOT retry with only max_workers or response_format — psmiles_list is required."
+                ),
+                "received_type": type(psmiles_list).__name__,
+                "received_value": repr(psmiles_list)[:120],
+            }
         from biologix_ai.simulation.openmm_compat import openmm_available
 
         if not openmm_available():
-            return _abort_install_json(
-                "OpenMM screening stack incomplete (openmm, openmmforcefields, openff.toolkit, "
-                "and AmberTools antechamber/parmchk2 on PATH). Run ./install."
-            )
+            return {
+                "ok": False,
+                "error": (
+                    "OpenMM screening stack incomplete (openmm, openmmforcefields, openff.toolkit, "
+                    "and AmberTools antechamber/parmchk2 on PATH). Run ./install."
+                ),
+            }
         from biologix_ai.simulation import MDSimulator
 
-        candidates = [{"material_name": f"Candidate_{i}", "chemical_structure": p} for i, p in enumerate(parts)]
+        candidates = [
+            {"material_name": f"Candidate_{i}", "chemical_structure": p}
+            for i, p in enumerate(parts)
+        ]
         sim = MDSimulator(n_steps=5000)
         ad = (artifacts_dir or "").strip()
         if not ad and (run_dir or "").strip():
@@ -555,13 +562,6 @@ def openmm_evaluate_psmiles(
         except Exception:
             _score = None
 
-        # ------------------------------------------------------------------ #
-        # candidate_outcomes — always present, regardless of verbose / mode. #
-        # Compact per-candidate summary with verbatim failure reason so the  #
-        # agent can log all failure types (prescreen chemistry errors,        #
-        # Packmol timeouts, wall-clock limits, OpenMM exceptions, etc.) in   #
-        # save_discovery_state for cross-iteration diagnostics.              #
-        # ------------------------------------------------------------------ #
         candidate_outcomes = []
         for ep in result.get("evaluation_progress") or []:
             status = ep.get("status", "unknown")
@@ -579,7 +579,8 @@ def openmm_evaluate_psmiles(
                     oc["reason"] = ep["reason"]
             candidate_outcomes.append(oc)
 
-        out = {
+        out: Dict[str, Any] = {
+            "ok": True,
             "high_performers": result["high_performers"],
             "effective_mechanisms": result["effective_mechanisms"],
             "problematic_features": result["problematic_features"],
@@ -614,9 +615,19 @@ def openmm_evaluate_psmiles(
                 )
             if paths:
                 out["structure_artifact_paths"] = paths
-        return json.dumps(out, indent=2)
-    except Exception as e:
-        return json.dumps({"error": str(e), "ok": False}, indent=2)
+        return out
+
+    payload = run_guarded_tool(
+        "openmm_evaluate_psmiles",
+        session,
+        _run,
+        stage="openmm_matrix_eval",
+        failure_hint=(
+            "OpenMM batch may still be running; check tool_events.jsonl and stderr heartbeats. "
+            "For faster turns set BIOLOGIX_AI_OPENMM_CANDIDATE_TIMEOUT_S or smaller batches."
+        ),
+    )
+    return json.dumps(payload, indent=2, default=str)
 
 
 @mcp.tool()
@@ -1558,13 +1569,23 @@ def render_psmiles_png(
 
     session = _session_dir_for_mcp(run_dir)
     session.mkdir(parents=True, exist_ok=True)
-    struct = session / "structures"
-    struct.mkdir(parents=True, exist_ok=True)
-    base = (output_basename or "").strip() or safe_filename_basename(psmiles[:80])
-    out = struct / f"{base}.png"
-    r = save_psmiles_png(psmiles.strip(), out, overwrite=True)
-    payload = {**r, "session_dir": str(session), "relative": f"structures/{out.name}"}
-    return json.dumps(payload, indent=2)
+
+    def _run() -> Dict[str, Any]:
+        struct = session / "structures"
+        struct.mkdir(parents=True, exist_ok=True)
+        base = (output_basename or "").strip() or safe_filename_basename(psmiles[:80])
+        out = struct / f"{base}.png"
+        r = save_psmiles_png(psmiles.strip(), out, overwrite=True)
+        return {**r, "session_dir": str(session), "relative": f"structures/{out.name}"}
+
+    payload = run_guarded_tool(
+        "render_psmiles_png",
+        session,
+        _run,
+        stage="psmiles_png",
+        artifact_key="path",
+    )
+    return json.dumps(payload, indent=2, default=str)
 
 
 @mcp.tool()
@@ -1586,12 +1607,28 @@ def compile_discovery_markdown_to_pdf(
     session = _session_dir_for_mcp(run_dir)
     from biologix_ai.discovery_report import compile_markdown_to_pdf
 
-    r = compile_markdown_to_pdf(
+    md_name = markdown_path.strip() or "SUMMARY_REPORT.md"
+    pdf_name = output_pdf_name.strip() or "SUMMARY_REPORT.pdf"
+
+    def _run() -> Dict[str, Any]:
+        return compile_markdown_to_pdf(
+            session,
+            markdown_filename=md_name,
+            output_pdf_name=pdf_name,
+        )
+
+    payload = run_guarded_tool(
+        "compile_discovery_markdown_to_pdf",
         session,
-        markdown_filename=markdown_path.strip() or "SUMMARY_REPORT.md",
-        output_pdf_name=output_pdf_name.strip() or "SUMMARY_REPORT.pdf",
+        _run,
+        stage="pdf_compile",
+        artifact_key="pdf",
+        failure_hint=(
+            "PDF compile failed; SUMMARY_REPORT.md may contain tables fpdf2 cannot render. "
+            "Check tool_errors.log — a plain-text table fallback is attempted automatically."
+        ),
     )
-    return json.dumps(r, indent=2, default=str)
+    return json.dumps(payload, indent=2, default=str)
 
 
 @mcp.tool()
@@ -1614,12 +1651,21 @@ def write_discovery_summary_report(
     session = _session_dir_for_mcp(run_dir)
     from biologix_ai.discovery_report import write_session_summary_reports
 
-    r = write_session_summary_reports(
+    def _run() -> Dict[str, Any]:
+        return write_session_summary_reports(
+            session,
+            title=title,
+            include_all_iterations=include_all_iterations,
+        )
+
+    payload = run_guarded_tool(
+        "write_discovery_summary_report",
         session,
-        title=title,
-        include_all_iterations=include_all_iterations,
+        _run,
+        stage="summary_report",
+        artifact_key="markdown",
     )
-    return json.dumps(r, indent=2, default=str)
+    return json.dumps(payload, indent=2, default=str)
 
 
 # ---------------------------------------------------------------------------

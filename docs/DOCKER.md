@@ -178,3 +178,24 @@ docker run --platform linux/amd64 -it --rm --init `
 | Precursor DB rebuilds for 30–90+ minutes on every `docker run --rm` | Fixed in images built after the entrypoint path correction (`data/retrosynthesis/precursors.json`). Mount **`biologix-data:/app/data`** (Compose does this) so Molport/AiZynth data persists across `--rm`. |
 | `monomer.png` files are SVG / PIL cannot open them | Headless `psmiles` may write SVG to `.png` paths. Rebuild the image after the `psmiles_drawing` fix, or upgrade to a tagged release that includes it. |
 | `setup_aizynthfinder.sh` failed during `docker build` / GitHub Actions | Usually a transient Zenodo/Figshare download error. Re-run the workflow (re-push the tag or use **Actions → Build and publish Docker image → Run workflow** with push enabled). Builds after the curl-based downloader fix are more resilient. |
+| OpenCode looks stuck on a tool (OpenMM, PDF, PNG) | The tool may still be running. In a second shell: `docker ps`, `docker logs --tail 50 <container>`, or `docker exec <container> tail -f /app/runs/<session>/tool_events.jsonl`. Expensive tools log **`started` / `completed` / `failed`** there and in MCP stderr. |
+| PDF compile failed on Markdown tables | Upgrade to an image with the `plain_tables_fallback` PDF path, or check `tool_errors.log` in the session folder. `SUMMARY_REPORT.md` is still valid even if PDF fails. |
+
+## Docker safety defaults
+
+The entrypoint sets conservative interactive defaults (override with `docker run -e …`):
+
+| Variable | Docker default | Purpose |
+|----------|----------------|---------|
+| `BIOLOGIX_AI_OPENMM_CANDIDATE_TIMEOUT_S` | `900` | Per-candidate OpenMM wall-clock limit |
+| `BIOLOGIX_AI_OPENMM_MAX_MINIMIZE_STEPS` | `1500` | Shorter minimization for faster turns |
+| `BIOLOGIX_AI_EVAL_MAX_WORKERS` | `1` | Sequential eval (safer under emulation) |
+
+## Smoke test (before publish or after local build)
+
+```bash
+docker compose build
+docker run --rm biologix-ai:local bash /app/scripts/docker_smoke_test.sh
+```
+
+CI runs the same script before pushing to GHCR.

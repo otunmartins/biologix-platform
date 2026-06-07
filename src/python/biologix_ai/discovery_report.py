@@ -384,6 +384,40 @@ def _html_normalize_local_images_for_fpdf(html: str, cache_dir: Path) -> str:
     return html
 
 
+def _markdown_without_tables(text: str) -> str:
+    """
+    Convert Markdown table blocks into preformatted text.
+
+    ``fpdf2.write_html`` rejects some table HTML generated from GitHub-style
+    Markdown tables, especially nested tags inside ``<td>``. A plain-text
+    fallback keeps the report content and avoids a hard PDF failure.
+    """
+    out: List[str] = []
+    lines = text.splitlines()
+    i = 0
+    sep_re = re.compile(r"^\s*\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)+\|?\s*$")
+
+    while i < len(lines):
+        if (
+            i + 1 < len(lines)
+            and "|" in lines[i]
+            and sep_re.match(lines[i + 1] or "")
+        ):
+            block: List[str] = [lines[i], lines[i + 1]]
+            i += 2
+            while i < len(lines) and "|" in lines[i] and lines[i].strip():
+                block.append(lines[i])
+                i += 1
+            out.append("```text")
+            out.extend(block)
+            out.append("```")
+            continue
+        out.append(lines[i])
+        i += 1
+
+    return "\n".join(out) + ("\n" if text.endswith("\n") else "")
+
+
 def compile_markdown_to_pdf(
     session_dir: Path,
     *,
@@ -437,27 +471,57 @@ def compile_markdown_to_pdf(
         }
 
     pdf_path = session_dir / output_pdf_name
+    pdf_render_mode = "html"
+    warnings: List[str] = []
     pdf = FPDF()
     pdf.set_auto_page_break(auto=True, margin=15)
     pdf.add_page()
     try:
         pdf.write_html(html)
     except Exception as e:
-        return {
-            "ok": False,
-            "error": f"fpdf2 write_html failed (try simpler Markdown or smaller images): {e}",
-            "session_dir": str(session_dir),
-            "markdown": str(md_path),
-        }
+        fallback_text = _markdown_without_tables(text)
+        try:
+            fallback_html = md_lib.markdown(
+                fallback_text,
+                extensions=["fenced_code", "nl2br"],
+            )
+            fallback_html = f"<div>{fallback_html}</div>"
+            fallback_html = _html_resolve_image_src(fallback_html, session_dir)
+            fallback_html = _html_normalize_local_images_for_fpdf(
+                fallback_html, cache_dir
+            )
+            pdf = FPDF()
+            pdf.set_auto_page_break(auto=True, margin=15)
+            pdf.add_page()
+            pdf.write_html(fallback_html)
+            pdf_render_mode = "plain_tables_fallback"
+            warnings.append(
+                "Markdown tables were converted to plain text for PDF rendering "
+                f"(fpdf2 rejected HTML tables: {e})"
+            )
+        except Exception as fallback_e:
+            return {
+                "ok": False,
+                "error": (
+                    "fpdf2 write_html failed (try simpler Markdown or smaller images): "
+                    f"{e}; fallback without tables also failed: {fallback_e}"
+                ),
+                "session_dir": str(session_dir),
+                "markdown": str(md_path),
+            }
 
     try:
         pdf.output(str(pdf_path))
     except Exception as e:
         return {"ok": False, "error": str(e), "session_dir": str(session_dir)}
 
-    return {
+    out: Dict[str, Any] = {
         "ok": True,
         "pdf": str(pdf_path.resolve()),
         "markdown": str(md_path.resolve()),
         "session_dir": str(session_dir),
+        "pdf_render_mode": pdf_render_mode,
     }
+    if warnings:
+        out["warnings"] = warnings
+    return out

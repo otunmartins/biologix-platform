@@ -13,6 +13,11 @@ conda activate biologix-ai-sim
 # Headless matplotlib + RDKit drawing (psmiles savefig may otherwise write SVG to .png paths)
 export MPLBACKEND=Agg
 
+# Interactive safety profile for Docker/OpenCode sessions (override with docker run -e …)
+export BIOLOGIX_AI_OPENMM_CANDIDATE_TIMEOUT_S="${BIOLOGIX_AI_OPENMM_CANDIDATE_TIMEOUT_S:-900}"
+export BIOLOGIX_AI_OPENMM_MAX_MINIMIZE_STEPS="${BIOLOGIX_AI_OPENMM_MAX_MINIMIZE_STEPS:-1500}"
+export BIOLOGIX_AI_EVAL_MAX_WORKERS="${BIOLOGIX_AI_EVAL_MAX_WORKERS:-1}"
+
 # ── LLM key check ────────────────────────────────────────────────────────────
 HAS_KEY=false
 for var in ANTHROPIC_API_KEY OPENAI_API_KEY OPENROUTER_API_KEY; do

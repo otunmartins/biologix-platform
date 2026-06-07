@@ -4,7 +4,7 @@
 import os
 import sys
 import time
-from concurrent.futures import ProcessPoolExecutor, as_completed
+from concurrent.futures import ProcessPoolExecutor, TimeoutError as FuturesTimeoutError, as_completed
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -152,6 +152,53 @@ def resolve_eval_structure_artifacts_dir(artifacts_dir: Optional[str] = None) ->
     return None
 
 
+def _candidate_timeout_s() -> Optional[float]:
+    """
+    Per-candidate wall-clock budget for OpenMM matrix evaluation.
+
+    ``BIOLOGIX_AI_OPENMM_CANDIDATE_TIMEOUT_S`` (default 900). Set ``0`` to disable.
+    """
+    raw = os.environ.get("BIOLOGIX_AI_OPENMM_CANDIDATE_TIMEOUT_S", "900").strip()
+    if not raw:
+        return 900.0
+    val = float(raw)
+    if val <= 0:
+        return None
+    return val
+
+
+def _run_matrix_eval_with_timeout(
+    psmiles: str,
+    matrix_kw: Dict[str, Any],
+    timeout_s: Optional[float],
+) -> Dict[str, Any]:
+    """Run matrix evaluation in a subprocess so wall-clock limits can be enforced."""
+    from .openmm_complex import run_openmm_matrix_relax_and_energy
+
+    if timeout_s is None:
+        res = run_openmm_matrix_relax_and_energy(psmiles, **matrix_kw)
+        if res is None:
+            return {"ok": False, "error": "unknown failure", "stage": "openmm"}
+        return res
+
+    with ProcessPoolExecutor(max_workers=1) as executor:
+        future = executor.submit(run_openmm_matrix_relax_and_energy, psmiles, **matrix_kw)
+        try:
+            res = future.result(timeout=timeout_s)
+        except FuturesTimeoutError:
+            return {
+                "ok": False,
+                "error": (
+                    f"candidate exceeded BIOLOGIX_AI_OPENMM_CANDIDATE_TIMEOUT_S={timeout_s}s"
+                ),
+                "stage": "timeout",
+                "psmiles": psmiles,
+            }
+    if res is None:
+        return {"ok": False, "error": "unknown failure", "stage": "openmm"}
+    return res
+
+
 def _env_max_workers() -> int:
     """
     Read ``BIOLOGIX_AI_EVAL_MAX_WORKERS`` from the environment.
@@ -226,7 +273,7 @@ def _evaluate_one_matrix_candidate(
     t0 = time.perf_counter()
 
     try:
-        res = run_openmm_matrix_relax_and_energy(psmiles, **kw)
+        res = _run_matrix_eval_with_timeout(psmiles, kw, _candidate_timeout_s())
     except Exception as exc:
         res = {"ok": False, "error": str(exc), "stage": "openmm", "psmiles": psmiles}
 
@@ -384,7 +431,6 @@ class MDSimulator:
         from biologix_ai.material_mappings import prescreen_psmiles_for_md
         from biologix_ai.psmiles_drawing import safe_filename_basename, save_psmiles_png
 
-        from .openmm_complex import run_openmm_matrix_relax_and_energy
         from .packmol_packer import _packmol_available
         from .pdb_preview import write_complex_preview_png
         from .pymol_complex_viz import write_complex_viz_png_auto
@@ -425,6 +471,7 @@ class MDSimulator:
             restrain_shell = _env_bool("BIOLOGIX_AI_OPENMM_MATRIX_RESTRAIN_SHELL", True)
         barostat_fs = _env_float("BIOLOGIX_AI_OPENMM_MATRIX_BAROSTAT_INTERVAL_FS", "", "10.0")
         n_total = len(to_eval)
+        candidate_timeout_s = _candidate_timeout_s()
 
         # Resolve parallelism: explicit argument > env > 1.
         effective_workers: int
@@ -553,7 +600,9 @@ class MDSimulator:
                 matrix_kw["save_minimized_pdb"] = pdb_out
 
                 try:
-                    res = run_openmm_matrix_relax_and_energy(psmiles, **matrix_kw)
+                    res = _run_matrix_eval_with_timeout(
+                        psmiles, matrix_kw, candidate_timeout_s
+                    )
                 except Exception as exc:
                     res = {"ok": False, "error": str(exc), "stage": "openmm", "psmiles": psmiles}
 
@@ -604,6 +653,10 @@ class MDSimulator:
                     except Exception as ex:
                         res["packing_metrics"] = {"ok": False, "error": str(ex)}
                 if struct_dir is not None:
+                    _stage_heartbeat_log = _progress_log
+                    _stage_heartbeat_log(
+                        f"[biologix-ai] stage=artifact_render {i + 1}/{n_total} writing structure PNGs"
+                    )
                     monomer_png = struct_dir / f"{slug}_monomer.png"
                     r_mono = save_psmiles_png(psmiles, monomer_png, overwrite=True)
                     res["monomer_png_path"] = r_mono.get("path") if r_mono.get("ok") else None
@@ -777,7 +830,26 @@ class MDSimulator:
                     for idx, ps, nm, sl, pdb in jobs
                 }
                 for future in as_completed(future_map):
-                    idx, res, entry = future.result()
+                    idx = future_map[future]
+                    try:
+                        if candidate_timeout_s is None:
+                            idx, res, entry = future.result()
+                        else:
+                            idx, res, entry = future.result(timeout=candidate_timeout_s)
+                    except FuturesTimeoutError:
+                        name = material_names[idx] if idx < len(material_names) else f"candidate_{idx}"
+                        entry = {
+                            "index": idx,
+                            "total": n_total,
+                            "status": "failed",
+                            "reason": (
+                                f"candidate exceeded BIOLOGIX_AI_OPENMM_CANDIDATE_TIMEOUT_S="
+                                f"{candidate_timeout_s}s"
+                            ),
+                            "stage": "timeout",
+                            "material_name": name,
+                        }
+                        res = None
                     md_results[idx] = res
                     if entry is not None:
                         progress.append(entry)
