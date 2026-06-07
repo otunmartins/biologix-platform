@@ -64,6 +64,13 @@ class ADMETBatchRequest(BaseModel):
     smiles_list: List[str] = Field(..., description="List of monomer SMILES")
 
 
+class AssembleRetroReportRequest(BaseModel):
+    session_dir: str = Field(..., description="Session folder path")
+    targets: List[str] = Field(default_factory=list, description="PSMILES/names; empty = all plans")
+    include_compile_narrative: bool = False
+    biologic_target: str = "insulin"
+
+
 # ---------------------------------------------------------------------------
 # Retrosynthesis routes
 # ---------------------------------------------------------------------------
@@ -203,6 +210,35 @@ def retrosynthesis_submit(req: SubmitRetroExtractionsRequest):
         }
     except Exception as exc:
         raise HTTPException(status_code=400, detail=str(exc))
+
+
+@router.post(
+    "/api/retrosynthesis/assemble-report",
+    summary="Build retrosynthesis markdown report from session plan artifacts",
+)
+def assemble_retrosynthesis_report(req: AssembleRetroReportRequest):
+    from pathlib import Path
+
+    from biologix_ai.retrosynthesis.retro_report import (
+        assemble_session_retrosynthesis_markdown,
+    )
+
+    session = Path(req.session_dir).expanduser().resolve()
+    if not session.is_dir():
+        raise HTTPException(status_code=400, detail=f"session_dir not found: {session}")
+    try:
+        md = assemble_session_retrosynthesis_markdown(session, req.targets)
+        out_path = session / "retrosynthesis" / "RETROSYNTHESIS_REPORT.md"
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        out_path.write_text(md, encoding="utf-8")
+        return {
+            "ok": True,
+            "markdown_path": str(out_path),
+            "markdown": md,
+            "polymer_count": md.count("### "),
+        }
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
 
 
 @router.get(

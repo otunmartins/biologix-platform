@@ -25,9 +25,14 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from biologix_ai.http_api.routers import (
+    biologics,
     candidates,
     experiments,
+    literature,
+    openmm,
     personas,
+    psmiles,
+    reports,
     retrosynthesis,
 )
 from biologix_ai.http_api.sse import router as sse_router
@@ -46,13 +51,18 @@ app = FastAPI(
         "Same service layer as the MCP server for OpenCode. "
         "Point Claude Design or any frontend codegen tool at /openapi.json."
     ),
-    version="0.4.0",
+    version="0.5.0",
     openapi_tags=[
         {"name": "Health", "description": "Liveness and feature availability checks."},
         {"name": "Experiments", "description": "Campaign lifecycle: create sessions, poll state, retrieve results."},
         {"name": "Candidates", "description": "Per-candidate operations: validate, profile, batch screen, compliance."},
+        {"name": "Literature", "description": "Literature mining, PaperQA2, and scientific search."},
+        {"name": "PSMILES", "description": "Polymer SMILES generation, mutation, fingerprints, rendering."},
+        {"name": "OpenMM", "description": "OpenMM matrix screening with background jobs and SSE."},
         {"name": "Retrosynthesis", "description": "Polymer retrosynthesis route planning."},
         {"name": "ADMET", "description": "Residual monomer toxicity and ADMET-AI predictions."},
+        {"name": "Biologics", "description": "Biologic target resolution and discovery loops."},
+        {"name": "Reports", "description": "Discovery summary and PDF report generation."},
         {"name": "Personas", "description": "Expert persona presets with scoring weight vectors."},
         {"name": "Streaming", "description": "Server-Sent Events for live pipeline progress."},
     ],
@@ -82,6 +92,11 @@ app.add_middleware(
 
 app.include_router(experiments.router)
 app.include_router(candidates.router)
+app.include_router(literature.router)
+app.include_router(psmiles.router)
+app.include_router(openmm.router)
+app.include_router(biologics.router)
+app.include_router(reports.router)
 app.include_router(retrosynthesis.router)
 app.include_router(personas.router)
 app.include_router(sse_router)
@@ -95,7 +110,7 @@ from pydantic import BaseModel  # noqa: E402
 
 class HealthResponse(BaseModel):
     status: str = "ok"
-    version: str = "0.4.0"
+    version: str = "0.5.0"
     retrosynthesis_agent_available: bool
     aizynthfinder_available: bool
     aizynthfinder_models_ready: bool

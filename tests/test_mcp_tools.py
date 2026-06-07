@@ -326,6 +326,28 @@ class TestNewMCPTools:
         assert any((session / "retrosynthesis").glob("admet_*.json"))
 
 
+class TestReverseParityMCPTools:
+    @pytest.fixture(autouse=True)
+    def _server(self):
+        self.server = _import_mcp_server()
+
+    def test_get_retrosynthesis_templates(self):
+        result = json.loads(self.server.get_retrosynthesis_templates())
+        assert "polymerization_types" in result
+        assert "RAFT" in result["polymerization_types"]
+
+    def test_get_personas(self):
+        result = json.loads(self.server.get_personas())
+        assert len(result) == 5
+        ids = {p["id"] for p in result}
+        assert "formulation-scientist" in ids
+
+    def test_get_persona_by_id(self):
+        result = json.loads(self.server.get_persona("regulatory-affairs"))
+        assert result["id"] == "regulatory-affairs"
+        assert "weights" in result
+
+
 class TestExistingToolsPreserved:
     """Ensure existing MCP tools still exist after our additions."""
 
@@ -366,6 +388,9 @@ class TestExistingToolsPreserved:
         "check_monomer_admet",
         "check_monomers_batch",
         "compile_results",
+        "get_retrosynthesis_templates",
+        "get_personas",
+        "get_persona",
     ])
     def test_tool_exists(self, tool_name):
         assert hasattr(self.server, tool_name), f"Missing tool: {tool_name}"

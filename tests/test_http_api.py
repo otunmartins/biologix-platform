@@ -42,7 +42,7 @@ class TestHealthEndpoint:
     def test_health_version_updated(self, client):
         resp = client.get("/health")
         data = resp.json()
-        assert data["version"] == "0.4.0"
+        assert data["version"] == "0.5.0"
 
 
 class TestRetrosynthesisEndpoint:
@@ -258,8 +258,10 @@ class TestExperimentsEndpoints:
         (runs_dir / "exp-001" / "discovery_world.json").write_text(
             json.dumps(world), encoding="utf-8"
         )
+        import biologix_ai.http_api.deps as deps
         import biologix_ai.http_api.routers.experiments as exp_module
-        monkeypatch.setattr(exp_module, "_RUNS", runs_dir)
+        monkeypatch.setattr(deps, "RUNS_DIR", runs_dir)
+        monkeypatch.setattr(exp_module, "RUNS_DIR", runs_dir)
 
         resp = client.get("/api/experiments/exp-001")
         assert resp.status_code == 200
@@ -281,8 +283,10 @@ class TestExperimentsEndpoints:
         (runs_dir / "exp-002" / "discovery_world.json").write_text(
             json.dumps(world), encoding="utf-8"
         )
+        import biologix_ai.http_api.deps as deps
         import biologix_ai.http_api.routers.experiments as exp_module
-        monkeypatch.setattr(exp_module, "_RUNS", runs_dir)
+        monkeypatch.setattr(deps, "RUNS_DIR", runs_dir)
+        monkeypatch.setattr(exp_module, "RUNS_DIR", runs_dir)
 
         resp = client.get("/api/experiments/exp-002/candidates")
         assert resp.status_code == 200
@@ -297,8 +301,10 @@ class TestExperimentsEndpoints:
         (runs_dir / "exp-003" / "discovery_world.json").write_text(
             json.dumps(world), encoding="utf-8"
         )
+        import biologix_ai.http_api.deps as deps
         import biologix_ai.http_api.routers.experiments as exp_module
-        monkeypatch.setattr(exp_module, "_RUNS", runs_dir)
+        monkeypatch.setattr(deps, "RUNS_DIR", runs_dir)
+        monkeypatch.setattr(exp_module, "RUNS_DIR", runs_dir)
 
         resp = client.get("/api/experiments/exp-003/world")
         assert resp.status_code == 200
@@ -308,8 +314,10 @@ class TestExperimentsEndpoints:
     def test_get_audit_empty_session(self, client, tmp_path, monkeypatch):
         runs_dir = tmp_path / "runs"
         (runs_dir / "exp-004").mkdir(parents=True)
+        import biologix_ai.http_api.deps as deps
         import biologix_ai.http_api.routers.experiments as exp_module
-        monkeypatch.setattr(exp_module, "_RUNS", runs_dir)
+        monkeypatch.setattr(deps, "RUNS_DIR", runs_dir)
+        monkeypatch.setattr(exp_module, "RUNS_DIR", runs_dir)
 
         resp = client.get("/api/experiments/exp-004/audit")
         assert resp.status_code == 200
@@ -318,8 +326,10 @@ class TestExperimentsEndpoints:
     def test_get_funnel_empty_session(self, client, tmp_path, monkeypatch):
         runs_dir = tmp_path / "runs"
         (runs_dir / "exp-005").mkdir(parents=True)
+        import biologix_ai.http_api.deps as deps
         import biologix_ai.http_api.routers.experiments as exp_module
-        monkeypatch.setattr(exp_module, "_RUNS", runs_dir)
+        monkeypatch.setattr(deps, "RUNS_DIR", runs_dir)
+        monkeypatch.setattr(exp_module, "RUNS_DIR", runs_dir)
 
         resp = client.get("/api/experiments/exp-005/funnel")
         assert resp.status_code == 200
@@ -336,13 +346,25 @@ class TestOpenAPISpec:
         assert resp.status_code == 200
         spec = resp.json()
         assert spec["info"]["title"] == "Biologics AI Platform API"
-        assert spec["info"]["version"] == "0.4.0"
+        assert spec["info"]["version"] == "0.5.0"
 
     def test_all_tags_present(self, client):
         resp = client.get("/openapi.json")
         spec = resp.json()
         tag_names = {t["name"] for t in spec.get("tags", [])}
-        for expected in ("Experiments", "Candidates", "Retrosynthesis", "ADMET", "Personas", "Streaming"):
+        for expected in (
+            "Experiments",
+            "Candidates",
+            "Literature",
+            "PSMILES",
+            "OpenMM",
+            "Retrosynthesis",
+            "ADMET",
+            "Biologics",
+            "Reports",
+            "Personas",
+            "Streaming",
+        ):
             assert expected in tag_names, f"Tag '{expected}' missing from OpenAPI spec"
 
     def test_experiments_routes_in_spec(self, client):

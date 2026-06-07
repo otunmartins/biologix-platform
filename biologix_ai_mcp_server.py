@@ -2629,5 +2629,53 @@ def get_pipeline_audit(
         return json.dumps({"error": str(exc)})
 
 
+@mcp.tool()
+def get_retrosynthesis_templates() -> str:
+    """List recognised polymerisation types accepted by plan_retrosynthesis.
+
+    HTTP API parity: GET /api/retrosynthesis/templates.
+    """
+    from biologix_ai.retrosynthesis.models import PolymerizationType
+
+    return json.dumps(
+        {
+            "polymerization_types": [t.value for t in PolymerizationType],
+            "note": "Template catalog is extensible via rxnutils.",
+        },
+        indent=2,
+    )
+
+
+@mcp.tool()
+def get_personas() -> str:
+    """List all expert persona presets with scoring weight vectors.
+
+    HTTP API parity: GET /api/personas.
+    """
+    from biologix_ai.persona_presets import PERSONAS
+
+    return json.dumps([p.model_dump() for p in PERSONAS], indent=2)
+
+
+@mcp.tool()
+def get_persona(persona_id: str) -> str:
+    """Return one persona preset by id.
+
+    HTTP API parity: GET /api/personas/{persona_id}.
+    """
+    from biologix_ai.persona_presets import PERSONA_MAP
+
+    persona = PERSONA_MAP.get(persona_id.strip())
+    if persona is None:
+        return json.dumps(
+            {
+                "error": f"Persona '{persona_id}' not found.",
+                "available": list(PERSONA_MAP),
+            },
+            indent=2,
+        )
+    return json.dumps(persona.model_dump(), indent=2)
+
+
 if __name__ == "__main__":
     mcp.run()
