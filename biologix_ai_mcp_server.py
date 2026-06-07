@@ -28,7 +28,7 @@ sys.path.insert(0, os.path.join(ROOT, "src", "python"))
 sys.path.insert(0, os.path.join(ROOT, "extern", "RetroSynthesisAgent"))
 
 from pathlib import Path
-from typing import Any, List, Optional, Union
+from typing import Any, Dict, List, Optional, Union
 
 from mcp.server.fastmcp import FastMCP
 
