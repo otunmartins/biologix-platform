@@ -61,13 +61,17 @@ If no polymer target was given, derive candidates from literature and `generate_
 ### Step 4 — Screen
 
 - `screen_candidate_library(psmiles_list, biologic_target, run_admet=true, run_compliance=true, run_dir=<session>)`
-- `openmm_evaluate_psmiles(psmiles_list=<comma-separated pass PSMILES from step 4>, run_dir=<session>, response_format="concise")`
+
+**OpenMM:** ask the user once before calling it — *"Run OpenMM physics screening? This takes 5–30 min per candidate on CPU."*
+Only proceed if they confirm. Limit to ≤3 pass candidates. Never call without `psmiles_list`.
+
+- `openmm_evaluate_psmiles(psmiles_list=<≤3 pass PSMILES>, run_dir=<session>, response_format="concise")`
 
 Build `psmiles_list` only from `library_disposition` **pass** rows (use **warning** only if no pass).
-Never call `openmm_evaluate_psmiles` without `psmiles_list`.
 
 ### Step 5 — Retrosynthesis (each pass candidate)
 
+Limit retrosynthesis to ≤3 pass candidates to keep total run time under 30 minutes.
 For each candidate PSMILES with `library_disposition="pass"`:
 
 **CTA / reagent rule:** Chain transfer agents (CTAs), initiators, and other small-molecule
