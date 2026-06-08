@@ -113,9 +113,6 @@ class TestPlanRetrosynthesisGuards:
 
 class TestTreeConstructTimeout:
     def test_tree_construct_timeout_returns_error(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-        if not rs._is_retrosynthesisagent_available():
-            pytest.skip("RetroSynthesisAgent not installed")
-
         from biologix_ai.retrosynthesis.retro_adapter import write_llm_res
 
         write_llm_res(
@@ -131,16 +128,15 @@ class TestTreeConstructTimeout:
             },
         )
 
-        class _SlowTree:
-            def __init__(self, *_args, **_kwargs) -> None:
-                self.product_dict: dict = {}
-                self.reactions = []
+        def _fake_run_tree(*_args, **_kwargs):
+            return [], "none", "Tree construction timed out after 2s"
 
-            def construct_tree(self) -> None:
-                time.sleep(30)
-
-        monkeypatch.setattr(rs, "_TREE_CONSTRUCT_TIMEOUT", 2)
-        monkeypatch.setattr("RetroSynAgent.treeBuilder.Tree", _SlowTree)
+        monkeypatch.setattr(rs, "_is_retrosynthesisagent_available", lambda: True)
+        monkeypatch.setattr(
+            "biologix_ai.retrosynthesis.retrosyn_bootstrap.ensure_retrosyn_agent_ready",
+            lambda: None,
+        )
+        monkeypatch.setattr(rs, "_run_tree_with_timeout", _fake_run_tree)
 
         routes, _provenance, error = rs._run_retrosynthesis_agent(
             material_name="poly(acrylic acid)",
@@ -150,6 +146,61 @@ class TestTreeConstructTimeout:
         assert routes == []
         assert error is not None
         assert "timed out" in error.lower()
+
+    def test_tree_subprocess_killed_on_timeout(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Hung tree subprocess is terminated; caller returns quickly with no routes."""
+
+        class _HungProcess:
+            pid = 99999
+
+            def start(self) -> None:
+                return
+
+            def join(self, timeout: float | None = None) -> None:
+                return
+
+            def is_alive(self) -> bool:
+                return True
+
+            def terminate(self) -> None:
+                return
+
+            def kill(self) -> None:
+                return
+
+        class _MockCtx:
+            def Process(self, target, args):  # noqa: ANN001
+                return _HungProcess()
+
+            def Queue(self):
+                import multiprocessing
+
+                return multiprocessing.Queue()
+
+        monkeypatch.setattr(rs.multiprocessing, "get_context", lambda _name: _MockCtx())
+        monkeypatch.setattr(rs.os, "killpg", lambda *_args, **_kwargs: None)
+        monkeypatch.setattr(rs.os, "getpgid", lambda pid: pid)
+
+        pdf_dir = tmp_path / "pdfs"
+        result_dir = tmp_path / "results"
+        pdf_dir.mkdir()
+        result_dir.mkdir()
+
+        start = time.monotonic()
+        routes, provenance, error = rs._run_tree_with_timeout(
+            "poly(acrylic acid)",
+            tmp_path,
+            pdf_dir,
+            result_dir,
+            timeout=2,
+        )
+        elapsed = time.monotonic() - start
+
+        assert routes == []
+        assert provenance == "none"
+        assert error is not None
+        assert "timed out" in error.lower()
+        assert elapsed < 5
 
 
 class TestPubchempyBootstrapPatch:

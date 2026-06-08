@@ -7,7 +7,6 @@ Two engines:
 
 from __future__ import annotations
 
-import concurrent.futures
 import json
 import logging
 import multiprocessing
@@ -73,11 +72,135 @@ def _pdf_download_worker(
             material_name,
             pdf_folder_name=pdf_folder,
             num_results=max_pdfs,
-            n_thread=2,
+            n_thread=1,
         )
         result_queue.put(downloader.main())
     except Exception:
         result_queue.put([])
+
+
+def _tree_worker(
+    material_name: str,
+    workspace: str,
+    pdf_folder: str,
+    result_folder: str,
+    result_queue: "multiprocessing.Queue[Any]",
+) -> None:
+    """Run RetroSyn tree construction in an isolated subprocess (killable on timeout)."""
+    try:
+        os.setpgrp()
+    except OSError:
+        pass
+    os.chdir(workspace)
+    try:
+        from biologix_ai.retrosynthesis.retrosyn_bootstrap import ensure_retrosyn_agent_ready
+
+        ensure_retrosyn_agent_ready()
+
+        from RetroSynAgent.entityAlignment import EntityAlignment
+        from RetroSynAgent.pdfProcessor import PDFProcessor
+        from RetroSynAgent.treeBuilder import Tree
+
+        processor = PDFProcessor(
+            pdf_folder_name=pdf_folder,
+            result_folder_name=result_folder,
+            result_json_name="llm_res",
+        )
+        processor.load_existing_results()
+
+        if not processor.result_dict:
+            result_queue.put({"routes": [], "provenance": "none", "error": None})
+            return
+
+        provenance = "session_agent_llm"
+        ea = EntityAlignment()
+        results_dict = ea.alignRootNode(result_folder, "llm_res", material_name)
+        results_dict = {
+            key: normalize_for_tree_root(text, material_name)
+            for key, text in results_dict.items()
+        }
+
+        try:
+            from biologix_ai.retrosynthesis.precursor_registry import (
+                collect_reactants_from_extractions,
+                seed_workspace_precursors,
+            )
+
+            reactants = collect_reactants_from_extractions(results_dict)
+            seed_workspace_precursors(Path(workspace), reactants)
+        except Exception as seed_exc:
+            logger.warning("Precursor seeding skipped: %s", seed_exc)
+
+        tree_root = material_name.strip().lower()
+        tree = Tree(tree_root, result_dict=results_dict)
+        _inject_product_aliases(tree, tree_root)
+        tree.construct_tree()
+
+        routes = _routes_from_tree(tree, material_name)
+        result_queue.put(
+            {
+                "routes": [route.model_dump() for route in routes],
+                "provenance": provenance,
+                "error": None,
+            }
+        )
+    except Exception as exc:
+        result_queue.put({"routes": [], "provenance": "none", "error": str(exc)})
+
+
+def _run_tree_with_timeout(
+    material_name: str,
+    workspace: Path,
+    pdf_folder: Path,
+    result_folder: Path,
+    timeout: int = _TREE_CONSTRUCT_TIMEOUT,
+) -> Tuple[List[PolymerRoute], str, Optional[str]]:
+    """Build RetroSyn KG tree with a hard timeout; kill child process group on expiry."""
+    ctx = multiprocessing.get_context("spawn")
+    result_queue: multiprocessing.Queue[Any] = ctx.Queue()
+    proc = ctx.Process(
+        target=_tree_worker,
+        args=(
+            material_name,
+            str(workspace),
+            str(pdf_folder),
+            str(result_folder),
+            result_queue,
+        ),
+    )
+    proc.start()
+    proc.join(timeout=timeout)
+    if proc.is_alive():
+        try:
+            os.killpg(os.getpgid(proc.pid), signal.SIGTERM)
+        except (ProcessLookupError, PermissionError, OSError):
+            proc.terminate()
+        proc.join(5)
+        if proc.is_alive():
+            proc.kill()
+            proc.join(2)
+        logger.warning(
+            "RetroSynAgent tree.construct_tree() killed after %ds for %r",
+            timeout,
+            material_name,
+        )
+        return [], "none", f"Tree construction timed out after {timeout}s"
+    if not result_queue.empty():
+        payload = result_queue.get_nowait()
+        if not isinstance(payload, dict):
+            return [], "none", "Tree worker returned invalid payload"
+        routes_raw = payload.get("routes") or []
+        routes = [
+            PolymerRoute.model_validate(route)
+            for route in routes_raw
+            if isinstance(route, dict)
+        ]
+        provenance = payload.get("provenance") or "none"
+        error = payload.get("error")
+        if error:
+            return [], provenance, str(error)
+        return routes, provenance, None
+    return [], "none", None
 
 
 def _download_pdfs_with_timeout(
@@ -481,96 +604,38 @@ def _run_retrosynthesis_agent(
             d.mkdir(parents=True, exist_ok=True)
         had_session_extractions = False
 
-    provenance = "none"
+    if not had_session_extractions:
+        logger.warning(
+            "No llm_res in session workspace; returning empty routes "
+            "(call submit_retro_extractions before plan_retrosynthesis)"
+        )
+        return [], "none", None
 
     try:
-        from RetroSynAgent.entityAlignment import EntityAlignment
-        from RetroSynAgent.pdfProcessor import PDFProcessor
-        from RetroSynAgent.treeBuilder import Tree
-
-        prev_cwd = os.getcwd()
-        try:
-            os.chdir(ws)
-
-            processor = PDFProcessor(
-                pdf_folder_name=str(pdf_folder),
-                result_folder_name=str(result_folder),
-                result_json_name="llm_res",
+        logger.info(
+            "Building RetroSyn KG tree for %s in isolated subprocess",
+            material_name,
+        )
+        routes, provenance, error = _run_tree_with_timeout(
+            material_name=material_name,
+            workspace=ws,
+            pdf_folder=pdf_folder,
+            result_folder=result_folder,
+            timeout=_TREE_CONSTRUCT_TIMEOUT,
+        )
+        if error:
+            return [], provenance, error
+        tree_root = material_name.strip().lower()
+        if routes and provenance == "none":
+            provenance = "session_agent_llm"
+        if not routes:
+            logger.warning(
+                "RetroSynAgent tree produced no paths for %s; "
+                "check that extraction Products include %r",
+                material_name,
+                tree_root,
             )
-            processor.load_existing_results()
-
-            if processor.result_dict:
-                provenance = "session_agent_llm"
-                logger.info(
-                    "Using %d existing llm_res entries for %s",
-                    len(processor.result_dict),
-                    material_name,
-                )
-            else:
-                logger.warning(
-                    "No llm_res in session workspace; returning empty routes "
-                    "(call submit_retro_extractions before plan_retrosynthesis)"
-                )
-                return [], "none", None
-
-            ea = EntityAlignment()
-            results_dict = ea.alignRootNode(
-                str(result_folder), "llm_res", material_name
-            )
-            results_dict = {
-                key: normalize_for_tree_root(text, material_name)
-                for key, text in results_dict.items()
-            }
-
-            # Seed workspace precursors BEFORE tree construction so that all
-            # reactant names from the extractions are registered as purchasable
-            # leaves (bundled DB + PubChem + ZINC bridge).
-            try:
-                from biologix_ai.retrosynthesis.precursor_registry import (
-                    collect_reactants_from_extractions,
-                    seed_workspace_precursors,
-                )
-
-                reactants = collect_reactants_from_extractions(results_dict)
-                seed_workspace_precursors(ws, reactants)
-            except Exception as seed_exc:
-                logger.warning("Precursor seeding skipped: %s", seed_exc)
-
-            tree_root = material_name.strip().lower()
-            tree = Tree(tree_root, result_dict=results_dict)
-            _inject_product_aliases(tree, tree_root)
-            executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
-            future = executor.submit(tree.construct_tree)
-            try:
-                future.result(timeout=_TREE_CONSTRUCT_TIMEOUT)
-            except concurrent.futures.TimeoutError:
-                logger.warning(
-                    "RetroSynAgent tree.construct_tree() timed out after %ds for %r",
-                    _TREE_CONSTRUCT_TIMEOUT,
-                    material_name,
-                )
-                executor.shutdown(wait=False, cancel_futures=True)
-                raise RuntimeError(
-                    f"Tree construction timed out after {_TREE_CONSTRUCT_TIMEOUT}s"
-                ) from None
-            finally:
-                if future.done():
-                    executor.shutdown(wait=True)
-                else:
-                    executor.shutdown(wait=False, cancel_futures=True)
-            routes = _routes_from_tree(tree, material_name)
-            if routes and provenance == "none":
-                provenance = "session_agent_llm"
-            if processor.result_dict and not routes:
-                logger.warning(
-                    "RetroSynAgent tree produced no paths for %s; "
-                    "check that extraction Products include %r",
-                    material_name,
-                    tree_root,
-                )
-            return routes, provenance, None
-        finally:
-            os.chdir(prev_cwd)
+        return routes, provenance, None
     except Exception as exc:
         logger.error("RetroSynthesisAgent failed for %s: %s", material_name, exc)
         return [], "none", str(exc)

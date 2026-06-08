@@ -5,8 +5,24 @@ set -euo pipefail
 
 source /opt/conda/etc/profile.d/conda.sh
 conda activate biologix-ai-sim
+export LD_LIBRARY_PATH="${CONDA_PREFIX}/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 cd /app
 export MPLBACKEND=Agg
+
+echo "=== Smoke: conda libstdc++ / libLerc loader ==="
+python - <<'PY'
+import ctypes
+import os
+from pathlib import Path
+
+prefix = Path(os.environ["CONDA_PREFIX"])
+liblerc = prefix / "lib" / "libLerc.so.4"
+assert liblerc.is_file(), f"missing {liblerc}"
+ctypes.CDLL(str(liblerc))
+ld = os.environ.get("LD_LIBRARY_PATH", "")
+assert str(prefix / "lib") in ld, f"LD_LIBRARY_PATH missing conda lib: {ld!r}"
+print("libLerc load OK")
+PY
 
 echo "=== Smoke: MCP server import ==="
 python - <<'PY'

@@ -24,6 +24,8 @@ services:
       - path: .env
         required: false
     environment:
+      # Conda libstdc++ (GLIBCXX_3.4.29+) — required by RetroSynAgent/libLerc in treeBuilder
+      - LD_LIBRARY_PATH=/opt/conda/envs/biologix-ai-sim/lib
       # Pass through provider keys from host env if not already in .env
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}

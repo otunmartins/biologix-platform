@@ -10,6 +10,10 @@ set -euo pipefail
 source /opt/conda/etc/profile.d/conda.sh
 conda activate biologix-ai-sim
 
+# Prefer conda libstdc++/libgcc (GLIBCXX_3.4.29+) over the Debian base image.
+# Without this, RetroSynAgent treeBuilder fails loading libLerc.so.4 via the MCP server.
+export LD_LIBRARY_PATH="${CONDA_PREFIX}/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+
 # Headless matplotlib + RDKit drawing (psmiles savefig may otherwise write SVG to .png paths)
 export MPLBACKEND=Agg
 
@@ -17,6 +21,8 @@ export MPLBACKEND=Agg
 export BIOLOGIX_AI_OPENMM_CANDIDATE_TIMEOUT_S="${BIOLOGIX_AI_OPENMM_CANDIDATE_TIMEOUT_S:-900}"
 export BIOLOGIX_AI_OPENMM_MAX_MINIMIZE_STEPS="${BIOLOGIX_AI_OPENMM_MAX_MINIMIZE_STEPS:-1500}"
 export BIOLOGIX_AI_EVAL_MAX_WORKERS="${BIOLOGIX_AI_EVAL_MAX_WORKERS:-1}"
+export BIOLOGIX_PDF_TIMEOUT="${BIOLOGIX_PDF_TIMEOUT:-30}"
+export BIOLOGIX_TREE_TIMEOUT="${BIOLOGIX_TREE_TIMEOUT:-90}"
 
 # Non-interactive / CI / custom command: run the requested command, not OpenCode.
 if [[ $# -gt 0 ]]; then

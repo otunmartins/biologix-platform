@@ -76,6 +76,8 @@ ENV RETRO_LLM_BACKEND=skip
 ENV BIOLOGIX_AI_AIZYNTH_CONFIG=/app/data/aizynthfinder/config.yml
 ENV PATH="/opt/conda/envs/biologix-ai-sim/bin:/root/.opencode/bin:${PATH}"
 ENV CONDA_DEFAULT_ENV=biologix-ai-sim
+# Conda-forge C++ libs (libLerc, graphviz) require newer libstdc++ than the base image.
+ENV LD_LIBRARY_PATH=/opt/conda/envs/biologix-ai-sim/lib
 # Make conda activate work inside RUN steps
 ENV BASH_ENV=/opt/conda/etc/profile.d/conda.sh
 

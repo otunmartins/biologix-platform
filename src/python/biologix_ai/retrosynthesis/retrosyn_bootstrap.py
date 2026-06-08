@@ -46,6 +46,15 @@ _BUILTIN_POLYMERS = [
     "Poly(caprolactone)",
     "Poly(ethylene glycol)",
     "Poly(propylene glycol)",
+    # Iteration-2 mutation targets (literature-mined excipients)
+    "Polyphenylene",
+    "Polyalanine",
+    "Poly(ethylene carbonate)",
+    "Polyurea",
+    "Polyketone",
+    "Polythioester",
+    "Polyhydrazide",
+    "Poly(diketone)",
 ]
 
 
