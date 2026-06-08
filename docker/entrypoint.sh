@@ -24,6 +24,15 @@ export BIOLOGIX_AI_EVAL_MAX_WORKERS="${BIOLOGIX_AI_EVAL_MAX_WORKERS:-1}"
 export BIOLOGIX_PDF_TIMEOUT="${BIOLOGIX_PDF_TIMEOUT:-30}"
 export BIOLOGIX_TREE_TIMEOUT="${BIOLOGIX_TREE_TIMEOUT:-90}"
 
+# Docker session markers — agents read these instead of blocking on mid-pipeline HITL prompts.
+export BIOLOGIX_AI_DOCKER=1
+export BIOLOGIX_AI_OPENMM_AUTO="${BIOLOGIX_AI_OPENMM_AUTO:-yes}"
+
+# Restore host TTY after OpenCode (mouse-tracking garbage, dead keyboard until reset).
+# shellcheck source=docker/restore_terminal.sh
+source /app/docker/restore_terminal.sh
+trap 'restore_host_terminal' EXIT INT TERM HUP
+
 # Non-interactive / CI / custom command: run the requested command, not OpenCode.
 if [[ $# -gt 0 ]]; then
   cd /app
@@ -71,4 +80,26 @@ fi
 # ── Launch OpenCode (MCP tools; no API keys required at container start) ───────
 # Configure a provider inside the session when needed: opencode auth login
 cd /app
-exec opencode .
+
+IMAGE_VER="${BIOLOGIX_AI_IMAGE_VERSION:-dev}"
+cat <<EOF
+────────────────────────────────────────────────────────────────────────
+ Biologix AI ${IMAGE_VER} — OpenCode (Docker)
+────────────────────────────────────────────────────────────────────────
+ Terminal: if input stops or you see garbage like "35;95;8M":
+   1) Second terminal → docker ps → docker kill <container_id>
+   2) In this tab → reset   (or: bash /app/docker/restore_terminal.sh)
+
+ OpenMM this session: BIOLOGIX_AI_OPENMM_AUTO=${BIOLOGIX_AI_OPENMM_AUTO}
+   yes  = auto-run on ≤3 pass candidates (no mid-pipeline Yes/No prompt)
+   skip = skip OpenMM and note it in the report
+   Override: docker run -e BIOLOGIX_AI_OPENMM_AUTO=skip ...
+────────────────────────────────────────────────────────────────────────
+EOF
+
+set +e
+opencode .
+exit_code=$?
+set -e
+restore_host_terminal
+exit "$exit_code"

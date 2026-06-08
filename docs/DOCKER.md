@@ -174,7 +174,9 @@ docker run --platform linux/amd64 -it --rm --init `
 | `mamba: command not found` inside container | `/opt/conda/bin` should be on PATH; rebuild with `--no-cache` |
 | `does not appear to be a Python project: neither 'setup.py' nor 'pyproject.toml' found` during build | The conda-env stage runs before the repo is copied; the Dockerfile strips `-e .` from the env YAML for this reason. Rebuild with the current Dockerfile — the project is installed later by `install_submodules.sh`. |
 | `bad interpreter: ...bash^M: no such file or directory` on startup | Windows CRLF in shell scripts. The bundled `.gitattributes` prevents this on fresh clones. If already affected: `git config core.autocrlf false` then re-checkout, or rebuild the image — the Dockerfile strips CRs automatically. |
-| OpenCode TUI frozen — cannot type or Ctrl+C (common in **Cursor** integrated terminal) | The session may still be running in the background. Open **Terminal.app** or **iTerm** for `docker compose run` / `docker run -it`. Add **`--init`** (Compose sets `init: true`). To stop a stuck container: second shell → `docker ps` → `docker kill <container_id>`. |
+| OpenCode TUI frozen — cannot type, Esc/Ctrl+C useless | OpenCode OpenTUI can stop reading keyboard while still drawing (especially `linux/amd64` on Apple Silicon). The session may be **waiting at a prompt**, not running a tool. Recovery: second shell → `docker ps` → `docker kill <container_id>` → in the original tab run **`reset`**. Images **≥ 0.5.7** also run `docker/restore_terminal.sh` on exit via the entrypoint trap. Prefer **Terminal.app** / **iTerm** over IDE-embedded terminals. |
+| Terminal prints garbage like `35;95;8M` after OpenCode exits | OpenTUI left **mouse-tracking** enabled. Run **`reset`**, or `bash /app/docker/restore_terminal.sh` on the host if you copied the script. Entrypoint **≥ 0.5.7** disables mouse modes on normal exit. |
+| Stuck at "Run OpenMM on top ≤3 candidates?" | Mid-pipeline Yes/No prompts are removed in Docker **≥ 0.5.7**. Set **`BIOLOGIX_AI_OPENMM_AUTO=yes`** (default) to auto-run, or **`skip`** to skip without typing. |
 | Precursor DB rebuilds for 30–90+ minutes on every `docker run --rm` | Fixed in images built after the entrypoint path correction (`data/retrosynthesis/precursors.json`). Mount **`biologix-data:/app/data`** (Compose does this) so Molport/AiZynth data persists across `--rm`. |
 | `monomer.png` files are SVG / PIL cannot open them | Headless `psmiles` may write SVG to `.png` paths. Rebuild the image after the `psmiles_drawing` fix, or upgrade to a tagged release that includes it. |
 | `setup_aizynthfinder.sh` failed during `docker build` / GitHub Actions | Usually a transient Zenodo/Figshare download error. Re-run the workflow (re-push the tag or use **Actions → Build and publish Docker image → Run workflow** with push enabled). Builds after the curl-based downloader fix are more resilient. |
@@ -187,6 +189,7 @@ The entrypoint sets conservative interactive defaults (override with `docker run
 
 | Variable | Docker default | Purpose |
 |----------|----------------|---------|
+| `BIOLOGIX_AI_OPENMM_AUTO` | `yes` | `yes` = run OpenMM on ≤3 pass candidates without a mid-pipeline prompt; `skip` = skip OpenMM |
 | `BIOLOGIX_AI_OPENMM_CANDIDATE_TIMEOUT_S` | `900` | Per-candidate OpenMM wall-clock limit |
 | `BIOLOGIX_AI_OPENMM_MAX_MINIMIZE_STEPS` | `1500` | Shorter minimization for faster turns |
 | `BIOLOGIX_AI_EVAL_MAX_WORKERS` | `1` | Sequential eval (safer under emulation) |

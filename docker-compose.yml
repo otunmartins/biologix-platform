@@ -26,6 +26,8 @@ services:
     environment:
       # Conda libstdc++ (GLIBCXX_3.4.29+) — required by RetroSynAgent/libLerc in treeBuilder
       - LD_LIBRARY_PATH=/opt/conda/envs/biologix-ai-sim/lib
+      # Avoid mid-pipeline OpenMM Yes/No prompts (OpenCode TUI can freeze in Docker)
+      - BIOLOGIX_AI_OPENMM_AUTO=${BIOLOGIX_AI_OPENMM_AUTO:-yes}
       # Pass through provider keys from host env if not already in .env
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}

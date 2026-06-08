@@ -50,6 +50,16 @@ for name in ("get_retrosynthesis_templates", "get_personas", "plan_retrosynthesi
 print("MCP server import OK")
 PY
 
+echo "=== Smoke: Docker entrypoint terminal restore ==="
+if [[ ! -x /app/docker/restore_terminal.sh ]]; then
+  echo "ERROR: restore_terminal.sh missing or not executable" >&2
+  exit 1
+fi
+/app/docker/restore_terminal.sh
+grep -q 'restore_host_terminal' /app/docker/entrypoint.sh
+grep -q 'BIOLOGIX_AI_OPENMM_AUTO' /app/docker/entrypoint.sh
+echo "entrypoint terminal restore OK"
+
 echo "=== Smoke: baked-in data ==="
 if [[ ! -f /app/data/retrosynthesis/precursors.json ]]; then
   echo "ERROR: precursors.json missing from image" >&2

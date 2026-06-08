@@ -62,8 +62,19 @@ If no polymer target was given, derive candidates from literature and `generate_
 
 - `screen_candidate_library(psmiles_list, biologic_target, run_admet=true, run_compliance=true, run_dir=<session>)`
 
-**OpenMM:** ask the user once before calling it — *"Run OpenMM physics screening? This takes 5–30 min per candidate on CPU."*
-Only proceed if they confirm. Limit to ≤3 pass candidates. Never call without `psmiles_list`.
+**OpenMM — do not block mid-pipeline on a typed Yes/No** (OpenCode TUI input can freeze in Docker).
+
+Read `BIOLOGIX_AI_OPENMM_AUTO` (Docker entrypoint sets this; default `yes`):
+
+| Value | Action |
+|-------|--------|
+| `yes` | Call `openmm_evaluate_psmiles` on ≤3 **pass** PSMILES (5–30 min/candidate on CPU). |
+| `skip` or `no` | Skip OpenMM; note *"OpenMM skipped (BIOLOGIX_AI_OPENMM_AUTO=…)."* in the report. |
+
+If `BIOLOGIX_AI_DOCKER` is unset and `BIOLOGIX_AI_OPENMM_AUTO` is unset, you may ask once in Step 1
+whether to run OpenMM — not again in Step 4.
+
+When running OpenMM:
 
 - `openmm_evaluate_psmiles(psmiles_list=<≤3 pass PSMILES>, run_dir=<session>, response_format="concise")`
 

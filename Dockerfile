@@ -59,6 +59,7 @@ FROM conda-env AS app
 
 # Build arg: set SLIM=1 to skip AiZynth model download + precursor DB build
 ARG SLIM=0
+ARG IMAGE_VERSION=dev
 
 # Copy the full repo (after .dockerignore is applied)
 COPY . .
@@ -78,6 +79,7 @@ ENV PATH="/opt/conda/envs/biologix-ai-sim/bin:/root/.opencode/bin:${PATH}"
 ENV CONDA_DEFAULT_ENV=biologix-ai-sim
 # Conda-forge C++ libs (libLerc, graphviz) require newer libstdc++ than the base image.
 ENV LD_LIBRARY_PATH=/opt/conda/envs/biologix-ai-sim/lib
+ENV BIOLOGIX_AI_IMAGE_VERSION=${IMAGE_VERSION}
 # Make conda activate work inside RUN steps
 ENV BASH_ENV=/opt/conda/etc/profile.d/conda.sh
 
@@ -106,7 +108,7 @@ RUN if [ -d /app/data ]; then cp -a /app/data /app/.data-seed; fi
 
 # Strip Windows CRLF line-endings that a Windows clone may have introduced,
 # then make the entrypoint executable.
-RUN sed -i 's/\r$//' /app/docker/entrypoint.sh /app/scripts/*.sh 2>/dev/null || true \
-    && chmod +x /app/docker/entrypoint.sh
+RUN sed -i 's/\r$//' /app/docker/entrypoint.sh /app/docker/restore_terminal.sh /app/scripts/*.sh 2>/dev/null || true \
+    && chmod +x /app/docker/entrypoint.sh /app/docker/restore_terminal.sh
 
 ENTRYPOINT ["/app/docker/entrypoint.sh"]
