@@ -44,6 +44,11 @@ If any tool returns `abort: true`, an import error, or a missing dependency:
 Do not suggest `RETRO_USE_INTERNAL_LLM`, manual pip steps, or partial workarounds.
 Do not read `src/`, `scripts/`, or config files to "understand the project" — call MCP tools only.
 
+## MCP concurrency (critical in Docker)
+
+Never batch parallel MCP tool calls (`generate_psmiles_from_name`, `validate_psmiles`, etc.).
+The stdio MCP server deadlocks under concurrent requests. **One tool → wait for result → next.**
+
 ## Protocol
 
 Execute these steps in order. Do not skip or reorder. After onboarding, call `todowrite` with
@@ -73,7 +78,8 @@ Save `run_dir` from the session response for all later tools.
 - `validate_psmiles(psmiles, material_name, crosscheck_web=false)` for each candidate PSMILES
   Use `crosscheck_web=false` in fast mode to avoid DuckDuckGo latency.
 
-If no polymer target was given, derive candidates from literature and `generate_psmiles_from_name`.
+If no polymer target was given, derive up to **6** names from literature and call
+`generate_psmiles_from_name` **sequentially** (one per turn).
 
 ### Step 4 — Screen
 

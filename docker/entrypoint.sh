@@ -93,7 +93,8 @@ cat <<EOF
  OpenMM this session: BIOLOGIX_AI_OPENMM_AUTO=${BIOLOGIX_AI_OPENMM_AUTO}
    yes  = auto-run on ≤3 pass candidates (no mid-pipeline Yes/No prompt)
    skip = skip OpenMM and note it in the report
-   Override: docker run -e BIOLOGIX_AI_OPENMM_AUTO=skip ...
+
+ MCP: agent must call biologix-ai tools one-at-a-time (parallel calls deadlock stdio).
 ────────────────────────────────────────────────────────────────────────
 EOF
 

@@ -31,6 +31,16 @@ Do not suggest `RETRO_USE_INTERNAL_LLM`, manual pip steps, or partial workaround
 `./install` provides AmberTools (antechamber/parmchk2) for OpenMM GAFF screening.
 Do not read `src/`, `scripts/`, or config files to "understand the project" — call MCP tools only.
 
+## MCP concurrency (critical in Docker)
+
+The `biologix-ai` MCP server uses **stdio**. **Never issue parallel/batched MCP tool calls**
+(multiple `generate_psmiles_from_name`, `validate_psmiles`, etc. in one turn). OpenCode can
+deadlock the pipe: tools appear to run forever, the TUI stops accepting keyboard input, and
+Esc does nothing.
+
+**Rule:** one MCP tool call → wait for its JSON result → then the next. Max **6** candidates
+per Step 3; if `generate_psmiles_from_name` returns `ok: false`, note it and continue.
+
 ## Protocol
 
 Execute these steps in order. Do not skip or reorder. After onboarding, call `todowrite` with
@@ -54,9 +64,14 @@ Save `run_dir` from the session response for all later tools.
 ### Step 3 — Literature and validation
 
 - `mine_literature(query="<biologic> excipient polymer stabilisation", ...)`
-- `validate_psmiles(psmiles, material_name, crosscheck_web=true)` for each candidate PSMILES
 
-If no polymer target was given, derive candidates from literature and `generate_psmiles_from_name`.
+If no polymer target was given, derive up to **6** candidate names from literature, then call
+`generate_psmiles_from_name(material_name)` **one name at a time** (sequential — see MCP concurrency).
+
+For each successful PSMILES, call `validate_psmiles` **one at a time**:
+
+- `crosscheck_web=false` when `BIOLOGIX_AI_DOCKER=1` (Docker default — avoids web latency)
+- `crosscheck_web=true` only outside Docker when the user wants web cross-check
 
 ### Step 4 — Screen
 
