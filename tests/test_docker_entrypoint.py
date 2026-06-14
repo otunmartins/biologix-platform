@@ -25,6 +25,49 @@ def test_entrypoint_wires_terminal_restore_and_docker_openmm_policy() -> None:
     assert "trap" in text and "restore_host_terminal" in text
     assert "BIOLOGIX_AI_DOCKER=1" in text
     assert "BIOLOGIX_AI_OPENMM_AUTO" in text
-    # Must not exec opencode directly — trap must run on exit.
     assert "exec opencode" not in text
     assert "opencode ." in text
+
+
+def test_cpu_limit_script_math() -> None:
+    script = REPO_ROOT / "scripts" / "docker_cpu_limit.sh"
+    assert script.is_file()
+    # 8 cores @ 75% → 6; 4 cores @ 75% → 3; 1 core → 1
+    import math
+
+    for host, pct, want in ((8, 75, 6), (4, 75, 3), (10, 75, 7), (1, 75, 1)):
+        got = max(1, math.floor(host * pct / 100))
+        assert got == want, (host, pct, got, want)
+
+
+def test_openmm_thread_split_for_parallel_batch() -> None:
+    """OMP threads when running up to 3 OpenMM candidates in parallel."""
+
+    def omp_threads(cpus: int, workers: int, batch: int = 3) -> int:
+        if workers == 1:
+            return max(1, cpus)
+        active = min(max(1, workers), batch, cpus)
+        return max(1, cpus // active)
+
+    assert omp_threads(8, 8) == 2
+    assert omp_threads(10, 10) == 3
+    assert omp_threads(4, 4) == 1
+    assert omp_threads(8, 1) == 8
+
+
+def test_eval_workers_full_container_cpus() -> None:
+    import math
+
+    for cpus, frac, want in ((8, 1.0, 8), (10, 1.0, 10), (8, 0.75, 6), (1, 1.0, 1)):
+        got = max(1, math.floor(cpus * frac))
+        assert got == want
+
+
+def test_entrypoint_auto_cpu_defaults() -> None:
+    text = ENTRYPOINT.read_text(encoding="utf-8")
+    cpu_defaults = (REPO_ROOT / "docker" / "cpu_defaults.sh").read_text(encoding="utf-8")
+    assert "cpu_defaults.sh" in text
+    assert "docker_default_eval_max_workers" in text
+    assert "MKL_NUM_THREADS" in text
+    assert "BIOLOGIX_AI_EVAL_CPU_FRACTION" in cpu_defaults
+    assert 'frac="${BIOLOGIX_AI_EVAL_CPU_FRACTION:-1.0}"' in cpu_defaults

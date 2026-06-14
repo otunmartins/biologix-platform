@@ -186,14 +186,53 @@ docker run --platform linux/amd64 -it --rm --init `
 
 ## Docker safety defaults
 
-The entrypoint sets conservative interactive defaults (override with `docker run -e …`):
+The entrypoint sets interactive defaults (override with `docker run -e …`):
 
 | Variable | Docker default | Purpose |
 |----------|----------------|---------|
 | `BIOLOGIX_AI_OPENMM_AUTO` | `yes` | `yes` = run OpenMM on ≤3 pass candidates without a mid-pipeline prompt; `skip` = skip OpenMM |
 | `BIOLOGIX_AI_OPENMM_CANDIDATE_TIMEOUT_S` | `900` | Per-candidate OpenMM wall-clock limit |
 | `BIOLOGIX_AI_OPENMM_MAX_MINIMIZE_STEPS` | `1500` | Shorter minimization for faster turns |
-| `BIOLOGIX_AI_EVAL_MAX_WORKERS` | `1` | Sequential eval (safer under emulation) |
+| `BIOLOGIX_AI_EVAL_MAX_WORKERS` | **100% of container CPUs** (`nproc`) | Parallel OpenMM processes; auto-detected at entrypoint |
+| `OMP_NUM_THREADS` | **CPUs ÷ min(workers, 3)** | OpenMM threads per worker; all CPUs when `workers=1` |
+| `BIOLOGIX_AI_EVAL_CPU_FRACTION` | `1.0` | Fraction of container CPUs for workers (e.g. `0.75` for headroom) |
+| `DOCKER_CPU_PCT` | `75` (host scripts only) | Optional `--cpus` quota via `scripts/docker_run.sh` |
+
+### CPU auto-detection (GHCR — no wrapper required)
+
+The **image entrypoint** runs `nproc` on every start and configures OpenMM to use **all CPUs Docker exposes to the container**:
+
+```bash
+docker run --platform linux/amd64 -it --rm --init \
+  -v "$(pwd)/runs:/app/runs" \
+  -v biologix-data:/app/data \
+  ghcr.io/otunmartins/biologix-ai:latest
+```
+
+The startup banner prints `CPUs visible`, `OpenMM workers`, and `OMP`.
+
+**Container CPU count** depends on Docker, not the image:
+
+- Plain `docker run` → all CPUs allocated to **Docker Desktop → Resources → CPUs**.
+- `docker run --cpus 6` → capped at 6.
+- `./scripts/docker_run.sh` → optional `--cpus` at 75% of **host** CPUs (macOS headroom).
+
+OpenMM runs up to **3 candidates in parallel** (agent limit). With 8 container CPUs: `workers=8`, `OMP=2` → ~6 threads active. Retrosynthesis remains mostly single-threaded.
+
+Overrides:
+
+```bash
+-e BIOLOGIX_AI_EVAL_MAX_WORKERS=1     # sequential candidates, all OMP threads each
+-e BIOLOGIX_AI_EVAL_CPU_FRACTION=0.5 # half the container for OpenMM workers
+-e OMP_NUM_THREADS=4                 # fixed per-worker thread cap
+```
+
+Optional host wrapper (75% `--cpus`):
+
+```bash
+./scripts/docker_run.sh
+./scripts/docker_compose_run.sh
+```
 
 ## Smoke test (before publish or after local build)
 

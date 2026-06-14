@@ -39,7 +39,7 @@ MCP **`openmm_evaluate_psmiles`** and [`MDSimulator.evaluate_candidates`](../src
 | `BIOLOGIX_AI_OPENMM_MATRIX_PROGRESSIVE_N_MAX` | *(unset)* | Optional **maximum** chain count (cap progressive growth). |
 | **Verbose / quiet:** `BIOLOGIX_AI_EVAL_QUIET=1` or `BIOLOGIX_AI_EVAL_VERBOSE=0` | | Smaller JSON / no stderr progress (also disables stderr heartbeat) |
 | **Stderr heartbeat** (implicit) | *(on)* | When **`verbose=False`** on `openmm_evaluate_psmiles` / `evaluate_candidates` but **quiet env is not set**, stderr still prints **`[biologix-ai] i/n matrix eval starting: …`** and **`… finished …`** per candidate. Parallel runs also log **`Submitting N candidate(s) to W worker process(es).`** |
-| `BIOLOGIX_AI_EVAL_MAX_WORKERS` | `1` | Number of parallel worker processes for `evaluate_candidates` / `openmm_evaluate_psmiles`. `1` = sequential (default, safe). Set to `2`–`4` to evaluate multiple candidates concurrently via `ProcessPoolExecutor`. Each worker loads a full OpenMM matrix system — start conservatively. Can also be set per-call via the `max_workers` argument on `openmm_evaluate_psmiles` or `MDSimulator.evaluate_candidates` (argument takes precedence over env). |
+| `BIOLOGIX_AI_EVAL_MAX_WORKERS` | `1` | Number of parallel worker processes. Docker entrypoint sets this to **100% of container CPUs** unless overridden. |
 | `BIOLOGIX_AI_OPENMM_CANDIDATE_TIMEOUT_S` | `900` (Docker default) | Per-candidate wall-clock budget for the full matrix eval (Packmol + minimize + energy). Set `0` to disable. Timed-out candidates return `stage=timeout` in `candidate_outcomes` instead of blocking the whole batch indefinitely. |
 
 **Note:** NPT is **off** by default so MCP runs finish in minutes; turn on for sampling-averaged interaction energy at the cost of runtime.
@@ -48,8 +48,8 @@ MCP **`openmm_evaluate_psmiles`** and [`MDSimulator.evaluate_candidates`](../src
 
 `openmm_evaluate_psmiles` and `MDSimulator.evaluate_candidates` support concurrent candidate evaluation via `ProcessPoolExecutor`:
 
-- **Default:** `max_workers=1` — sequential, identical to previous behaviour, no regression.
-- **Enable:** pass `max_workers=N` to the MCP tool, or set `BIOLOGIX_AI_EVAL_MAX_WORKERS=N` in the environment.  The explicit argument takes precedence over the environment variable.
+- **Default:** `max_workers=1` outside Docker; **Docker entrypoint** sets `BIOLOGIX_AI_EVAL_MAX_WORKERS` to **100% of container CPUs** (`nproc`) unless overridden.
+- **Enable / override:** pass `max_workers=N` to the MCP tool, or set `BIOLOGIX_AI_EVAL_MAX_WORKERS=N` in the environment. The explicit argument takes precedence over the environment variable.
 - **Prescreen in parent:** validity checks and `prescreen_psmiles_for_md` run in the main process; only candidates that pass are dispatched to workers. Skipped/rejected entries are recorded at their original indices before dispatching.
 - **Order preserved:** results are always returned in the original candidate order regardless of completion order.
 - **Seeds:** each worker receives `seed = base_seed + candidate_index` so runs are reproducible per candidate. Parallel and sequential results may differ slightly (interleaved RNG state in OpenMM NPT) but relative rankings are stable.
