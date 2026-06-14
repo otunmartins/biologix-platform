@@ -30,6 +30,12 @@ Onboard biologic → resolve_biologic_target (PDB)
 
 **`biologics-delivery-discovery`** is the default OpenCode agent and owns the full pipeline above (Steps 1–6 per iteration, **Step 7 iteration checkpoint** before any Iteration 2+). The legacy `materials-discovery` agent was removed; **`biologics-retrosynthesis`** remains a specialist legacy agent. The platform is **human-in-the-loop only**. Clients connecting via MCP can also drive the pipeline tool-by-tool.
 
+### MCP timeout → CLI fallback (agents)
+
+If **any** biologix-ai MCP call **times out once**, agents must **not** retry the same batched MCP call.
+Switch to the documented **CLI equivalent** via bash (one operation at a time). See
+[`.opencode/MCP_CLI_FALLBACK.md`](../.opencode/MCP_CLI_FALLBACK.md).
+
 ### NovoMCP-inspired MCP tools added (May 2026)
 
 | Tool | Pattern | Purpose |

@@ -11,6 +11,12 @@ This page describes the biologix-ai MCP tools and what each one needs. For setup
 
 The launcher uses the `biologix-ai-sim` conda env. Session outputs go to `runs/<session_id>/`. Screening details: [OPENMM_SCREENING.md](OPENMM_SCREENING.md).
 
+### MCP timeout → CLI fallback
+
+If **any** MCP tool times out once in OpenCode, treat it as **stdio transport failure** and run the
+equivalent CLI via bash (see [`.opencode/MCP_CLI_FALLBACK.md`](../.opencode/MCP_CLI_FALLBACK.md)).
+Do not retry the same batched MCP call.
+
 ---
 
 ## Tool prerequisites

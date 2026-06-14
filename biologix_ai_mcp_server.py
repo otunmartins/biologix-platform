@@ -2597,6 +2597,10 @@ def save_pipeline_stage(
         detail: Optional JSON or text explaining the disposition (alert names,
             scores, exclusion reason, route count, etc.).
         run_dir: Session directory.
+
+    Note: This append is instant. A client-side "timeout" usually means the MCP stdio server
+    is still busy (e.g. OpenMM running) or parallel MCP calls blocked the pipe — retry one save
+    at a time after the prior tool completes.
     """
     from biologix_ai.services.pipeline_audit import save_pipeline_stage as _save
 

@@ -19,6 +19,8 @@ You run **time-bounded scripted discovery** for polymer screening—same spirit 
 
 This agent uses the **`run_autonomous_discovery`** subprocess: fixed pipeline (Scholar mine → cheminformatics mutation → OpenMM evaluate) with **no LLM reasoning** between steps.
 
+If **`run_autonomous_discovery`** MCP times out once, run **`python3 scripts/run_autonomous_discovery.py`** via bash instead (see `.opencode/MCP_CLI_FALLBACK.md`).
+
 ## Primary action: start the overnight loop
 
 1. Call **`run_autonomous_discovery`** with `budget_minutes`, `run_in_background=true`, optional `run_name`. Each run creates **one folder** `runs/<session_id>/` containing TSV, subprocess log, summary JSON, and per-iteration JSON.

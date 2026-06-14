@@ -29,14 +29,29 @@ If any tool returns `abort: true`, an import error, or a missing dependency:
 
 Do not suggest `RETRO_USE_INTERNAL_LLM`, manual pip steps, or partial workarounds.
 `./install` provides AmberTools (antechamber/parmchk2) for OpenMM GAFF screening.
-Do not read `src/`, `scripts/`, or config files to "understand the project" — call MCP tools only.
+Do not read `src/`, `scripts/`, or config files to "understand the project" — call MCP tools first,
+**except** documented **CLI fallbacks** when MCP times out (see below and `.opencode/MCP_CLI_FALLBACK.md`).
+
+## MCP timeout → CLI fallback (all platform tools)
+
+If **any** `biologix-ai` MCP call **times out once**, returns no JSON, shows a red icon, or hangs while
+work may still be running → **MCP stdio failed**, not necessarily bad science.
+
+1. **Stop** retrying the same batched/parallel MCP call.
+2. **Switch** to the equivalent **bash / CLI** (one operation at a time, `2>&1` for visible progress).
+3. Parse CLI JSON/text output; continue the pipeline from that result.
+4. Record audit with **single** MCP calls when they return instantly (`save_pipeline_stage`, etc.).
+5. Note in the report: *"via CLI fallback (MCP timeout)."*
+
+See **`.opencode/MCP_CLI_FALLBACK.md`** for the full tool → CLI mapping. OpenMM is the most common case
+(`scripts/run_openmm_matrix.py` — detailed in Step 4).
 
 ## MCP concurrency (critical in Docker)
 
 The `biologix-ai` MCP server uses **stdio**. **Never issue parallel/batched MCP tool calls**
-(multiple `generate_psmiles_from_name`, `validate_psmiles`, etc. in one turn). OpenCode can
-deadlock the pipe: tools appear to run forever, the TUI stops accepting keyboard input, and
-Esc does nothing.
+(multiple `generate_psmiles_from_name`, `validate_psmiles`, `openmm_evaluate_psmiles`,
+`save_pipeline_stage`, etc. in one turn). OpenCode can deadlock the pipe or hit MCP timeouts:
+tools appear to run forever, saves fail with red icons, and the TUI may stop accepting input.
 
 **Rule:** one MCP tool call → wait for its JSON result → then the next. Max **6** candidates
 per Step 3; if `generate_psmiles_from_name` returns `ok: false`, note it and continue.
@@ -91,7 +106,27 @@ whether to run OpenMM — not again in Step 4.
 
 When running OpenMM:
 
-- `openmm_evaluate_psmiles(psmiles_list=<≤3 pass PSMILES>, run_dir=<session>, response_format="concise")`
+**Preferred (audit-integrated):** one MCP call **per candidate** (not a batch of 3 in one call):
+
+- `openmm_evaluate_psmiles(psmiles_list=<single pass PSMILES>, run_dir=<session>, max_workers=1, response_format="concise")`
+- Wait for JSON → `save_pipeline_stage(..., stage="openmm", ...)` → next candidate.
+
+Do **not** pass 3 PSMILES with `max_workers=3` in one MCP call — OpenCode MCP timeout (~10 min)
+often kills the batch before any result returns, even while OpenMM is still running.
+
+**CLI fallback** (when MCP times out, returns empty, or the UI looks stuck with no JSON):
+
+Run **one polymer at a time** via bash (progress visible with `2>&1`; same physics as MCP):
+
+```bash
+cd /app && python3 scripts/run_openmm_matrix.py '<PSMILES>' \
+  --n-repeats 4 --n-polymers 8 --box-nm 7.5 --packing-mode bulk --no-npt 2>&1
+```
+
+- `--no-npt` matches Docker MCP defaults (minimize + single-point interaction energy).
+- Parse the trailing JSON for `interaction_energy_kj_mol` (and `interaction_energy_std_kj_mol` if present).
+- Record each result with **`save_pipeline_stage`** (one MCP call, wait for JSON) before the next bash run.
+- In the report, note: *"OpenMM via CLI fallback (MCP batch timed out)."*
 
 Build `psmiles_list` only from `library_disposition` **pass** rows (use **warning** only if no pass).
 
@@ -134,6 +169,14 @@ resolves to a polymer name).
 7. `check_excipient_compliance(psmiles, jurisdiction="FDA,EMA", run_dir=<session>)`
 
 8. `save_pipeline_stage(candidate_psmiles, stage="retro", disposition, detail, run_dir=<session>)`
+
+**Audit saves (`save_pipeline_stage`):** append-only JSONL — completes in milliseconds. If a save
+shows a timeout or red icon, the MCP server is usually **still busy** or **blocked by parallel
+MCP calls** — not slow disk I/O. Retry **one** save at a time after the prior MCP/bash call
+finishes; never fire three `save_pipeline_stage` calls in parallel.
+
+If OpenMM used the CLI fallback, still call `save_pipeline_stage(..., stage="openmm", ...)` per
+candidate with the parsed energy in `detail`.
 
 If `plan_retrosynthesis` returns no routes after the retry loop: stop and report the exact
 `kg_empty_after_session_extractions` detail — do not invent routes.
@@ -190,6 +233,7 @@ Would you like to run **Iteration <N+1>** with refined candidates, or stop here?
 - State "RetroSyn KG routes" only when `metadata.route_provenance` is `session_agent_llm`.
 - State "AiZynthFinder ran" only when `aizynth_monomers_attempted > 0`.
 - Do not describe retrosynthesis for a candidate without `retrosynthesis/plan_*.json`.
+- OpenMM scores require `openmm_evaluate_psmiles` **or** CLI `run_openmm_matrix.py` for that candidate; note CLI fallback if MCP timed out.
 
 ## On failure (repeat)
 

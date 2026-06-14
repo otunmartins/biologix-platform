@@ -42,11 +42,19 @@ If any tool returns `abort: true`, an import error, or a missing dependency:
 3. Tell them: **Run `./install` from the repo root, then restart this session.**
 
 Do not suggest `RETRO_USE_INTERNAL_LLM`, manual pip steps, or partial workarounds.
-Do not read `src/`, `scripts/`, or config files to "understand the project" — call MCP tools only.
+Do not read `src/`, `scripts/`, or config files except **CLI fallbacks** after MCP timeout
+(`.opencode/MCP_CLI_FALLBACK.md`).
+
+## MCP timeout → CLI fallback (all platform tools)
+
+If **any** `biologix-ai` MCP call **times out once**, returns no JSON, or hangs → treat as **MCP transport
+failure**. Stop batched/parallel MCP retries. Run the equivalent CLI via bash (one at a time, `2>&1`).
+See **`.opencode/MCP_CLI_FALLBACK.md`**. OpenMM: `scripts/run_openmm_matrix.py` (Step 4).
 
 ## MCP concurrency (critical in Docker)
 
-Never batch parallel MCP tool calls (`generate_psmiles_from_name`, `validate_psmiles`, etc.).
+Never batch parallel MCP tool calls (`generate_psmiles_from_name`, `validate_psmiles`,
+`openmm_evaluate_psmiles`, `save_pipeline_stage`, etc.).
 The stdio MCP server deadlocks under concurrent requests. **One tool → wait for result → next.**
 
 ## Protocol
@@ -89,8 +97,19 @@ If no polymer target was given, derive up to **6** names from literature and cal
 Only call `openmm_evaluate_psmiles` if the user explicitly confirmed "Run OpenMM: yes" in Step 1,
 or asks for it mid-session. If skipping, note it: *"OpenMM skipped this iteration (fast mode)."*
 
-If running OpenMM, limit to ≤3 pass candidates and pass `response_format="concise"`:
-- `openmm_evaluate_psmiles(psmiles_list=<≤3 pass PSMILES>, run_dir=<session>, response_format="concise")`
+If running OpenMM, limit to ≤3 pass candidates. **One MCP call per candidate** (`max_workers=1`):
+
+- `openmm_evaluate_psmiles(psmiles_list=<single PSMILES>, run_dir=<session>, max_workers=1, response_format="concise")`
+
+If MCP times out (~10 min OpenCode limit) or returns no JSON, use the **CLI fallback** (bash, one
+polymer at a time; same core physics; progress visible with `2>&1`):
+
+```bash
+cd /app && python3 scripts/run_openmm_matrix.py '<PSMILES>' \
+  --n-repeats 4 --n-polymers 8 --box-nm 7.5 --packing-mode bulk --no-npt 2>&1
+```
+
+Parse JSON output → `save_pipeline_stage(..., stage="openmm", ...)` per candidate (sequential MCP).
 
 ### Step 5 — Retrosynthesis (each pass candidate)
 

@@ -99,6 +99,25 @@ print(r['evaluation_progress'][0])
 "
 ```
 
+## MCP timeout → CLI fallback (OpenCode agents)
+
+OpenCode **`mcp_timeout`** (~10 minutes) applies to the **whole** MCP tool response. A batch
+`openmm_evaluate_psmiles` with 3 candidates often exceeds that even when OpenMM is still running.
+
+**Agent policy (delivery / fast-discovery agents):**
+
+1. Prefer **one PSMILES per MCP call**, `max_workers=1`.
+2. On timeout or empty MCP result → run **`scripts/run_openmm_matrix.py`** via **bash** (one polymer
+   at a time, `2>&1` so `stage=…` progress appears in the session).
+3. Use **`--no-npt`** to match Docker MCP defaults (minimize + single-point interaction energy).
+4. Parse the trailing JSON; record with **`save_pipeline_stage(..., stage="openmm", ...)`** — **one
+   MCP save at a time** (saves are instant; "timeout" on save usually means MCP stdio blocked).
+
+```bash
+cd /app && python3 scripts/run_openmm_matrix.py '[*]OC(=O)C(C)[*]' \
+  --n-repeats 4 --n-polymers 8 --box-nm 7.5 --packing-mode bulk --no-npt 2>&1
+```
+
 ## Fast merged insulin + single oligomer (diagnostics only)
 
 **Not** used by `openmm_evaluate_psmiles`. For a quick vacuum merge of insulin + **one** offset oligomer (no Packmol):
