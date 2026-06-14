@@ -24,8 +24,7 @@ If any tool returns `abort: true` or a dependency error: stop, show the error, t
 
 ## MCP timeout → CLI fallback
 
-If any MCP call **times out once** → MCP transport failure. Use CLI per `.opencode/MCP_CLI_FALLBACK.md`
-(one bash job at a time, `2>&1`). Do not retry batched MCP.
+**Golden rule:** If **any** MCP call **times out for any reason** → **do not retry MCP** for that operation. Switch to the bash CLI in **`.opencode/MCP_CLI_FALLBACK.md`** (one job, `2>&1`).
 
 ## Protocol
 

@@ -13,9 +13,14 @@ The launcher uses the `biologix-ai-sim` conda env. Session outputs go to `runs/<
 
 ### MCP timeout → CLI fallback
 
-If **any** MCP tool times out once in OpenCode, treat it as **stdio transport failure** and run the
-equivalent CLI via bash (see [`.opencode/MCP_CLI_FALLBACK.md`](../.opencode/MCP_CLI_FALLBACK.md)).
-Do not retry the same batched MCP call.
+**Golden rule:** If **any** MCP tool times out for **any reason**, switch to the bash CLI in [`.opencode/MCP_CLI_FALLBACK.md`](../.opencode/MCP_CLI_FALLBACK.md). Do not retry the same operation via MCP.
+
+### Stdio serialization and progress (v0.5.11+)
+
+- **One tool at a time:** [`mcp_stdio_guard.py`](../src/python/biologix_ai/mcp_stdio_guard.py) wraps every handler. A second concurrent call returns `{"ok": false, "error": "MCP_BUSY"}` immediately.
+- **Progress keepalive:** long tools (`openmm_evaluate_psmiles`, `generate_psmiles_from_name`, guarded PDF paths) emit MCP `notifications/progress` every ~15s plus `runs/<session>/tool_events.jsonl` entries.
+- **Stdout rule:** MCP protocol uses stdout only; all logs go to stderr (`PYTHONUNBUFFERED=1` in `scripts/run_mcp_server.sh`).
+- **Response cap:** large OpenMM JSON is truncated (`truncated: true`); full detail remains in `tool_events.jsonl`.
 
 ---
 

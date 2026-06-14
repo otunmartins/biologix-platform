@@ -6,11 +6,20 @@ minimize, then compute interaction energy.
 Requires: packmol (pip install packmol), biologix-ai-sim env (openmm, openff, rdkit).
   mamba activate biologix-ai-sim
   python scripts/run_openmm_matrix.py '[*]CC[*]'
+
+When CLI flags are omitted, defaults follow BIOLOGIX_AI_* env vars (same as MCP OpenMM path).
+
+With --run-dir (or BIOLOGIX_AI_SESSION_DIR set), writes <session>/structures/ artifacts:
+monomer PNG, matplotlib preview, PyMOL chemviz PNG (*_complex_chemviz.png), minimized PDB.
 """
+
+from __future__ import annotations
+
 import argparse
 import json
 import os
 import sys
+from pathlib import Path
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(REPO, "src", "python"))
@@ -42,9 +51,24 @@ def main() -> None:
     ap.add_argument(
         "--target-density",
         type=float,
-        default=0.6,
+        default=None,
         metavar="G_CM3",
         help="Target polymer density (g/cm³) when --density-driven",
+    )
+    ap.add_argument(
+        "--run-dir",
+        metavar="PATH",
+        help="Session run directory; writes <run-dir>/structures/ PNGs and minimized PDB (MCP parity)",
+    )
+    ap.add_argument(
+        "--material-name",
+        default="cli_candidate",
+        help="Candidate label for artifact filenames (default: cli_candidate)",
+    )
+    ap.add_argument(
+        "--slug",
+        metavar="NAME",
+        help="Filename slug for artifacts (default: derived from --material-name)",
     )
     ap.add_argument("--save-packed", metavar="PATH", help="Save packed PDB (before minimization)")
     ap.add_argument(
@@ -85,6 +109,18 @@ def main() -> None:
         help="Stop NPT when wall-clock exceeds this many minutes (default: 15)",
     )
     ap.add_argument(
+        "--max-minimize-steps",
+        type=int,
+        default=None,
+        help="LocalEnergyMinimizer step cap (default: BIOLOGIX_AI_OPENMM_MAX_MINIMIZE_STEPS or 2000)",
+    )
+    ap.add_argument(
+        "--candidate-timeout-s",
+        type=float,
+        default=None,
+        help="Wall-clock cap for this run (default: BIOLOGIX_AI_OPENMM_CANDIDATE_TIMEOUT_S)",
+    )
+    ap.add_argument(
         "--progressive-pack",
         action="store_true",
         help="After initial n_polymers, keep adding chains until Packmol fails/times out or limits hit",
@@ -113,7 +149,26 @@ def main() -> None:
     ap.add_argument("-v", "--verbose", action="store_true")
     args = ap.parse_args()
 
-    from biologix_ai.simulation.openmm_complex import run_openmm_matrix_relax_and_energy
+    from biologix_ai.run_paths import ENV_SESSION
+    from biologix_ai.simulation.md_simulator import (
+        _run_matrix_eval_with_timeout,
+        attach_matrix_structure_artifacts,
+        resolve_eval_structure_artifacts_dir,
+    )
+    from biologix_ai.simulation.openmm_cli_config import resolve_openmm_cli_kwargs
+    from biologix_ai.psmiles_drawing import safe_filename_basename
+
+    density_flag = True if args.density_driven else None
+    no_npt_flag = True if args.no_npt else None
+
+    env_kw = resolve_openmm_cli_kwargs(
+        density_driven_flag=density_flag,
+        n_polymers_flag=None if density_flag else args.n_polymers,
+        target_density_flag=args.target_density,
+        no_npt_flag=no_npt_flag,
+        max_minimize_steps_flag=args.max_minimize_steps,
+        candidate_timeout_flag=args.candidate_timeout_s,
+    )
 
     kw: dict = dict(
         n_repeats=args.n_repeats,
@@ -122,7 +177,6 @@ def main() -> None:
         save_minimized_pdb=args.save_minimized,
         verbose=args.verbose,
         packing_mode=args.packing_mode,
-        run_npt=not args.no_npt,
         barostat_interval_fs=args.barostat_interval_fs,
         npt_duration_ps=args.npt_ps,
         wall_clock_limit_s=args.wall_clock_min * 60,
@@ -131,23 +185,53 @@ def main() -> None:
         progressive_max_total_s=args.progressive_pack_max_total_s,
         progressive_n_max=args.progressive_pack_n_max,
     )
+    kw.update({k: v for k, v in env_kw.items() if k not in ("candidate_timeout_s", "run_npt")})
+    if "run_npt" in env_kw:
+        kw["run_npt"] = env_kw["run_npt"]
+    if env_kw.get("target_density_g_cm3") is not None:
+        kw["target_density_g_cm3"] = env_kw["target_density_g_cm3"]
+    elif env_kw.get("n_polymers") is not None:
+        kw["n_polymers"] = env_kw["n_polymers"]
+    if env_kw.get("max_minimize_steps") is not None:
+        kw["max_minimize_steps"] = env_kw["max_minimize_steps"]
+
     if args.no_restrain_shell:
         kw["restrain_shell"] = False
     elif args.packing_mode == "bulk":
         kw["restrain_shell"] = None
     else:
         kw["restrain_shell"] = True
-    if args.density_driven:
-        kw["target_density_g_cm3"] = args.target_density
-    else:
-        kw["n_polymers"] = args.n_polymers
-        if args.packing_mode != "bulk":
-            kw["shell_only_angstrom"] = args.shell_angstrom
+    if not env_kw.get("target_density_g_cm3") and args.packing_mode != "bulk":
+        kw["shell_only_angstrom"] = args.shell_angstrom
 
-    result = run_openmm_matrix_relax_and_energy(args.psmiles, **kw)
-    if result is None:
+    if args.run_dir:
+        os.environ[ENV_SESSION] = str(Path(args.run_dir).resolve())
+
+    struct_dir = resolve_eval_structure_artifacts_dir(None)
+    slug = (args.slug or "").strip() or safe_filename_basename(args.material_name)
+    pdb_out: str | None = None
+    if struct_dir is not None:
+        pdb_out = str(struct_dir / f"{slug}_complex_minimized.pdb")
+        kw["save_minimized_pdb"] = pdb_out
+    elif args.save_minimized:
+        kw["save_minimized_pdb"] = args.save_minimized
+
+    timeout_s = env_kw.get("candidate_timeout_s")
+    result = _run_matrix_eval_with_timeout(args.psmiles, kw, timeout_s)
+    if not isinstance(result, dict) or result.get("ok") is False:
+        print(json.dumps(result or {"ok": False, "error": "unknown failure"}, indent=2))
         print("run_openmm_matrix_relax_and_energy failed", file=sys.stderr)
         sys.exit(1)
+
+    if struct_dir is not None:
+        result = attach_matrix_structure_artifacts(
+            result,
+            psmiles=args.psmiles,
+            slug=slug,
+            struct_dir=struct_dir,
+            pdb_out=pdb_out,
+        )
+
     print(json.dumps(result, indent=2))
 
 

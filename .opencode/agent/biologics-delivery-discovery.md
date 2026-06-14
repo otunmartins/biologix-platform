@@ -34,17 +34,15 @@ Do not read `src/`, `scripts/`, or config files to "understand the project" — 
 
 ## MCP timeout → CLI fallback (all platform tools)
 
-If **any** `biologix-ai` MCP call **times out once**, returns no JSON, shows a red icon, or hangs while
-work may still be running → **MCP stdio failed**, not necessarily bad science.
+**Golden rule:** If **any** `biologix-ai` MCP call **times out for any reason** (OpenCode limit, hang, no JSON, red icon, transport error, host step timeout) → **do not retry MCP for that operation**. **Switch immediately** to the equivalent **bash CLI** (one job at a time, `2>&1`).
 
-1. **Stop** retrying the same batched/parallel MCP call.
-2. **Switch** to the equivalent **bash / CLI** (one operation at a time, `2>&1` for visible progress).
+1. **Stop** retrying the same MCP call (batched, parallel, or sequential).
+2. **Run** the bash/CLI command from **`.opencode/MCP_CLI_FALLBACK.md`** for that tool.
 3. Parse CLI JSON/text output; continue the pipeline from that result.
-4. Record audit with **single** MCP calls when they return instantly (`save_pipeline_stage`, etc.).
+4. Record audit with **single** instant MCP calls when they return (`save_pipeline_stage`, etc.).
 5. Note in the report: *"via CLI fallback (MCP timeout)."*
 
-See **`.opencode/MCP_CLI_FALLBACK.md`** for the full tool → CLI mapping. OpenMM is the most common case
-(`scripts/run_openmm_matrix.py` — detailed in Step 4).
+OpenMM is the most common case: `scripts/run_openmm_matrix.py` (Step 4).
 
 ## MCP concurrency (critical in Docker)
 
@@ -53,8 +51,7 @@ The `biologix-ai` MCP server uses **stdio**. **Never issue parallel/batched MCP 
 `save_pipeline_stage`, etc. in one turn). OpenCode can deadlock the pipe or hit MCP timeouts:
 tools appear to run forever, saves fail with red icons, and the TUI may stop accepting input.
 
-**Rule:** one MCP tool call → wait for its JSON result → then the next. Max **6** candidates
-per Step 3; if `generate_psmiles_from_name` returns `ok: false`, note it and continue.
+**Rule:** one MCP tool call → wait for its JSON result → then the next. Parallel calls return **`MCP_BUSY`** — retry **one** MCP call sequentially. If **that** call times out for any reason → bash CLI per **`.opencode/MCP_CLI_FALLBACK.md`**. Max **6** candidates per Step 3; if `generate_psmiles_from_name` returns `ok: false`, note it and continue.
 
 ## Protocol
 
@@ -114,17 +111,20 @@ When running OpenMM:
 Do **not** pass 3 PSMILES with `max_workers=3` in one MCP call — OpenCode MCP timeout (~10 min)
 often kills the batch before any result returns, even while OpenMM is still running.
 
-**CLI fallback** (when MCP times out, returns empty, or the UI looks stuck with no JSON):
+**CLI fallback** (mandatory when MCP **times out for any reason** — do not retry MCP):
 
-Run **one polymer at a time** via bash (progress visible with `2>&1`; same physics as MCP):
+Run **one polymer at a time** via bash (progress visible with `2>&1`):
 
 ```bash
 cd /app && python3 scripts/run_openmm_matrix.py '<PSMILES>' \
-  --n-repeats 4 --n-polymers 8 --box-nm 7.5 --packing-mode bulk --no-npt 2>&1
+  --run-dir runs/SESSION --material-name 'Candidate_N' \
+  --density-driven --target-density 0.52 \
+  --n-repeats 4 --box-nm 7.5 --packing-mode bulk --no-npt 2>&1
 ```
 
 - `--no-npt` matches Docker MCP defaults (minimize + single-point interaction energy).
-- Parse the trailing JSON for `interaction_energy_kj_mol` (and `interaction_energy_std_kj_mol` if present).
+- `--run-dir` + `--material-name` write `<session>/structures/{slug}_complex_chemviz.png` (PyMOL) and related PNGs/PDB — same as MCP.
+- Parse the trailing JSON for `interaction_energy_kj_mol` (and `complex_chemviz_png_path` for reports).
 - Record each result with **`save_pipeline_stage`** (one MCP call, wait for JSON) before the next bash run.
 - In the report, note: *"OpenMM via CLI fallback (MCP batch timed out)."*
 

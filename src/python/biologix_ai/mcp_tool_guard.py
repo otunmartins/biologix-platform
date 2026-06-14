@@ -14,7 +14,18 @@ import time
 import traceback
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Callable, Dict, Optional, Union
+from typing import TYPE_CHECKING, Any, Callable, Dict, Optional, Union
+
+if TYPE_CHECKING:
+    from mcp.server.fastmcp import Context
+
+_TRUNCATE_HEAVY_KEYS = (
+    "evaluation_progress",
+    "structure_artifact_paths",
+    "evaluation_note",
+    "traceback",
+    "property_analysis",
+)
 
 
 def _utc_now() -> str:
@@ -114,9 +125,116 @@ def enrich_tool_result(
         out.setdefault(
             "hint",
             hint
-            or "Check <session>/tool_events.jsonl and tool_errors.log; retry or simplify inputs.",
+            or "Check <session>/tool_events.jsonl and tool_errors.log. "
+            "If MCP timed out for this tool, switch to bash CLI per .opencode/MCP_CLI_FALLBACK.md.",
         )
     return out
+
+
+def truncate_mcp_json(payload: Dict[str, Any], max_bytes: int = 65536) -> Dict[str, Any]:
+    """Strip heavy fields when MCP JSON would exceed stdio-friendly size."""
+    encoded = json.dumps(payload, default=str).encode("utf-8")
+    if len(encoded) <= max_bytes:
+        return payload
+    trimmed = dict(payload)
+    for key in _TRUNCATE_HEAVY_KEYS:
+        trimmed.pop(key, None)
+    if len(json.dumps(trimmed, default=str).encode("utf-8")) > max_bytes:
+        trimmed = {
+            "ok": trimmed.get("ok", True),
+            "truncated": True,
+            "hint": "Full detail in <session>/tool_events.jsonl",
+            "candidate_outcomes": trimmed.get("candidate_outcomes"),
+            "error": trimmed.get("error"),
+        }
+    else:
+        trimmed["truncated"] = True
+        trimmed.setdefault(
+            "hint",
+            "Response truncated for MCP stdio; see <session>/tool_events.jsonl for full detail.",
+        )
+    return trimmed
+
+
+def log_tool_budget(
+    session_dir: Optional[Union[str, Path]],
+    *,
+    tool: str,
+    candidate_timeout_s: Optional[float] = None,
+    mcp_timeout_ms: Optional[int] = None,
+) -> None:
+    """Log expected wall-clock budget at MCP tool start."""
+    budgets = []
+    if candidate_timeout_s is not None and candidate_timeout_s > 0:
+        budgets.append(float(candidate_timeout_s))
+    if mcp_timeout_ms is not None and mcp_timeout_ms > 0:
+        budgets.append(mcp_timeout_ms / 1000.0)
+    expected = min(budgets) if budgets else None
+    extra: Dict[str, Any] = {}
+    if candidate_timeout_s is not None:
+        extra["candidate_timeout_s"] = candidate_timeout_s
+    if mcp_timeout_ms is not None:
+        extra["mcp_timeout_ms"] = mcp_timeout_ms
+    if expected is not None:
+        extra["expected_budget_s"] = round(expected, 1)
+    log_tool_event(
+        Path(session_dir).resolve() if session_dir else None,
+        tool=tool,
+        status="budget",
+        stage="plan",
+        message=f"expected_budget_s={expected}" if expected is not None else "",
+        extra=extra or None,
+    )
+
+
+class McpProgressReporter:
+    """Emit MCP ``notifications/progress`` plus stderr / tool_events mirrors."""
+
+    def __init__(
+        self,
+        ctx: Optional["Context"],
+        *,
+        tool: str = "",
+        session_dir: Optional[Union[str, Path]] = None,
+        interval_s: float = 15.0,
+    ) -> None:
+        self._ctx = ctx
+        self._tool = tool
+        self._session = Path(session_dir).resolve() if session_dir else None
+        self._interval_s = max(0.0, float(interval_s))
+        self._last_emit = 0.0
+        self._counter = 0.0
+
+    def heartbeat(
+        self,
+        message: str,
+        *,
+        stage: str = "",
+        progress: Optional[float] = None,
+        total: Optional[float] = None,
+        force: bool = False,
+        extra: Optional[Dict[str, Any]] = None,
+    ) -> None:
+        now = time.perf_counter()
+        if not force and self._interval_s > 0 and (now - self._last_emit) < self._interval_s:
+            return
+        self._last_emit = now
+        if progress is None:
+            self._counter += 1.0
+            progress = self._counter
+        if self._ctx is not None:
+            try:
+                self._ctx.report_progress(progress, total, message)
+            except Exception:
+                pass
+        log_tool_event(
+            self._session,
+            tool=self._tool or "mcp_tool",
+            status="progress",
+            stage=stage or "heartbeat",
+            message=message,
+            extra=extra,
+        )
 
 
 def run_guarded_tool(
@@ -188,5 +306,6 @@ def run_guarded_tool(
             status="failed",
             stage=stage,
             hint=failure_hint
-            or "Unexpected tool exception; inspect tool_errors.log in the session folder.",
+            or "Unexpected tool exception; inspect tool_errors.log. "
+            "If MCP timed out, use bash CLI per .opencode/MCP_CLI_FALLBACK.md.",
         )

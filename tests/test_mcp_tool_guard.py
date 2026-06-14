@@ -41,3 +41,11 @@ def test_run_guarded_tool_failure(tmp_path):
     assert r["status"] == "failed"
     assert "hint" in r
     assert (sess / "tool_errors.log").is_file()
+
+
+def test_truncate_mcp_json_in_guard_module() -> None:
+    from biologix_ai.mcp_tool_guard import truncate_mcp_json
+
+    big = {"ok": True, "evaluation_progress": [{"x": "y" * 8000}]}
+    out = truncate_mcp_json(big, max_bytes=512)
+    assert out.get("truncated") is True

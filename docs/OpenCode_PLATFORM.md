@@ -32,9 +32,24 @@ Onboard biologic → resolve_biologic_target (PDB)
 
 ### MCP timeout → CLI fallback (agents)
 
-If **any** biologix-ai MCP call **times out once**, agents must **not** retry the same batched MCP call.
-Switch to the documented **CLI equivalent** via bash (one operation at a time). See
-[`.opencode/MCP_CLI_FALLBACK.md`](../.opencode/MCP_CLI_FALLBACK.md).
+If **any** biologix-ai MCP call **times out for any reason**, agents must **not** retry that operation via MCP. **Switch immediately** to the documented **bash CLI** equivalent. See [`.opencode/MCP_CLI_FALLBACK.md`](../.opencode/MCP_CLI_FALLBACK.md).
+
+### MCP timeout stack (v0.5.11+)
+
+| Layer | Default | Notes |
+|-------|---------|-------|
+| OpenCode `experimental.mcp_timeout` | **960000 ms** | Whole tool call (`.opencode/opencode.jsonc`) |
+| `BIOLOGIX_AI_OPENMM_CANDIDATE_TIMEOUT_S` | **840 s** | In-process per candidate; fails before transport |
+| MCP progress keepalive | **~15 s** | `Context.report_progress` + `tool_events.jsonl` |
+| Stdio serialization | **`MCP_BUSY`** | Second parallel call rejected immediately |
+
+**OpenCode pin:** Docker records installed version in `/app/.opencode-version`. Verify with
+`bash scripts/verify_opencode_mcp_host.sh` (fast) or `… full` for sleep-server import check.
+Build with `docker build --build-arg OPENCODE_VERSION=x.y.z` after a release passes the >130s MCP smoke.
+Documented minimum: **`OPENCODE_MIN_VERSION=1.14.31`** (needs `onprogress` + stepMs fixes).
+
+If the model provider still cuts long steps, set provider `"timeout": false` in OpenCode config
+(see OpenCode #8701).
 
 ### NovoMCP-inspired MCP tools added (May 2026)
 

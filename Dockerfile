@@ -96,9 +96,13 @@ RUN if [ "$SLIM" = "0" ]; then \
       echo "SLIM build: skipping AiZynthFinder model download"; \
     fi
 
-# Install OpenCode CLI
+# Install OpenCode CLI (pin with build-arg OPENCODE_VERSION when verified)
+ARG OPENCODE_VERSION=""
 RUN curl -fsSL https://opencode.ai/install | bash \
-    && /root/.opencode/bin/opencode --version
+    && if [ -n "$OPENCODE_VERSION" ]; then \
+         /root/.opencode/bin/opencode upgrade "$OPENCODE_VERSION" || true; \
+       fi \
+    && /root/.opencode/bin/opencode --version | tee /app/.opencode-version
 
 # Create runtime directories (volume mount points)
 RUN mkdir -p /app/runs /app/papers /app/data/aizynthfinder

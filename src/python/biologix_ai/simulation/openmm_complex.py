@@ -31,6 +31,26 @@ def _stage_heartbeat(stage: str, msg: str) -> None:
     ):
         return
     print(f"[biologix-ai] stage={stage} {msg}", file=sys.stderr, flush=True)
+    hook = _STAGE_HEARTBEAT_HOOK
+    if hook is not None:
+        try:
+            hook(stage, msg)
+        except Exception:
+            pass
+
+
+_STAGE_HEARTBEAT_HOOK: Optional[Any] = None
+
+
+def register_stage_heartbeat_hook(hook: Optional[Any]) -> None:
+    """Register optional callback ``hook(stage, msg)`` for MCP progress mirroring."""
+    global _STAGE_HEARTBEAT_HOOK
+    _STAGE_HEARTBEAT_HOOK = hook
+
+
+def clear_stage_heartbeat_hook() -> None:
+    """Remove any registered stage heartbeat hook."""
+    register_stage_heartbeat_hook(None)
 
 
 # OpenMM

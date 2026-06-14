@@ -6,7 +6,7 @@ import sys
 import time
 from concurrent.futures import ProcessPoolExecutor, TimeoutError as FuturesTimeoutError, as_completed
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 from biologix_ai.run_paths import repo_root_from_package, session_dir_from_env
 
@@ -152,15 +152,88 @@ def resolve_eval_structure_artifacts_dir(artifacts_dir: Optional[str] = None) ->
     return None
 
 
+def attach_matrix_structure_artifacts(
+    res: Dict[str, Any],
+    *,
+    psmiles: str,
+    slug: str,
+    struct_dir: Union[str, Path],
+    pdb_out: Optional[Union[str, Path]] = None,
+) -> Dict[str, Any]:
+    """
+    Write monomer PNG, matplotlib preview, and PyMOL chemviz PNG for one matrix eval result.
+
+    Matches MCP ``evaluate_candidates`` artifact layout under ``<struct_dir>/``:
+    ``{slug}_monomer.png``, ``{slug}_complex_preview.png``, ``{slug}_complex_chemviz.png``.
+    Requires ``pymol`` on PATH for chemviz (open-source PyMOL); evaluation still succeeds if missing.
+    """
+    from biologix_ai.psmiles_drawing import save_psmiles_png
+
+    from .pdb_preview import write_complex_preview_png
+    from .pymol_complex_viz import write_complex_viz_png_auto
+
+    out = dict(res)
+    struct = Path(struct_dir).resolve()
+    struct.mkdir(parents=True, exist_ok=True)
+
+    if pdb_out:
+        out["complex_pdb_path"] = str(Path(pdb_out).resolve())
+    elif out.get("minimized_pdb"):
+        out["complex_pdb_path"] = out["minimized_pdb"]
+
+    npc = out.get("n_polymer_atoms_per_chain")
+    nch = out.get("n_polymer_chains")
+    if npc is not None and nch is not None:
+        out["n_polymer_atoms"] = int(npc) * int(nch)
+
+    cp = out.get("complex_pdb_path")
+    nprot = out.get("n_insulin_atoms")
+    if cp and nprot is not None:
+        try:
+            from .matrix_packing_metrics import compute_matrix_packing_metrics
+
+            out["packing_metrics"] = compute_matrix_packing_metrics(str(cp), int(nprot))
+        except Exception as ex:
+            out["packing_metrics"] = {"ok": False, "error": str(ex)}
+
+    _progress_log(f"[biologix-ai] stage=artifact_render writing structure PNGs for {slug}")
+    monomer_png = struct / f"{slug}_monomer.png"
+    r_mono = save_psmiles_png(psmiles, monomer_png, overwrite=True)
+    out["monomer_png_path"] = r_mono.get("path") if r_mono.get("ok") else None
+    out["monomer_png_error"] = r_mono.get("error")
+    if cp:
+        preview_png = struct / f"{slug}_complex_preview.png"
+        r_prev = write_complex_preview_png(str(cp), str(preview_png))
+        out["complex_preview_png_path"] = r_prev.get("path") if r_prev.get("ok") else None
+        out["complex_preview_png_error"] = r_prev.get("error")
+        chemviz_png = struct / f"{slug}_complex_chemviz.png"
+        r_cv, cv_backend = write_complex_viz_png_auto(
+            str(cp),
+            str(chemviz_png),
+            n_protein_atoms=out.get("n_insulin_atoms"),
+        )
+        out["complex_chemviz_png_path"] = r_cv.get("path") if r_cv.get("ok") else None
+        out["complex_chemviz_png_error"] = r_cv.get("error")
+        out["complex_chemviz_backend"] = cv_backend
+    else:
+        out["complex_preview_png_path"] = None
+        out["complex_preview_png_error"] = "complex PDB not written"
+        out["complex_chemviz_png_path"] = None
+        out["complex_chemviz_png_error"] = "complex PDB not written"
+        out["complex_chemviz_backend"] = None
+    out["structure_artifacts_dir"] = str(struct)
+    return out
+
+
 def _candidate_timeout_s() -> Optional[float]:
     """
     Per-candidate wall-clock budget for OpenMM matrix evaluation.
 
-    ``BIOLOGIX_AI_OPENMM_CANDIDATE_TIMEOUT_S`` (default 900). Set ``0`` to disable.
+    ``BIOLOGIX_AI_OPENMM_CANDIDATE_TIMEOUT_S`` (default 840). Set ``0`` to disable.
     """
-    raw = os.environ.get("BIOLOGIX_AI_OPENMM_CANDIDATE_TIMEOUT_S", "900").strip()
+    raw = os.environ.get("BIOLOGIX_AI_OPENMM_CANDIDATE_TIMEOUT_S", "840").strip()
     if not raw:
-        return 900.0
+        return 840.0
     val = float(raw)
     if val <= 0:
         return None
@@ -258,11 +331,7 @@ def _evaluate_one_matrix_candidate(
     -------
     (index, result_dict_or_none, progress_entry_or_none)
     """
-    from biologix_ai.psmiles_drawing import save_psmiles_png
-
     from .openmm_complex import run_openmm_matrix_relax_and_energy
-    from .pdb_preview import write_complex_preview_png
-    from .pymol_complex_viz import write_complex_viz_png_auto
 
     kw = dict(matrix_kw)
     kw["random_seed"] = random_seed_offset
@@ -297,47 +366,15 @@ def _evaluate_one_matrix_candidate(
         res["complex_pdb_path"] = pdb_out
     elif res.get("minimized_pdb"):
         res["complex_pdb_path"] = res["minimized_pdb"]
-    npc = res.get("n_polymer_atoms_per_chain")
-    nch = res.get("n_polymer_chains")
-    if npc is not None and nch is not None:
-        res["n_polymer_atoms"] = int(npc) * int(nch)
-
-    cp = res.get("complex_pdb_path")
-    nprot = res.get("n_insulin_atoms")
-    if cp and nprot is not None:
-        try:
-            from .matrix_packing_metrics import compute_matrix_packing_metrics
-
-            res["packing_metrics"] = compute_matrix_packing_metrics(str(cp), int(nprot))
-        except Exception as ex:
-            res["packing_metrics"] = {"ok": False, "error": str(ex)}
 
     if struct_dir_str is not None:
-        struct_dir = Path(struct_dir_str)
-        monomer_png = struct_dir / f"{slug}_monomer.png"
-        r_mono = save_psmiles_png(psmiles, monomer_png, overwrite=True)
-        res["monomer_png_path"] = r_mono.get("path") if r_mono.get("ok") else None
-        res["monomer_png_error"] = r_mono.get("error")
-        preview_png = struct_dir / f"{slug}_complex_preview.png"
-        if res.get("complex_pdb_path"):
-            r_prev = write_complex_preview_png(res["complex_pdb_path"], str(preview_png))
-            res["complex_preview_png_path"] = r_prev.get("path") if r_prev.get("ok") else None
-            res["complex_preview_png_error"] = r_prev.get("error")
-            chemviz_png = struct_dir / f"{slug}_complex_chemviz.png"
-            r_cv, cv_backend = write_complex_viz_png_auto(
-                res["complex_pdb_path"],
-                str(chemviz_png),
-                n_protein_atoms=res.get("n_insulin_atoms"),
-            )
-            res["complex_chemviz_png_path"] = r_cv.get("path") if r_cv.get("ok") else None
-            res["complex_chemviz_png_error"] = r_cv.get("error")
-            res["complex_chemviz_backend"] = cv_backend
-        else:
-            res["complex_preview_png_path"] = None
-            res["complex_preview_png_error"] = "complex PDB not written"
-            res["complex_chemviz_png_path"] = None
-            res["complex_chemviz_png_error"] = "complex PDB not written"
-            res["complex_chemviz_backend"] = None
+        res = attach_matrix_structure_artifacts(
+            res,
+            psmiles=psmiles,
+            slug=slug,
+            struct_dir=struct_dir_str,
+            pdb_out=pdb_out,
+        )
 
     pm = res.get("packing_metrics") or {}
     entry = {
@@ -398,6 +435,7 @@ class MDSimulator:
         verbose: bool = True,
         artifacts_dir: Optional[str] = None,
         max_workers: Optional[int] = None,
+        progress_callback: Optional[Any] = None,
     ) -> Dict[str, Any]:
         """
         Evaluate polymer PSMILES candidates via OpenMM Packmol matrix.
@@ -429,14 +467,34 @@ class MDSimulator:
             Start with 2–4 on a machine with plenty of RAM.
         """
         from biologix_ai.material_mappings import prescreen_psmiles_for_md
-        from biologix_ai.psmiles_drawing import safe_filename_basename, save_psmiles_png
+        from biologix_ai.psmiles_drawing import safe_filename_basename
 
         from .packmol_packer import _packmol_available
         from .pdb_preview import write_complex_preview_png
         from .pymol_complex_viz import write_complex_viz_png_auto
+        from .openmm_complex import clear_stage_heartbeat_hook, register_stage_heartbeat_hook
 
         if not _packmol_available():
             raise _packmol_required_error()
+
+        def _emit_progress(**fields: Any) -> None:
+            if progress_callback is None:
+                return
+            try:
+                progress_callback(fields)
+            except Exception:
+                pass
+
+        if progress_callback is not None:
+            register_stage_heartbeat_hook(
+                lambda stage, msg: _emit_progress(
+                    status="progress",
+                    stage=stage,
+                    message=msg,
+                )
+            )
+        else:
+            clear_stage_heartbeat_hook()
 
         eval_quiet_env = _eval_quiet()
         if eval_quiet_env:
@@ -592,6 +650,14 @@ class MDSimulator:
                     _progress_log(
                         f"[biologix-ai] {i + 1}/{n_total} matrix eval starting: {preview}"
                     )
+                _emit_progress(
+                    status="progress",
+                    stage="candidate_start",
+                    candidate_index=i,
+                    total=n_total,
+                    material_name=name,
+                    message=f"candidate {i + 1}/{n_total} matrix eval starting",
+                )
                 slug = safe_filename_basename(str(name))
                 pdb_out: Optional[str] = None
                 if struct_dir is not None:
@@ -622,6 +688,14 @@ class MDSimulator:
                         "seconds": round(elapsed, 3),
                     }
                     progress.append(entry)
+                    _emit_progress(
+                        status="failed",
+                        stage=stage,
+                        candidate_index=i,
+                        total=n_total,
+                        material_name=name,
+                        message=str(err_msg)[:200],
+                    )
                     if verbose:
                         _progress_log(
                             f"[biologix-ai] {i + 1}/{n_total} FAILED ({stage}): {err_msg[:200]}"
@@ -633,61 +707,18 @@ class MDSimulator:
                         )
                     continue
 
-                if pdb_out:
+                if struct_dir is not None:
+                    res = attach_matrix_structure_artifacts(
+                        res,
+                        psmiles=psmiles,
+                        slug=slug,
+                        struct_dir=struct_dir,
+                        pdb_out=pdb_out,
+                    )
+                elif pdb_out:
                     res["complex_pdb_path"] = pdb_out
                 elif res.get("minimized_pdb"):
                     res["complex_pdb_path"] = res["minimized_pdb"]
-                npc = res.get("n_polymer_atoms_per_chain")
-                nch = res.get("n_polymer_chains")
-                if npc is not None and nch is not None:
-                    res["n_polymer_atoms"] = int(npc) * int(nch)
-                cp = res.get("complex_pdb_path")
-                nprot = res.get("n_insulin_atoms")
-                if cp and nprot is not None:
-                    try:
-                        from .matrix_packing_metrics import compute_matrix_packing_metrics
-
-                        res["packing_metrics"] = compute_matrix_packing_metrics(
-                            str(cp), int(nprot)
-                        )
-                    except Exception as ex:
-                        res["packing_metrics"] = {"ok": False, "error": str(ex)}
-                if struct_dir is not None:
-                    _stage_heartbeat_log = _progress_log
-                    _stage_heartbeat_log(
-                        f"[biologix-ai] stage=artifact_render {i + 1}/{n_total} writing structure PNGs"
-                    )
-                    monomer_png = struct_dir / f"{slug}_monomer.png"
-                    r_mono = save_psmiles_png(psmiles, monomer_png, overwrite=True)
-                    res["monomer_png_path"] = r_mono.get("path") if r_mono.get("ok") else None
-                    res["monomer_png_error"] = r_mono.get("error")
-                    preview_png = struct_dir / f"{slug}_complex_preview.png"
-                    if res.get("complex_pdb_path"):
-                        r_prev = write_complex_preview_png(
-                            res["complex_pdb_path"],
-                            str(preview_png),
-                        )
-                        res["complex_preview_png_path"] = (
-                            r_prev.get("path") if r_prev.get("ok") else None
-                        )
-                        res["complex_preview_png_error"] = r_prev.get("error")
-                        chemviz_png = struct_dir / f"{slug}_complex_chemviz.png"
-                        r_cv, cv_backend = write_complex_viz_png_auto(
-                            res["complex_pdb_path"],
-                            str(chemviz_png),
-                            n_protein_atoms=res.get("n_insulin_atoms"),
-                        )
-                        res["complex_chemviz_png_path"] = (
-                            r_cv.get("path") if r_cv.get("ok") else None
-                        )
-                        res["complex_chemviz_png_error"] = r_cv.get("error")
-                        res["complex_chemviz_backend"] = cv_backend
-                    else:
-                        res["complex_preview_png_path"] = None
-                        res["complex_preview_png_error"] = "complex PDB not written"
-                        res["complex_chemviz_png_path"] = None
-                        res["complex_chemviz_png_error"] = "complex PDB not written"
-                        res["complex_chemviz_backend"] = None
                 md_results.append(res)
                 entry = {
                     "index": i,
@@ -719,6 +750,17 @@ class MDSimulator:
                         "fraction_polymer_within_0.80_nm"
                     )
                 progress.append(entry)
+                _emit_progress(
+                    status="completed",
+                    stage="done",
+                    candidate_index=i,
+                    total=n_total,
+                    material_name=name,
+                    message=(
+                        f"candidate {i + 1}/{n_total} completed "
+                        f"E_int={res.get('interaction_energy_kj_mol')} kJ/mol"
+                    ),
+                )
                 if verbose:
                     log_tail = f"E_int={res.get('interaction_energy_kj_mol')} kJ/mol"
                     if pm.get("ok"):
@@ -915,4 +957,5 @@ class MDSimulator:
                     else ""
                 )
             )
+        clear_stage_heartbeat_hook()
         return out

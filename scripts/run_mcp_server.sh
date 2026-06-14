@@ -30,6 +30,10 @@ if _lib="$(_conda_lib_path)"; then
   export LD_LIBRARY_PATH="${_lib}${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 fi
 
+export PYTHONUNBUFFERED=1
+export PYTHONIOENCODING=utf-8
+export BIOLOGIX_AI_MCP_TIMEOUT_MS="${BIOLOGIX_AI_MCP_TIMEOUT_MS:-960000}"
+
 # RetroSynAgent: OpenCode agent supplies extractions via submit_retro_extractions
 export RETRO_LLM_BACKEND="${RETRO_LLM_BACKEND:-skip}"
 

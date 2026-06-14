@@ -231,3 +231,53 @@ def test_max_workers_argument_overrides_env(monkeypatch):
     assert len(prog) == 1
     assert prog[0].get("status") == "completed"
     assert result.get("md_results_raw") is not None
+
+
+def _slow_openmm_matrix(psmiles, **kwargs):
+    import time
+
+    time.sleep(0.2)
+    return {"ok": True, "interaction_energy_kj_mol": -1.0}
+
+
+def test_run_matrix_eval_with_timeout_returns_timeout_stage(monkeypatch) -> None:
+    """Slow matrix eval should surface stage=timeout before transport kill."""
+    from biologix_ai.simulation import md_simulator as ms
+
+    monkeypatch.setattr(
+        "biologix_ai.simulation.openmm_complex.run_openmm_matrix_relax_and_energy",
+        _slow_openmm_matrix,
+    )
+    res = ms._run_matrix_eval_with_timeout("[*]CC[*]", {}, timeout_s=0.05)
+    assert res.get("ok") is False
+    assert res.get("stage") == "timeout"
+
+
+def test_evaluate_candidates_invokes_progress_callback(monkeypatch) -> None:
+    from biologix_ai.simulation import md_simulator as ms
+    from biologix_ai.simulation.openmm_compat import openmm_available
+
+    if not openmm_available():
+        pytest.skip("OpenMM stack required")
+
+    events = []
+
+    def _fake_eval(psmiles, matrix_kw, timeout_s):
+        return {"ok": True, "interaction_energy_kj_mol": -10.0, "method": "OpenMM_matrix"}
+
+    monkeypatch.setattr(ms, "_run_matrix_eval_with_timeout", _fake_eval)
+    monkeypatch.setattr(
+        "biologix_ai.material_mappings.prescreen_psmiles_for_md",
+        lambda _p: {"ok": True},
+    )
+    monkeypatch.setattr("biologix_ai.simulation.packmol_packer._packmol_available", lambda: True)
+
+    sim = ms.MDSimulator(n_steps=10)
+    sim.evaluate_candidates(
+        [{"material_name": "t", "chemical_structure": "[*]CC[*]"}],
+        max_candidates=1,
+        verbose=False,
+        max_workers=1,
+        progress_callback=lambda e: events.append(dict(e)),
+    )
+    assert any(e.get("stage") == "candidate_start" for e in events)

@@ -322,6 +322,17 @@ def _apply_pubchem_similarity(out: Dict[str, Any], psmiles: Optional[str]) -> No
         )
 
 
+def pubchem_timeout_s() -> float:
+    """HTTP read timeout for PubChem PUG REST (``BIOLOGIX_PUBCHEM_TIMEOUT_S``, default 5)."""
+    import os
+
+    raw = os.environ.get("BIOLOGIX_PUBCHEM_TIMEOUT_S", "5").strip()
+    if not raw:
+        return 5.0
+    val = float(raw)
+    return max(1.0, val)
+
+
 def lookup_monomer_pubchem(
     material_name: str,
     psmiles: Optional[str] = None,
@@ -787,7 +798,7 @@ def name_to_psmiles(material_name: str) -> Dict[str, Any]:
             "md_compatible": pre.get("ok", False),
         }
 
-    pub = lookup_monomer_pubchem(name)
+    pub = lookup_monomer_pubchem(name, timeout=pubchem_timeout_s())
     if not pub.get("ok"):
         return {
             "ok": False,

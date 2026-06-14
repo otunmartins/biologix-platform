@@ -1,9 +1,10 @@
 {
   "$schema": "https://opencode.ai/config.json",
   "default_agent": "biologics-delivery-discovery",
+  // Agents: any MCP timeout (any reason) → bash CLI per .opencode/MCP_CLI_FALLBACK.md (no MCP retry).
   "experimental": {
-    // Stdio MCP deadlocks on parallel tool calls; keep a finite timeout so hung tools fail.
-    "mcp_timeout": 600000
+    // Stdio MCP: server rejects parallel calls (MCP_BUSY); align with candidate timeout stack.
+    "mcp_timeout": 960000
   },
   "mcp": {
     "biologix-ai": {

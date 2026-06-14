@@ -20,9 +20,9 @@ export MPLBACKEND=Agg
 # shellcheck source=docker/cpu_defaults.sh
 source /app/docker/cpu_defaults.sh
 
-# OpenMM: auto-detect container CPUs and use all of them unless overridden (-e …).
+# OpenMM: default one parallel candidate for MCP-safe stdio (override for batch HPC).
 if [[ -z "${BIOLOGIX_AI_EVAL_MAX_WORKERS:-}" ]]; then
-  export BIOLOGIX_AI_EVAL_MAX_WORKERS="$(docker_default_eval_max_workers)"
+  export BIOLOGIX_AI_EVAL_MAX_WORKERS=1
 fi
 if [[ -z "${OMP_NUM_THREADS:-}" ]]; then
   export OMP_NUM_THREADS="$(docker_default_omp_num_threads "${BIOLOGIX_AI_EVAL_MAX_WORKERS}")"
@@ -33,7 +33,8 @@ export OPENBLAS_NUM_THREADS="${OPENBLAS_NUM_THREADS:-${OMP_NUM_THREADS}}"
 export NUMEXPR_NUM_THREADS="${NUMEXPR_NUM_THREADS:-${OMP_NUM_THREADS}}"
 
 # Interactive safety profile for Docker/OpenCode sessions (override with docker run -e …)
-export BIOLOGIX_AI_OPENMM_CANDIDATE_TIMEOUT_S="${BIOLOGIX_AI_OPENMM_CANDIDATE_TIMEOUT_S:-900}"
+export BIOLOGIX_AI_OPENMM_CANDIDATE_TIMEOUT_S="${BIOLOGIX_AI_OPENMM_CANDIDATE_TIMEOUT_S:-840}"
+export BIOLOGIX_AI_MCP_TIMEOUT_MS="${BIOLOGIX_AI_MCP_TIMEOUT_MS:-960000}"
 export BIOLOGIX_AI_OPENMM_MAX_MINIMIZE_STEPS="${BIOLOGIX_AI_OPENMM_MAX_MINIMIZE_STEPS:-1500}"
 export BIOLOGIX_PDF_TIMEOUT="${BIOLOGIX_PDF_TIMEOUT:-30}"
 export BIOLOGIX_TREE_TIMEOUT="${BIOLOGIX_TREE_TIMEOUT:-90}"
@@ -108,10 +109,11 @@ cat <<EOF
    yes  = auto-run on ≤3 pass candidates (no mid-pipeline Yes/No prompt)
    skip = skip OpenMM and note it in the report
 
- MCP: agent must call biologix-ai tools one-at-a-time (parallel calls deadlock stdio).
+ MCP: agent must call biologix-ai tools one-at-a-time (parallel calls return MCP_BUSY).
 
  CPUs visible: $(nproc 2>/dev/null || echo ?) → OpenMM workers=${BIOLOGIX_AI_EVAL_MAX_WORKERS} OMP=${OMP_NUM_THREADS}
-   (auto: 100% container CPUs; override -e BIOLOGIX_AI_EVAL_MAX_WORKERS=1 for sequential)
+   (default workers=1 for MCP; override -e BIOLOGIX_AI_EVAL_MAX_WORKERS=N for batch HPC)
+ OpenMM timeouts: candidate=${BIOLOGIX_AI_OPENMM_CANDIDATE_TIMEOUT_S}s MCP=${BIOLOGIX_AI_MCP_TIMEOUT_MS}ms
 ────────────────────────────────────────────────────────────────────────
 EOF
 

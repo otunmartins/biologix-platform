@@ -192,16 +192,17 @@ The entrypoint sets interactive defaults (override with `docker run -e …`):
 | Variable | Docker default | Purpose |
 |----------|----------------|---------|
 | `BIOLOGIX_AI_OPENMM_AUTO` | `yes` | `yes` = run OpenMM on ≤3 pass candidates without a mid-pipeline prompt; `skip` = skip OpenMM |
-| `BIOLOGIX_AI_OPENMM_CANDIDATE_TIMEOUT_S` | `900` | Per-candidate OpenMM wall-clock limit |
+| `BIOLOGIX_AI_OPENMM_CANDIDATE_TIMEOUT_S` | `840` | Per-candidate OpenMM wall-clock limit (below MCP transport) |
+| `BIOLOGIX_AI_MCP_TIMEOUT_MS` | `960000` | OpenCode MCP transport budget (ms) |
 | `BIOLOGIX_AI_OPENMM_MAX_MINIMIZE_STEPS` | `1500` | Shorter minimization for faster turns |
-| `BIOLOGIX_AI_EVAL_MAX_WORKERS` | **100% of container CPUs** (`nproc`) | Parallel OpenMM processes; auto-detected at entrypoint |
-| `OMP_NUM_THREADS` | **CPUs ÷ min(workers, 3)** | OpenMM threads per worker; all CPUs when `workers=1` |
+| `BIOLOGIX_AI_EVAL_MAX_WORKERS` | **`1`** (MCP-safe) | Parallel OpenMM **candidates**; use `-e BIOLOGIX_AI_EVAL_MAX_WORKERS=N` for batch HPC |
+| `OMP_NUM_THREADS` | **`nproc`** when `workers=1` | OpenMM threads per worker |
 | `BIOLOGIX_AI_EVAL_CPU_FRACTION` | `1.0` | Fraction of container CPUs for workers (e.g. `0.75` for headroom) |
 | `DOCKER_CPU_PCT` | `75` (host scripts only) | Optional `--cpus` quota via `scripts/docker_run.sh` |
 
 ### CPU auto-detection (GHCR — no wrapper required)
 
-The **image entrypoint** runs `nproc` on every start and configures OpenMM to use **all CPUs Docker exposes to the container**:
+The **image entrypoint** runs `nproc` on every start and configures OpenMM with **`BIOLOGIX_AI_EVAL_MAX_WORKERS=1`** (MCP-safe) while **`OMP_NUM_THREADS`** uses all container CPUs for math inside each candidate:
 
 ```bash
 docker run --platform linux/amd64 -it --rm --init \

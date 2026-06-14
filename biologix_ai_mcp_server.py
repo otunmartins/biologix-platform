@@ -30,7 +30,7 @@ sys.path.insert(0, os.path.join(ROOT, "extern", "RetroSynthesisAgent"))
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
 
-from mcp.server.fastmcp import FastMCP
+from mcp.server.fastmcp import Context, FastMCP
 
 from biologix_ai.run_paths import ENV_SESSION, new_session_dir, session_dir_from_env
 from biologix_ai.discovery_world import (
@@ -42,7 +42,13 @@ from biologix_ai.discovery_world import (
     touch_meta_after_iteration,
     world_path_for_session,
 )
-from biologix_ai.mcp_tool_guard import run_guarded_tool
+from biologix_ai.mcp_stdio_guard import install_stdio_guards
+from biologix_ai.mcp_tool_guard import (
+    McpProgressReporter,
+    log_tool_budget,
+    run_guarded_tool,
+    truncate_mcp_json,
+)
 
 
 def _normalize_psmiles_list_for_eval(psmiles_list: Union[str, List[Any], None]) -> List[str]:
@@ -142,7 +148,10 @@ mcp = FastMCP(
         "prepare_retrosynthesis, submit_retro_extractions, plan_retrosynthesis, assemble_retrosynthesis_report, "
         "check_monomer_admet, check_monomers_batch, compile_results (optional run_dir for session); "
         "ADMET and literature; PSMILES tools; OpenMM openmm_evaluate_psmiles; discovery world; transcripts. "
-        "Arbitrary biologics via biologic_target and BIOLOGIX_AI_TARGET_PROTEIN_PDB after start_biologics_session."
+        "Arbitrary biologics via biologic_target and BIOLOGIX_AI_TARGET_PROTEIN_PDB after start_biologics_session. "
+        "MCP TIMEOUT RULE: If any biologix-ai MCP tool call times out for any reason (host limit, hang, no JSON, "
+        "transport error), do NOT retry that operation via MCP — switch immediately to the equivalent bash CLI "
+        "documented in .opencode/MCP_CLI_FALLBACK.md (one CLI job at a time, append 2>&1)."
     ),
 )
 
@@ -377,6 +386,7 @@ def lookup_material(material_name: str, max_results: int = 5) -> str:
 
 @mcp.tool()
 def validate_psmiles(
+    ctx: Context,
     psmiles: Union[str, List[Any]],
     material_name: str = "",
     crosscheck_web: bool = False,
@@ -397,13 +407,23 @@ def validate_psmiles(
     **When ``crosscheck_web`` is also true:** adds ``name_crosscheck`` with DuckDuckGo
     snippets (heuristic aid for manual comparison).
     """
-    try:
+    session = session_dir_from_env(Path(ROOT))
+
+    def _run() -> Dict[str, Any]:
         from biologix_ai.material_mappings import (
             annotate_functional_groups,
             check_name_structure_consistency,
             lookup_monomer_pubchem,
+            pubchem_timeout_s,
             validate_psmiles as _validate,
         )
+
+        reporter = McpProgressReporter(
+            ctx,
+            tool="validate_psmiles",
+            session_dir=session,
+        )
+        reporter.heartbeat("validating PSMILES", stage="validate", force=True)
 
         psm = _coerce_single_psmiles_string(psmiles)
         out = dict(_validate(psm))
@@ -418,11 +438,14 @@ def validate_psmiles(
         if name:
             out["name_consistency"] = check_name_structure_consistency(name, psm)
             try:
-                out["pubchem_lookup"] = lookup_monomer_pubchem(name, psm, timeout=5.0)
+                out["pubchem_lookup"] = lookup_monomer_pubchem(
+                    name, psm, timeout=pubchem_timeout_s()
+                )
             except Exception as e:
                 out["pubchem_lookup"] = {"ok": False, "error": str(e)}
 
         if crosscheck_web and name:
+            reporter.heartbeat("web crosscheck", stage="crosscheck_web")
             q = f"{name} polymer repeat unit SMILES structure"
             raw = _ddg_text_results(q, max_results=5)
             snippets = []
@@ -448,6 +471,45 @@ def validate_psmiles(
             out["name_crosscheck"] = {
                 "error": "crosscheck_web requires a non-empty material_name",
             }
+        return {"ok": True, **out}
+
+    if crosscheck_web:
+        payload = run_guarded_tool(
+            "validate_psmiles",
+            session,
+            _run,
+            stage="validate_crosscheck",
+        )
+        return json.dumps(truncate_mcp_json(payload), indent=2, default=str)
+
+    try:
+        from biologix_ai.material_mappings import (
+            annotate_functional_groups,
+            check_name_structure_consistency,
+            lookup_monomer_pubchem,
+            pubchem_timeout_s,
+            validate_psmiles as _validate,
+        )
+
+        psm = _coerce_single_psmiles_string(psmiles)
+        out = dict(_validate(psm))
+
+        fg = annotate_functional_groups(psm)
+        if fg.get("ok"):
+            out["functional_groups"] = fg["groups"]
+        else:
+            out["functional_groups_error"] = fg.get("error", "unknown")
+
+        name = (material_name or "").strip()
+        if name:
+            out["name_consistency"] = check_name_structure_consistency(name, psm)
+            try:
+                out["pubchem_lookup"] = lookup_monomer_pubchem(
+                    name, psm, timeout=pubchem_timeout_s()
+                )
+            except Exception as e:
+                out["pubchem_lookup"] = {"ok": False, "error": str(e)}
+
         return json.dumps(out, indent=2)
     except Exception as e:
         return json.dumps({"valid": False, "error": str(e)})
@@ -455,12 +517,13 @@ def validate_psmiles(
 
 @mcp.tool()
 def openmm_evaluate_psmiles(
+    ctx: Context,
     psmiles_list: Union[str, List[Any]] = "",
-    verbose: Union[bool, str, int] = True,
+    verbose: Union[bool, str, int] = False,
     run_dir: str = "",
     artifacts_dir: str = "",
     max_workers: Optional[int] = None,
-    response_format: str = "full",
+    response_format: str = "concise",
 ) -> str:
     """
     Evaluate PSMILES via OpenMM **Packmol matrix**: insulin AMBER14SB + multiple polymer
@@ -509,8 +572,37 @@ def openmm_evaluate_psmiles(
     unless per-candidate seeds are fixed (they are: seed = base + candidate index).
     """
     session = _optional_session_dir(run_dir) or session_dir_from_env(Path(ROOT))
+    from biologix_ai.simulation.md_simulator import _candidate_timeout_s
+
+    log_tool_budget(
+        session,
+        tool="openmm_evaluate_psmiles",
+        candidate_timeout_s=_candidate_timeout_s(),
+        mcp_timeout_ms=int(os.environ.get("BIOLOGIX_AI_MCP_TIMEOUT_MS", "960000")),
+    )
+    reporter = McpProgressReporter(
+        ctx,
+        tool="openmm_evaluate_psmiles",
+        session_dir=session,
+    )
+
+    def _progress_callback(event: Dict[str, Any]) -> None:
+        stage = str(event.get("stage", "progress"))
+        msg = str(event.get("message", stage))
+        idx = event.get("candidate_index")
+        total = event.get("total")
+        progress_val = float(idx) + 1.0 if idx is not None else None
+        total_val = float(total) if total is not None else None
+        reporter.heartbeat(
+            msg,
+            stage=stage,
+            progress=progress_val,
+            total=total_val,
+            extra=event,
+        )
 
     def _run() -> Dict[str, Any]:
+        reporter.heartbeat("openmm batch starting", stage="openmm_matrix_eval", force=True)
         parts = _normalize_psmiles_list_for_eval(psmiles_list)
         if not parts:
             return {
@@ -546,14 +638,15 @@ def openmm_evaluate_psmiles(
         ad = (artifacts_dir or "").strip()
         if not ad and (run_dir or "").strip():
             ad = str(_session_dir_for_mcp(run_dir) / "structures")
-        vb = _coerce_bool_flag(verbose, default=True)
+        vb = _coerce_bool_flag(verbose, default=False)
         concise = str(response_format).strip().lower() == "concise"
         result = sim.evaluate_candidates(
             candidates,
             max_candidates=len(candidates),
             verbose=vb,
             artifacts_dir=ad or None,
-            max_workers=max_workers,
+            max_workers=max_workers if max_workers is not None else 1,
+            progress_callback=_progress_callback,
         )
         try:
             from biologix_ai.simulation.scoring import discovery_score
@@ -623,15 +716,16 @@ def openmm_evaluate_psmiles(
         _run,
         stage="openmm_matrix_eval",
         failure_hint=(
-            "OpenMM batch may still be running; check tool_events.jsonl and stderr heartbeats. "
-            "For faster turns set BIOLOGIX_AI_OPENMM_CANDIDATE_TIMEOUT_S or smaller batches."
+            "If MCP timed out for any reason, do not retry openmm_evaluate_psmiles — run "
+            "scripts/run_openmm_matrix.py via bash (see .opencode/MCP_CLI_FALLBACK.md). "
+            "Otherwise check tool_events.jsonl and stderr heartbeats."
         ),
     )
-    return json.dumps(payload, indent=2, default=str)
+    return json.dumps(truncate_mcp_json(payload), indent=2, default=str)
 
 
 @mcp.tool()
-def generate_psmiles_from_name(material_name: str) -> str:
+def generate_psmiles_from_name(ctx: Context, material_name: str) -> str:
     """
     Convert a polymer or monomer **name** to a PSMILES repeat-unit string.
 
@@ -654,13 +748,33 @@ def generate_psmiles_from_name(material_name: str) -> str:
     If conversion fails, ``ok`` is false with ``error`` and the raw PubChem
     SMILES so the caller can attempt manual conversion.
     """
-    try:
+    session = session_dir_from_env(Path(ROOT))
+
+    def _run() -> Dict[str, Any]:
         from biologix_ai.material_mappings import name_to_psmiles
 
+        reporter = McpProgressReporter(
+            ctx,
+            tool="generate_psmiles_from_name",
+            session_dir=session,
+        )
+        reporter.heartbeat(f"lookup {material_name}", stage="name_to_psmiles", force=True)
         result = name_to_psmiles(material_name)
-        return json.dumps(result, indent=2)
-    except Exception as e:
-        return json.dumps({"ok": False, "error": str(e)}, indent=2)
+        if not isinstance(result, dict):
+            return {"ok": True, "result": result}
+        return result
+
+    payload = run_guarded_tool(
+        "generate_psmiles_from_name",
+        session,
+        _run,
+        stage="name_to_psmiles",
+        failure_hint=(
+            "If MCP timed out, use bash CLI per .opencode/MCP_CLI_FALLBACK.md "
+            "(generate_psmiles_from_name python -c snippet). Do not retry MCP."
+        ),
+    )
+    return json.dumps(truncate_mcp_json(payload), indent=2, default=str)
 
 
 @mcp.tool()
@@ -2577,6 +2691,7 @@ def get_funnel_context(
 
 @mcp.tool()
 def save_pipeline_stage(
+    ctx: Context,
     candidate_psmiles: str,
     stage: str,
     disposition: str,
@@ -2607,7 +2722,8 @@ def save_pipeline_stage(
     session = _optional_session_dir(run_dir) or session_dir_from_env(Path(ROOT))
     if session is None:
         return json.dumps({"error": "No session directory. Provide run_dir or call start_biologics_session first."})
-    try:
+
+    def _run() -> Dict[str, Any]:
         record = _save(
             session_dir=Path(session),
             candidate_psmiles=candidate_psmiles,
@@ -2615,9 +2731,15 @@ def save_pipeline_stage(
             disposition=disposition,
             detail=detail,
         )
-        return json.dumps({"recorded": True, "audit_id": record["audit_id"]}, indent=2)
-    except Exception as exc:
-        return json.dumps({"error": str(exc)})
+        return {"ok": True, "recorded": True, "audit_id": record["audit_id"]}
+
+    payload = run_guarded_tool(
+        "save_pipeline_stage",
+        session,
+        _run,
+        stage="pipeline_audit",
+    )
+    return json.dumps(payload, indent=2, default=str)
 
 
 @mcp.tool()
@@ -2696,4 +2818,5 @@ def get_persona(persona_id: str) -> str:
 
 
 if __name__ == "__main__":
+    install_stdio_guards(mcp)
     mcp.run()

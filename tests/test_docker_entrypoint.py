@@ -67,7 +67,14 @@ def test_entrypoint_auto_cpu_defaults() -> None:
     text = ENTRYPOINT.read_text(encoding="utf-8")
     cpu_defaults = (REPO_ROOT / "docker" / "cpu_defaults.sh").read_text(encoding="utf-8")
     assert "cpu_defaults.sh" in text
-    assert "docker_default_eval_max_workers" in text
+    assert "docker_default_eval_max_workers" in cpu_defaults
     assert "MKL_NUM_THREADS" in text
     assert "BIOLOGIX_AI_EVAL_CPU_FRACTION" in cpu_defaults
     assert 'frac="${BIOLOGIX_AI_EVAL_CPU_FRACTION:-1.0}"' in cpu_defaults
+
+
+def test_entrypoint_mcp_safe_worker_and_timeout_defaults() -> None:
+    text = ENTRYPOINT.read_text(encoding="utf-8")
+    assert 'export BIOLOGIX_AI_EVAL_MAX_WORKERS=1' in text
+    assert 'BIOLOGIX_AI_OPENMM_CANDIDATE_TIMEOUT_S="${BIOLOGIX_AI_OPENMM_CANDIDATE_TIMEOUT_S:-840}"' in text
+    assert 'BIOLOGIX_AI_MCP_TIMEOUT_MS="${BIOLOGIX_AI_MCP_TIMEOUT_MS:-960000}"' in text

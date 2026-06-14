@@ -47,15 +47,14 @@ Do not read `src/`, `scripts/`, or config files except **CLI fallbacks** after M
 
 ## MCP timeout → CLI fallback (all platform tools)
 
-If **any** `biologix-ai` MCP call **times out once**, returns no JSON, or hangs → treat as **MCP transport
-failure**. Stop batched/parallel MCP retries. Run the equivalent CLI via bash (one at a time, `2>&1`).
-See **`.opencode/MCP_CLI_FALLBACK.md`**. OpenMM: `scripts/run_openmm_matrix.py` (Step 4).
+**Golden rule:** If **any** MCP call **times out for any reason** → **do not retry MCP** for that operation. **Switch immediately** to the bash CLI in **`.opencode/MCP_CLI_FALLBACK.md`** (one job, `2>&1`). OpenMM: `scripts/run_openmm_matrix.py` (Step 4).
 
 ## MCP concurrency (critical in Docker)
 
 Never batch parallel MCP tool calls (`generate_psmiles_from_name`, `validate_psmiles`,
 `openmm_evaluate_psmiles`, `save_pipeline_stage`, etc.).
 The stdio MCP server deadlocks under concurrent requests. **One tool → wait for result → next.**
+Parallel calls return **`MCP_BUSY`** — retry **one** MCP call sequentially (not in parallel). If **that** call times out → bash CLI per **`.opencode/MCP_CLI_FALLBACK.md`**.
 
 ## Protocol
 
@@ -101,15 +100,16 @@ If running OpenMM, limit to ≤3 pass candidates. **One MCP call per candidate**
 
 - `openmm_evaluate_psmiles(psmiles_list=<single PSMILES>, run_dir=<session>, max_workers=1, response_format="concise")`
 
-If MCP times out (~10 min OpenCode limit) or returns no JSON, use the **CLI fallback** (bash, one
-polymer at a time; same core physics; progress visible with `2>&1`):
+If MCP **times out for any reason** (OpenCode limit, hang, no JSON, red icon), **do not retry MCP** — use the **CLI fallback** (bash, one polymer at a time; progress visible with `2>&1`):
 
 ```bash
 cd /app && python3 scripts/run_openmm_matrix.py '<PSMILES>' \
-  --n-repeats 4 --n-polymers 8 --box-nm 7.5 --packing-mode bulk --no-npt 2>&1
+  --run-dir runs/SESSION --material-name 'Candidate_N' \
+  --density-driven --target-density 0.52 \
+  --n-repeats 4 --box-nm 7.5 --packing-mode bulk --no-npt 2>&1
 ```
 
-Parse JSON output → `save_pipeline_stage(..., stage="openmm", ...)` per candidate (sequential MCP).
+Parse JSON output (energy + `complex_chemviz_png_path`) → `save_pipeline_stage(..., stage="openmm", ...)` per candidate (sequential MCP).
 
 ### Step 5 — Retrosynthesis (each pass candidate)
 

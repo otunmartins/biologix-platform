@@ -99,6 +99,16 @@ assert (sess / "SUMMARY_REPORT.pdf").is_file()
 print("PDF OK:", r.get("pdf_render_mode"), r.get("warnings"))
 PY
 
+echo "=== Smoke: MCP stdio guard + tool guard ==="
+PYTHONPATH=src/python python -m pytest tests/test_mcp_stdio_guard.py tests/test_mcp_tool_guard.py -q
+
+echo "=== Smoke: OpenCode version file (when present) ==="
+if [[ -f /app/.opencode-version ]]; then
+  bash /app/scripts/verify_opencode_mcp_host.sh fast || echo "WARN: OpenCode version below documented minimum"
+else
+  echo "SKIP: .opencode-version not baked (dev/local image)"
+fi
+
 echo "=== Smoke: OpenMM matrix (tiny settings, hard cap 5 min) ==="
 export BIOLOGIX_AI_OPENMM_CANDIDATE_TIMEOUT_S="${BIOLOGIX_AI_OPENMM_CANDIDATE_TIMEOUT_S:-120}"
 export BIOLOGIX_AI_OPENMM_MATRIX_FIXED_MODE=1
