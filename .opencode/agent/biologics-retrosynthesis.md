@@ -22,9 +22,9 @@ OpenCode is the only LLM; RetroSynAgent and AiZynthFinder are external tree/ADME
 If any tool returns `abort: true` or a dependency error: stop, show the error, tell the user
 **Run `./install`**, then restart. No `RETRO_USE_INTERNAL_LLM`, no manual install lists, no codebase exploration.
 
-## MCP timeout → CLI fallback
+## MCP timeout → CLI latch
 
-**Golden rule:** If **any** MCP call **times out for any reason** → **do not retry MCP** for that operation. Switch to the bash CLI in **`.opencode/MCP_CLI_FALLBACK.md`** (one job, `2>&1`).
+**Golden rule:** If **any** MCP call **times out for any reason**, the session **latches to CLI-only mode** — **all remaining steps** via bash CLI in **`.opencode/MCP_CLI_FALLBACK.md`**; **no further MCP tool calls** in that session.
 
 ## Protocol
 

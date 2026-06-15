@@ -30,8 +30,8 @@ def mcp_busy_json(session_dir: Optional[Path] = None) -> str:
         "hint": (
             "Another biologix-ai MCP tool call is in flight. "
             "Call biologix-ai MCP tools one at a time and wait for JSON before the next. "
-            "If a tool times out for any reason, do not retry MCP — use bash CLI per "
-            ".opencode/MCP_CLI_FALLBACK.md."
+            "If a tool times out for any reason, the session latches to CLI-only mode — do not call MCP again; "
+            "use bash CLI per .opencode/MCP_CLI_FALLBACK.md."
         ),
     }
     log_tool_event(

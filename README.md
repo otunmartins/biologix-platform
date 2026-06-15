@@ -85,32 +85,32 @@ No Anthropic (or other) API key is required before you start — configure the L
 
 ### Pull the pre-built image and run
 
-**Recommended release:** `ghcr.io/otunmartins/biologix-ai:0.5.10` (tag `v0.5.10`). Pin this tag for reproducible runs; `latest` tracks the same build but can change when a new release ships.
+**Recommended release:** `ghcr.io/otunmartins/biologix-ai:0.5.12` (tag `v0.5.12`). Pin this tag for reproducible runs; `latest` tracks the same build but can change when a new release ships.
 
 From any directory where you want session folders (or clone this repo and use it as the working directory):
 
 ```bash
 mkdir -p runs papers
 
-docker pull --platform linux/amd64 ghcr.io/otunmartins/biologix-ai:0.5.10
+docker pull --platform linux/amd64 ghcr.io/otunmartins/biologix-ai:0.5.12
 
 docker run --platform linux/amd64 -it --rm --init \
   -v "$(pwd)/runs:/app/runs" \
   -v "$(pwd)/papers:/app/papers" \
   -v biologix-data:/app/data \
-  ghcr.io/otunmartins/biologix-ai:0.5.10
+  ghcr.io/otunmartins/biologix-ai:0.5.12
 ```
 
 **Windows (PowerShell)** — same flow; use `${PWD}` instead of `$(pwd)`:
 
 ```powershell
 mkdir runs, papers -Force
-docker pull --platform linux/amd64 ghcr.io/otunmartins/biologix-ai:0.5.10
+docker pull --platform linux/amd64 ghcr.io/otunmartins/biologix-ai:0.5.12
 docker run --platform linux/amd64 -it --rm --init `
   -v "${PWD}/runs:/app/runs" `
   -v "${PWD}/papers:/app/papers" `
   -v biologix-data:/app/data `
-  ghcr.io/otunmartins/biologix-ai:0.5.10
+  ghcr.io/otunmartins/biologix-ai:0.5.12
 ```
 
 **What happens:** the entrypoint activates the conda env, runs first-run data setup if needed, then starts **OpenCode** with the default **`biologics-delivery-discovery`** agent. Discovery outputs land in `./runs/` on your host.

@@ -30,17 +30,17 @@ If any tool returns `abort: true`, an import error, or a missing dependency:
 Do not suggest `RETRO_USE_INTERNAL_LLM`, manual pip steps, or partial workarounds.
 `./install` provides AmberTools (antechamber/parmchk2) for OpenMM GAFF screening.
 Do not read `src/`, `scripts/`, or config files to "understand the project" — call MCP tools first,
-**except** documented **CLI fallbacks** when MCP times out (see below and `.opencode/MCP_CLI_FALLBACK.md`).
+**except** documented **CLI fallbacks** after MCP latch (see below and `.opencode/MCP_CLI_FALLBACK.md`).
 
-## MCP timeout → CLI fallback (all platform tools)
+## MCP timeout → CLI latch (all platform tools)
 
-**Golden rule:** If **any** `biologix-ai` MCP call **times out for any reason** (OpenCode limit, hang, no JSON, red icon, transport error, host step timeout) → **do not retry MCP for that operation**. **Switch immediately** to the equivalent **bash CLI** (one job at a time, `2>&1`).
+**Golden rule:** If **any** `biologix-ai` MCP call **times out for any reason** (OpenCode limit, hang, no JSON, red icon, transport error, host step timeout), the session **latches to CLI-only mode**. **All remaining steps** — every later tool in Steps 3–7 and any new iteration in the same session — must run via **bash CLI only**. **Do not call any `biologix-ai` MCP tool again** after the first timeout.
 
-1. **Stop** retrying the same MCP call (batched, parallel, or sequential).
-2. **Run** the bash/CLI command from **`.opencode/MCP_CLI_FALLBACK.md`** for that tool.
-3. Parse CLI JSON/text output; continue the pipeline from that result.
-4. Record audit with **single** instant MCP calls when they return (`save_pipeline_stage`, etc.).
-5. Note in the report: *"via CLI fallback (MCP timeout)."*
+1. **Stop** all MCP tool calls for the rest of the session (not just the timed-out step).
+2. **Run** each remaining step from **`.opencode/MCP_CLI_FALLBACK.md`** (one job at a time, `2>&1`).
+3. Parse CLI JSON/text output; continue the pipeline from CLI results only.
+4. Record audit via **CLI** (`save_pipeline_stage` / `save_funnel_context` one-liners in the fallback doc).
+5. Note in the report: *"MCP latched — Steps X–Y via CLI fallback (first timeout at Step Z)."*
 
 OpenMM is the most common case: `scripts/run_openmm_matrix.py` (Step 4).
 
@@ -51,7 +51,7 @@ The `biologix-ai` MCP server uses **stdio**. **Never issue parallel/batched MCP 
 `save_pipeline_stage`, etc. in one turn). OpenCode can deadlock the pipe or hit MCP timeouts:
 tools appear to run forever, saves fail with red icons, and the TUI may stop accepting input.
 
-**Rule:** one MCP tool call → wait for its JSON result → then the next. Parallel calls return **`MCP_BUSY`** — retry **one** MCP call sequentially. If **that** call times out for any reason → bash CLI per **`.opencode/MCP_CLI_FALLBACK.md`**. Max **6** candidates per Step 3; if `generate_psmiles_from_name` returns `ok: false`, note it and continue.
+**Rule:** one MCP tool call → wait for its JSON result → then the next. Parallel calls return **`MCP_BUSY`** — retry **one** MCP call sequentially **only before any timeout**. If **any** call times out → **CLI latch** (no more MCP for the session). Max **6** candidates per Step 3; if `generate_psmiles_from_name` returns `ok: false`, note it and continue.
 
 ## Protocol
 
@@ -111,7 +111,7 @@ When running OpenMM:
 Do **not** pass 3 PSMILES with `max_workers=3` in one MCP call — OpenCode MCP timeout (~10 min)
 often kills the batch before any result returns, even while OpenMM is still running.
 
-**CLI fallback** (mandatory when MCP **times out for any reason** — do not retry MCP):
+**CLI latch** (mandatory after **any** MCP timeout — no MCP for rest of session):
 
 Run **one polymer at a time** via bash (progress visible with `2>&1`):
 
@@ -125,8 +125,8 @@ cd /app && python3 scripts/run_openmm_matrix.py '<PSMILES>' \
 - `--no-npt` matches Docker MCP defaults (minimize + single-point interaction energy).
 - `--run-dir` + `--material-name` write `<session>/structures/{slug}_complex_chemviz.png` (PyMOL) and related PNGs/PDB — same as MCP.
 - Parse the trailing JSON for `interaction_energy_kj_mol` (and `complex_chemviz_png_path` for reports).
-- Record each result with **`save_pipeline_stage`** (one MCP call, wait for JSON) before the next bash run.
-- In the report, note: *"OpenMM via CLI fallback (MCP batch timed out)."*
+- Record each result with **`save_pipeline_stage` via CLI** (see `.opencode/MCP_CLI_FALLBACK.md`) before the next bash run.
+- In the report, note: *"MCP latched — OpenMM via CLI fallback."*
 
 Build `psmiles_list` only from `library_disposition` **pass** rows (use **warning** only if no pass).
 
@@ -170,13 +170,9 @@ resolves to a polymer name).
 
 8. `save_pipeline_stage(candidate_psmiles, stage="retro", disposition, detail, run_dir=<session>)`
 
-**Audit saves (`save_pipeline_stage`):** append-only JSONL — completes in milliseconds. If a save
-shows a timeout or red icon, the MCP server is usually **still busy** or **blocked by parallel
-MCP calls** — not slow disk I/O. Retry **one** save at a time after the prior MCP/bash call
-finishes; never fire three `save_pipeline_stage` calls in parallel.
+**Audit saves (`save_pipeline_stage`):** append-only JSONL — completes in milliseconds via MCP **before latch**. After **any MCP timeout**, use the **`save_pipeline_stage` CLI one-liner** in `.opencode/MCP_CLI_FALLBACK.md` — **never MCP** for audit in a latched session.
 
-If OpenMM used the CLI fallback, still call `save_pipeline_stage(..., stage="openmm", ...)` per
-candidate with the parsed energy in `detail`.
+If OpenMM ran via CLI (latched session), record each candidate with **`save_pipeline_stage` via CLI** and the parsed energy in `detail`.
 
 If `plan_retrosynthesis` returns no routes after the retry loop: stop and report the exact
 `kg_empty_after_session_extractions` detail — do not invent routes.
@@ -233,7 +229,7 @@ Would you like to run **Iteration <N+1>** with refined candidates, or stop here?
 - State "RetroSyn KG routes" only when `metadata.route_provenance` is `session_agent_llm`.
 - State "AiZynthFinder ran" only when `aizynth_monomers_attempted > 0`.
 - Do not describe retrosynthesis for a candidate without `retrosynthesis/plan_*.json`.
-- OpenMM scores require `openmm_evaluate_psmiles` **or** CLI `run_openmm_matrix.py` for that candidate; note CLI fallback if MCP timed out.
+- OpenMM scores require `openmm_evaluate_psmiles` **before latch**, or CLI `run_openmm_matrix.py` after latch; note *"MCP latched"* in the report if any step used CLI fallback.
 
 ## On failure (repeat)
 

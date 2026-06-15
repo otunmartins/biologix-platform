@@ -100,19 +100,19 @@ print(r['evaluation_progress'][0])
 "
 ```
 
-## MCP timeout → CLI fallback (OpenCode agents)
+## MCP timeout → CLI latch (OpenCode agents)
 
 OpenCode **`experimental.mcp_timeout`** (**960000 ms / 16 min** in `.opencode/opencode.jsonc`) applies to the **whole** MCP tool response. Per-candidate timeout (**840 s**) is set **below** transport so failures return JSON in-process first.
 
+**Session latch:** The **first** MCP timeout (any reason) switches the **entire remaining session** to CLI-only — agents must **not** call any `biologix-ai` MCP tool again after latch.
+
 **Agent policy (delivery / fast-discovery agents):**
 
-0. **Any MCP timeout (any reason)** → run the **bash CLI** from the table below; **never** retry the same MCP operation.
-1. Prefer **one PSMILES per MCP call**, `max_workers=1`.
-2. On timeout, **`MCP_BUSY`** (after one sequential retry), hang, or empty MCP result → **bash CLI** (one polymer
-   at a time, `2>&1` so `stage=…` progress appears in the session).
+0. **Any MCP timeout (any reason)** → **CLI latch** for all subsequent steps (not just the timed-out tool).
+1. Prefer **one PSMILES per MCP call**, `max_workers=1` **before latch only**.
+2. On timeout, hang, or empty MCP result → **bash CLI** for **every** remaining step (one job at a time, `2>&1`).
 3. CLI with **no extra flags** follows **`BIOLOGIX_AI_*` env** (density-driven @ 0.52 g/cm³, NPT off). Or pass **`--density-driven --target-density 0.52 --no-npt`** explicitly.
-4. Parse the trailing JSON; record with **`save_pipeline_stage(..., stage="openmm", ...)`** — **one
-   MCP save at a time** (saves are instant; "timeout" on save usually means MCP stdio blocked).
+4. Parse the trailing JSON; record with **`save_pipeline_stage` via CLI** (see `.opencode/MCP_CLI_FALLBACK.md`) — not MCP after latch.
 
 ```bash
 cd /app && python3 scripts/run_openmm_matrix.py '[*]OC(=O)C(C)[*]' \

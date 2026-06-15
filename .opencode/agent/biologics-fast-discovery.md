@@ -42,19 +42,19 @@ If any tool returns `abort: true`, an import error, or a missing dependency:
 3. Tell them: **Run `./install` from the repo root, then restart this session.**
 
 Do not suggest `RETRO_USE_INTERNAL_LLM`, manual pip steps, or partial workarounds.
-Do not read `src/`, `scripts/`, or config files except **CLI fallbacks** after MCP timeout
+Do not read `src/`, `scripts/`, or config files except **CLI fallbacks** after MCP latch
 (`.opencode/MCP_CLI_FALLBACK.md`).
 
-## MCP timeout → CLI fallback (all platform tools)
+## MCP timeout → CLI latch (all platform tools)
 
-**Golden rule:** If **any** MCP call **times out for any reason** → **do not retry MCP** for that operation. **Switch immediately** to the bash CLI in **`.opencode/MCP_CLI_FALLBACK.md`** (one job, `2>&1`). OpenMM: `scripts/run_openmm_matrix.py` (Step 4).
+**Golden rule:** If **any** MCP call **times out for any reason**, the session **latches to CLI-only mode**. **All remaining steps** must use bash CLI from **`.opencode/MCP_CLI_FALLBACK.md`** — **no further MCP tool calls** in that session. OpenMM: `scripts/run_openmm_matrix.py` (Step 4).
 
 ## MCP concurrency (critical in Docker)
 
 Never batch parallel MCP tool calls (`generate_psmiles_from_name`, `validate_psmiles`,
 `openmm_evaluate_psmiles`, `save_pipeline_stage`, etc.).
 The stdio MCP server deadlocks under concurrent requests. **One tool → wait for result → next.**
-Parallel calls return **`MCP_BUSY`** — retry **one** MCP call sequentially (not in parallel). If **that** call times out → bash CLI per **`.opencode/MCP_CLI_FALLBACK.md`**.
+Parallel calls return **`MCP_BUSY`** — retry **one** MCP call sequentially **only before any timeout**. If **any** call times out → **CLI latch** (no more MCP for the session).
 
 ## Protocol
 
@@ -100,7 +100,7 @@ If running OpenMM, limit to ≤3 pass candidates. **One MCP call per candidate**
 
 - `openmm_evaluate_psmiles(psmiles_list=<single PSMILES>, run_dir=<session>, max_workers=1, response_format="concise")`
 
-If MCP **times out for any reason** (OpenCode limit, hang, no JSON, red icon), **do not retry MCP** — use the **CLI fallback** (bash, one polymer at a time; progress visible with `2>&1`):
+If MCP **times out for any reason**, the session **latches to CLI-only** — **no further MCP**; use CLI fallback (bash, one polymer at a time; progress visible with `2>&1`):
 
 ```bash
 cd /app && python3 scripts/run_openmm_matrix.py '<PSMILES>' \
@@ -109,7 +109,7 @@ cd /app && python3 scripts/run_openmm_matrix.py '<PSMILES>' \
   --n-repeats 4 --box-nm 7.5 --packing-mode bulk --no-npt 2>&1
 ```
 
-Parse JSON output (energy + `complex_chemviz_png_path`) → `save_pipeline_stage(..., stage="openmm", ...)` per candidate (sequential MCP).
+Parse JSON output (energy + `complex_chemviz_png_path`) → record via **`save_pipeline_stage` CLI** per candidate (see `.opencode/MCP_CLI_FALLBACK.md`).
 
 ### Step 5 — Retrosynthesis (each pass candidate)
 

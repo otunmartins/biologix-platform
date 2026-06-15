@@ -126,7 +126,8 @@ def enrich_tool_result(
             "hint",
             hint
             or "Check <session>/tool_events.jsonl and tool_errors.log. "
-            "If MCP timed out for this tool, switch to bash CLI per .opencode/MCP_CLI_FALLBACK.md.",
+            "If MCP timed out, the session latches to CLI-only — do not call MCP again; "
+            "use bash CLI per .opencode/MCP_CLI_FALLBACK.md.",
         )
     return out
 
@@ -307,5 +308,6 @@ def run_guarded_tool(
             stage=stage,
             hint=failure_hint
             or "Unexpected tool exception; inspect tool_errors.log. "
-            "If MCP timed out, use bash CLI per .opencode/MCP_CLI_FALLBACK.md.",
+            "If MCP timed out, session latches to CLI-only — no further MCP; "
+            "use bash CLI per .opencode/MCP_CLI_FALLBACK.md.",
         )

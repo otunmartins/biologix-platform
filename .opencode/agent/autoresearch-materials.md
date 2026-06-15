@@ -19,7 +19,7 @@ You run **time-bounded scripted discovery** for polymer screening—same spirit 
 
 This agent uses the **`run_autonomous_discovery`** subprocess: fixed pipeline (Scholar mine → cheminformatics mutation → OpenMM evaluate) with **no LLM reasoning** between steps.
 
-If **`run_autonomous_discovery`** (or any biologix-ai MCP tool) **times out for any reason**, **do not retry MCP** — run the equivalent bash CLI from **`.opencode/MCP_CLI_FALLBACK.md`** (e.g. `python3 scripts/run_autonomous_discovery.py …`).
+If **`run_autonomous_discovery`** (or any biologix-ai MCP tool) **times out for any reason**, the session **latches to CLI-only** — run **all remaining steps** via bash CLI from **`.opencode/MCP_CLI_FALLBACK.md`** (e.g. `python3 scripts/run_autonomous_discovery.py …`); **do not call MCP again** in that session.
 
 ## Primary action: start the overnight loop
 

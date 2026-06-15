@@ -182,7 +182,7 @@ docker run --platform linux/amd64 -it --rm --init `
 | `monomer.png` files are SVG / PIL cannot open them | Headless `psmiles` may write SVG to `.png` paths. Rebuild the image after the `psmiles_drawing` fix, or upgrade to a tagged release that includes it. |
 | `setup_aizynthfinder.sh` failed during `docker build` / GitHub Actions | Usually a transient Zenodo/Figshare download error. Re-run the workflow (re-push the tag or use **Actions → Build and publish Docker image → Run workflow** with push enabled). Builds after the curl-based downloader fix are more resilient. |
 | OpenCode looks stuck on a tool (OpenMM, PDF, PNG) | The tool may still be running. In a second shell: `docker ps`, `docker logs --tail 50 <container>`, or `docker exec <container> tail -f /app/runs/<session>/tool_events.jsonl`. Expensive tools log **`started` / `completed` / `failed`** there and in MCP stderr. |
-| `save_pipeline_stage` red icon / timeout | The save itself is a **single JSONL append** (milliseconds). Failure usually means **parallel MCP calls** blocked stdio or OpenMM still held the MCP server. Retry **one** save after the prior tool finishes; see agent OpenMM CLI fallback in `docs/OPENMM_SCREENING.md`. |
+| `save_pipeline_stage` red icon / timeout | Before latch: usually **parallel MCP calls** blocked stdio. After **any MCP timeout**, the session **latches to CLI-only** — use the `save_pipeline_stage` CLI one-liner in `.opencode/MCP_CLI_FALLBACK.md`; do not call MCP again. |
 | PDF compile failed on Markdown tables | Upgrade to an image with the `plain_tables_fallback` PDF path, or check `tool_errors.log` in the session folder. `SUMMARY_REPORT.md` is still valid even if PDF fails. |
 
 ## Docker safety defaults

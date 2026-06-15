@@ -2,38 +2,28 @@
 
 Apply to **every** `biologix-ai` MCP tool call in OpenCode/Docker sessions.
 
-## Golden rule
+## Golden rule — session latch
 
-**If an MCP tool call times out for any reason**, switch to the **equivalent bash CLI command** in the table below. Do not retry the same operation via MCP.
+**If any MCP tool call times out for any reason**, the session **latches to CLI-only mode** for **all remaining steps** in that run (current iteration and any later steps). Do **not** return to MCP for any tool — not even for steps that worked via MCP earlier, and not for "instant" audit saves.
 
-Timeout-like symptoms (all mean: use CLI for that operation):
+Timeout-like symptoms (all latch the session):
 
 - OpenCode red icon / `mcp_timeout` / `-32001` / "Request timed out"
 - Tool hangs with no JSON while the same work via bash would show progress
 - Empty or partial MCP response after the wait limit
 - Host step timeout (e.g. AI SDK ~120s) even when the server is still running
-- Any transport/pipe error on a tool call
+- Any transport/pipe error on a tool call after you already waited
 
-**Do not** retry the same MCP call (batched, parallel, or sequential) after a timeout. **Do** run bash CLI once (`2>&1`), parse stdout/JSON, then continue the pipeline.
+**After latch:**
 
-Note in the report: *"Step X via CLI fallback (MCP timeout)."*
+1. **Stop** calling `biologix-ai` MCP tools for the rest of the session.
+2. **Run** every step from the CLI table below via `bash` (one job at a time, append `2>&1`).
+3. Parse stdout/JSON and continue the pipeline from CLI results only.
+4. Note in the report: *"MCP transport latched — remaining steps via CLI fallback (first timeout at Step X)."*
 
-## When to switch (also applies)
+**Before latch:** one MCP tool at a time; wait for JSON before the next. **`MCP_BUSY`** (parallel call rejected) is not a timeout — retry **one** MCP call sequentially. If **that** call times out → latch engages per this rule.
 
-If **any** MCP call **once**:
-
-- times out (any layer — see above),
-- hangs with no response while bash would show progress,
-- fails with transport/pipe errors after you already waited, or
-- was issued in parallel with other MCP calls and the batch failed,
-
-then **stop using MCP for that operation**. Treat it as **MCP transport failure**, not failed science.
-
-**Do not:** retry the same batched MCP call, fire parallel MCP tools to "speed up," or call the same long-running MCP tool again hoping for a different outcome.
-
-**Do:** run the **equivalent CLI** via `bash` (one job at a time, append `2>&1`), parse stdout/JSON, then optionally record audit state with **single** instant MCP calls (`save_pipeline_stage`, `save_funnel_context`) when those return immediately.
-
-**`MCP_BUSY`** (parallel call rejected) is not a timeout — retry **one** MCP call sequentially. If **that** call times out → CLI fallback per this rule.
+**Do not:** retry MCP after latch, call MCP for "quick" saves, or mix MCP and CLI in the same session after the first timeout.
 
 ## CLI equivalents
 
@@ -48,10 +38,11 @@ Run from repo root `/app` in Docker. Set `PYTHONPATH=src/python` when using Pyth
 | **`run_autonomous_discovery`** | `python3 scripts/run_autonomous_discovery.py …` (see script `--help`) |
 | **`run_biologics_discovery`** | `python3 scripts/run_biologics_discovery.py --biologic-target … --session-dir runs/SESSION` |
 | **`render_psmiles_png`** | `python3 scripts/generate_psmiles_images.py` or `biologix_ai.psmiles_drawing.save_psmiles_png` via `-c` |
-| **`save_pipeline_stage`** | No CLI needed — instant JSONL append. If this "times out", MCP is blocked; wait, then **one** retry. |
-| **`mine_literature`**, **`screen_candidate_library`**, **`plan_retrosynthesis`** | No single script; retry MCP **once** sequentially, or invoke `biologix_ai` Python modules via `-c` if you know the API. |
+| **`save_pipeline_stage`** | `python3 -c "from pathlib import Path; from biologix_ai.services.pipeline_audit import save_pipeline_stage; import json; print(json.dumps(save_pipeline_stage(Path('runs/SESSION'), 'PSMILES', 'STAGE', 'pass', 'detail'), indent=2))"` |
+| **`save_funnel_context`** | `python3 -c "from pathlib import Path; from biologix_ai.services.funnel_context import save_funnel_context; import json; print(json.dumps({'path': str(save_funnel_context('STAGE', {}, Path('runs/SESSION')))}, indent=2))"` |
+| **`mine_literature`**, **`screen_candidate_library`**, **`plan_retrosynthesis`** | No single script — invoke the matching `biologix_ai` Python module via `python3 -c` or a one-off script; **do not** call MCP after latch. |
 
-## OpenMM CLI template (most common fallback)
+## OpenMM CLI template (most common latch trigger)
 
 ```bash
 cd /app && python3 scripts/run_openmm_matrix.py '<PSMILES>' \
@@ -62,4 +53,8 @@ cd /app && python3 scripts/run_openmm_matrix.py '<PSMILES>' \
 
 Parse trailing JSON for `interaction_energy_kj_mol` and structure paths (`complex_chemviz_png_path`, `structure_artifacts_dir`). When the session env is already set, `--run-dir` may be omitted.
 
-`save_pipeline_stage(candidate_psmiles=…, stage="openmm", disposition="pass", detail=<energy JSON>, run_dir=<session>)`
+Record audit via CLI (not MCP) after latch:
+
+```bash
+python3 -c "from pathlib import Path; from biologix_ai.services.pipeline_audit import save_pipeline_stage; import json; print(json.dumps(save_pipeline_stage(Path('runs/SESSION'), 'PSMILES', 'openmm', 'pass', '<energy JSON>'), indent=2))"
+```

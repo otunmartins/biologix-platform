@@ -150,8 +150,9 @@ mcp = FastMCP(
         "ADMET and literature; PSMILES tools; OpenMM openmm_evaluate_psmiles; discovery world; transcripts. "
         "Arbitrary biologics via biologic_target and BIOLOGIX_AI_TARGET_PROTEIN_PDB after start_biologics_session. "
         "MCP TIMEOUT RULE: If any biologix-ai MCP tool call times out for any reason (host limit, hang, no JSON, "
-        "transport error), do NOT retry that operation via MCP — switch immediately to the equivalent bash CLI "
-        "documented in .opencode/MCP_CLI_FALLBACK.md (one CLI job at a time, append 2>&1)."
+        "transport error), the session LATCHES to CLI-only mode for ALL remaining steps — do NOT call any "
+        "biologix-ai MCP tool again in that session. Use bash CLI only, per .opencode/MCP_CLI_FALLBACK.md "
+        "(one CLI job at a time, append 2>&1)."
     ),
 )
 
@@ -716,9 +717,9 @@ def openmm_evaluate_psmiles(
         _run,
         stage="openmm_matrix_eval",
         failure_hint=(
-            "If MCP timed out for any reason, do not retry openmm_evaluate_psmiles — run "
-            "scripts/run_openmm_matrix.py via bash (see .opencode/MCP_CLI_FALLBACK.md). "
-            "Otherwise check tool_events.jsonl and stderr heartbeats."
+            "If MCP timed out for any reason, the session latches to CLI-only — do not call any "
+            "biologix-ai MCP tool again; run scripts/run_openmm_matrix.py via bash for OpenMM and "
+            "see .opencode/MCP_CLI_FALLBACK.md for all other steps."
         ),
     )
     return json.dumps(truncate_mcp_json(payload), indent=2, default=str)
@@ -770,8 +771,8 @@ def generate_psmiles_from_name(ctx: Context, material_name: str) -> str:
         _run,
         stage="name_to_psmiles",
         failure_hint=(
-            "If MCP timed out, use bash CLI per .opencode/MCP_CLI_FALLBACK.md "
-            "(generate_psmiles_from_name python -c snippet). Do not retry MCP."
+            "If MCP timed out, session latches to CLI-only — no further MCP; use bash CLI per "
+            ".opencode/MCP_CLI_FALLBACK.md (generate_psmiles_from_name python -c snippet)."
         ),
     )
     return json.dumps(truncate_mcp_json(payload), indent=2, default=str)
@@ -2713,9 +2714,9 @@ def save_pipeline_stage(
             scores, exclusion reason, route count, etc.).
         run_dir: Session directory.
 
-    Note: This append is instant. A client-side "timeout" usually means the MCP stdio server
-    is still busy (e.g. OpenMM running) or parallel MCP calls blocked the pipe — retry one save
-    at a time after the prior tool completes.
+    Note: This append is instant via MCP **before latch**. After **any MCP timeout**, the session
+    latches to CLI-only — use the save_pipeline_stage CLI one-liner in .opencode/MCP_CLI_FALLBACK.md
+    instead of calling this MCP tool again.
     """
     from biologix_ai.services.pipeline_audit import save_pipeline_stage as _save
 
