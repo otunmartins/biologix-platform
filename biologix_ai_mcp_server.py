@@ -47,6 +47,7 @@ from biologix_ai.mcp_tool_guard import (
     McpProgressReporter,
     log_tool_budget,
     run_guarded_tool,
+    run_instant_mcp_tool,
     truncate_mcp_json,
 )
 
@@ -1238,12 +1239,20 @@ def save_session_transcript(
     fn = (filename or "SESSION_TRANSCRIPT.md").strip()
     if not fn or ".." in fn.replace("\\", "/"):
         return json.dumps({"error": "invalid filename"})
-    path = session / fn
-    try:
+
+    def _run() -> Dict[str, Any]:
+        path = session / fn
         path.write_text(content, encoding="utf-8")
-    except OSError as e:
-        return json.dumps({"error": str(e)})
-    return json.dumps({"saved": str(path), "session_dir": str(session)}, indent=2)
+        return {"ok": True, "saved": str(path), "session_dir": str(session)}
+
+    payload = run_instant_mcp_tool(
+        "save_session_transcript",
+        session,
+        _run,
+        stage="transcript_write",
+        artifact_key="saved",
+    )
+    return json.dumps(payload, indent=2, default=str)
 
 
 @mcp.tool()
@@ -1281,11 +1290,19 @@ def import_chat_transcript_file(
     if ".." in dest.replace("\\", "/"):
         return json.dumps({"error": "invalid dest_filename"})
     out = session / dest
-    try:
+
+    def _run() -> Dict[str, Any]:
         shutil.copy2(src, out)
-    except OSError as e:
-        return json.dumps({"error": str(e)})
-    return json.dumps({"copied_to": str(out), "session_dir": str(session)}, indent=2)
+        return {"ok": True, "copied_to": str(out), "session_dir": str(session)}
+
+    payload = run_instant_mcp_tool(
+        "import_chat_transcript_file",
+        session,
+        _run,
+        stage="transcript_import",
+        artifact_key="copied_to",
+    )
+    return json.dumps(payload, indent=2, default=str)
 
 
 @mcp.tool()
@@ -1308,29 +1325,38 @@ def save_discovery_state(
     except json.JSONDecodeError as e:
         return f"Error parsing feedback_json: {e}"
 
-    from datetime import datetime
+    def _run() -> Dict[str, Any]:
+        from datetime import datetime
 
-    state = {
-        "iteration": iteration,
-        "timestamp": datetime.now().isoformat(),
-        "query_used": query_used,
-        "notes": notes,
-        "feedback": feedback,
-    }
-    path = session / f"agent_iteration_{iteration}.json"
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump(state, f, indent=2, ensure_ascii=False)
+        state = {
+            "iteration": iteration,
+            "timestamp": datetime.now().isoformat(),
+            "query_used": query_used,
+            "notes": notes,
+            "feedback": feedback,
+        }
+        path = session / f"agent_iteration_{iteration}.json"
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(state, f, indent=2, ensure_ascii=False)
 
-    wp = world_path_for_session(session)
-    if wp.is_file():
-        try:
-            world = load_world(wp)
-            world = touch_meta_after_iteration(world, iteration, path.name)
-            save_world(wp, world)
-        except OSError:
-            pass
+        wp = world_path_for_session(session)
+        if wp.is_file():
+            try:
+                world = load_world(wp)
+                world = touch_meta_after_iteration(world, iteration, path.name)
+                save_world(wp, world)
+            except OSError:
+                pass
+        return {"ok": True, "saved": str(path), "session_dir": str(session)}
 
-    return json.dumps({"saved": str(path), "session_dir": str(session)}, indent=2)
+    payload = run_instant_mcp_tool(
+        "save_discovery_state",
+        session,
+        _run,
+        stage="discovery_state",
+        artifact_key="saved",
+    )
+    return json.dumps(payload, indent=2, default=str)
 
 
 @mcp.tool()
@@ -1373,26 +1399,31 @@ def get_discovery_world_state(run_dir: str = "", summary: bool = False) -> str:
     session.mkdir(parents=True, exist_ok=True)
     os.environ[ENV_SESSION] = str(session)
     wp = world_path_for_session(session)
-    try:
+
+    def _run() -> Dict[str, Any]:
         data = load_world(wp)
         if _coerce_bool_flag(summary, default=False):
             ctx = planning_context(data, max_chars=12_000)
-            return json.dumps(
-                {
-                    "session_dir": str(session),
-                    "world_path": str(wp),
-                    "planning_context": ctx,
-                },
-                indent=2,
-                ensure_ascii=False,
-            )
-        return json.dumps(
-            {"session_dir": str(session), "world_path": str(wp), "world": data},
-            indent=2,
-            ensure_ascii=False,
-        )
-    except Exception as e:
-        return json.dumps({"error": str(e)}, indent=2)
+            return {
+                "ok": True,
+                "session_dir": str(session),
+                "world_path": str(wp),
+                "planning_context": ctx,
+            }
+        return {
+            "ok": True,
+            "session_dir": str(session),
+            "world_path": str(wp),
+            "world": data,
+        }
+
+    payload = run_instant_mcp_tool(
+        "get_discovery_world_state",
+        session,
+        _run,
+        stage="discovery_world_read",
+    )
+    return json.dumps(payload, indent=2, ensure_ascii=False)
 
 
 @mcp.tool()
@@ -1406,29 +1437,31 @@ def patch_discovery_world(patch_json: str, run_dir: str = "") -> str:
     session.mkdir(parents=True, exist_ok=True)
     os.environ[ENV_SESSION] = str(session)
     wp = world_path_for_session(session)
-    try:
+
+    def _run() -> Dict[str, Any]:
         patch = json.loads(patch_json) if patch_json.strip() else {}
         if not isinstance(patch, dict):
-            return json.dumps({"error": "patch_json must be a JSON object"}, indent=2)
+            return {"ok": False, "error": "patch_json must be a JSON object"}
         existing = load_world(wp)
         merged = apply_patch(existing, patch)
         save_world(wp, merged)
-        return json.dumps(
-            {
-                "ok": True,
-                "world_path": str(wp),
-                "session_dir": str(session),
-                "meta": merged.get("meta", {}),
-            },
-            indent=2,
-            ensure_ascii=False,
+        return {
+            "ok": True,
+            "world_path": str(wp),
+            "session_dir": str(session),
+            "meta": merged.get("meta", {}),
+        }
+
+    try:
+        payload = run_instant_mcp_tool(
+            "patch_discovery_world",
+            session,
+            _run,
+            stage="discovery_world_patch",
         )
     except ValueError as e:
         return json.dumps({"ok": False, "error": str(e)}, indent=2)
-    except json.JSONDecodeError as e:
-        return json.dumps({"ok": False, "error": f"invalid JSON: {e}"}, indent=2)
-    except OSError as e:
-        return json.dumps({"ok": False, "error": str(e)}, indent=2)
+    return json.dumps(payload, indent=2, ensure_ascii=False)
 
 
 @mcp.tool()
@@ -1441,7 +1474,8 @@ def discovery_world_planning_context(max_chars: int = 8000, run_dir: str = "") -
     session.mkdir(parents=True, exist_ok=True)
     os.environ[ENV_SESSION] = str(session)
     wp = world_path_for_session(session)
-    try:
+
+    def _run() -> Dict[str, Any]:
         data = load_world(wp)
         n = int(max_chars) if max_chars else 8000
         if n < 500:
@@ -1449,17 +1483,20 @@ def discovery_world_planning_context(max_chars: int = 8000, run_dir: str = "") -
         if n > 50_000:
             n = 50_000
         ctx = planning_context(data, max_chars=n)
-        return json.dumps(
-            {
-                "session_dir": str(session),
-                "world_path": str(wp),
-                "planning_context": ctx,
-            },
-            indent=2,
-            ensure_ascii=False,
-        )
-    except Exception as e:
-        return json.dumps({"error": str(e)}, indent=2)
+        return {
+            "ok": True,
+            "session_dir": str(session),
+            "world_path": str(wp),
+            "planning_context": ctx,
+        }
+
+    payload = run_instant_mcp_tool(
+        "discovery_world_planning_context",
+        session,
+        _run,
+        stage="discovery_world_context",
+    )
+    return json.dumps(payload, indent=2, ensure_ascii=False)
 
 
 # --- Literature search (folded from lit-* servers) ---
@@ -2650,11 +2687,19 @@ def save_funnel_context(
         data = json.loads(checkpoint_data) if isinstance(checkpoint_data, str) else checkpoint_data
     except json.JSONDecodeError as exc:
         return json.dumps({"error": f"checkpoint_data is not valid JSON: {exc}"})
-    try:
+
+    def _run() -> Dict[str, Any]:
         path = _save(stage=stage, checkpoint_data=data, session_dir=Path(session))
-        return json.dumps({"saved": True, "stage": stage, "path": str(path)}, indent=2)
-    except Exception as exc:
-        return json.dumps({"error": str(exc)})
+        return {"ok": True, "saved": True, "stage": stage, "path": str(path)}
+
+    payload = run_instant_mcp_tool(
+        "save_funnel_context",
+        session,
+        _run,
+        stage="funnel_checkpoint",
+        artifact_key="path",
+    )
+    return json.dumps(payload, indent=2, default=str)
 
 
 @mcp.tool()
@@ -2679,15 +2724,23 @@ def get_funnel_context(
     session = _optional_session_dir(run_dir) or session_dir_from_env(Path(ROOT))
     if session is None:
         return json.dumps({"checkpoint": None, "stages_available": []})
-    try:
+
+    def _run() -> Dict[str, Any]:
         cp = _get(session_dir=Path(session), stage=stage)
         stages = list_funnel_stages(Path(session))
-        return json.dumps({
+        return {
+            "ok": True,
             "checkpoint": cp,
             "stages_available": [s.get("stage") for s in stages],
-        }, indent=2, default=str)
-    except Exception as exc:
-        return json.dumps({"error": str(exc)})
+        }
+
+    payload = run_instant_mcp_tool(
+        "get_funnel_context",
+        session,
+        _run,
+        stage="funnel_read",
+    )
+    return json.dumps(payload, indent=2, default=str)
 
 
 @mcp.tool()
@@ -2714,9 +2767,9 @@ def save_pipeline_stage(
             scores, exclusion reason, route count, etc.).
         run_dir: Session directory.
 
-    Note: This append is instant via MCP **before latch**. After **any MCP timeout**, the session
-    latches to CLI-only — use the save_pipeline_stage CLI one-liner in .opencode/MCP_CLI_FALLBACK.md
-    instead of calling this MCP tool again.
+    Note: This append is instant via MCP **before latch** (capped by ``BIOLOGIX_AI_MCP_INSTANT_TIMEOUT_S``,
+    default 30 s). After **any MCP timeout**, the session latches to CLI-only — use the
+    save_pipeline_stage CLI one-liner in .opencode/MCP_CLI_FALLBACK.md instead of calling this MCP tool again.
     """
     from biologix_ai.services.pipeline_audit import save_pipeline_stage as _save
 
@@ -2734,7 +2787,7 @@ def save_pipeline_stage(
         )
         return {"ok": True, "recorded": True, "audit_id": record["audit_id"]}
 
-    payload = run_guarded_tool(
+    payload = run_instant_mcp_tool(
         "save_pipeline_stage",
         session,
         _run,
@@ -2763,11 +2816,20 @@ def get_pipeline_audit(
     session = _optional_session_dir(run_dir) or session_dir_from_env(Path(ROOT))
     if session is None:
         return json.dumps([])
-    try:
+
+    def _run() -> Dict[str, Any]:
         records = _get(session_dir=Path(session), candidate_psmiles=candidate_psmiles)
-        return json.dumps(records, indent=2, default=str)
-    except Exception as exc:
-        return json.dumps({"error": str(exc)})
+        return {"ok": True, "records": records}
+
+    payload = run_instant_mcp_tool(
+        "get_pipeline_audit",
+        session,
+        _run,
+        stage="pipeline_audit_read",
+    )
+    if payload.get("ok") and "records" in payload:
+        return json.dumps(payload["records"], indent=2, default=str)
+    return json.dumps(payload, indent=2, default=str)
 
 
 @mcp.tool()
@@ -2778,13 +2840,28 @@ def get_retrosynthesis_templates() -> str:
     """
     from biologix_ai.retrosynthesis.models import PolymerizationType
 
-    return json.dumps(
-        {
+    def _run() -> Dict[str, Any]:
+        return {
+            "ok": True,
             "polymerization_types": [t.value for t in PolymerizationType],
             "note": "Template catalog is extensible via rxnutils.",
-        },
-        indent=2,
+        }
+
+    payload = run_instant_mcp_tool(
+        "get_retrosynthesis_templates",
+        None,
+        _run,
+        stage="catalog",
     )
+    if payload.get("ok"):
+        return json.dumps(
+            {
+                "polymerization_types": payload["polymerization_types"],
+                "note": payload["note"],
+            },
+            indent=2,
+        )
+    return json.dumps(payload, indent=2, default=str)
 
 
 @mcp.tool()
@@ -2795,7 +2872,13 @@ def get_personas() -> str:
     """
     from biologix_ai.persona_presets import PERSONAS
 
-    return json.dumps([p.model_dump() for p in PERSONAS], indent=2)
+    def _run() -> Dict[str, Any]:
+        return {"ok": True, "personas": [p.model_dump() for p in PERSONAS]}
+
+    payload = run_instant_mcp_tool("get_personas", None, _run, stage="catalog")
+    if payload.get("ok") and "personas" in payload:
+        return json.dumps(payload["personas"], indent=2, default=str)
+    return json.dumps(payload, indent=2, default=str)
 
 
 @mcp.tool()
@@ -2806,16 +2889,22 @@ def get_persona(persona_id: str) -> str:
     """
     from biologix_ai.persona_presets import PERSONA_MAP
 
-    persona = PERSONA_MAP.get(persona_id.strip())
-    if persona is None:
-        return json.dumps(
-            {
+    pid = persona_id.strip()
+
+    def _run() -> Dict[str, Any]:
+        persona = PERSONA_MAP.get(pid)
+        if persona is None:
+            return {
+                "ok": False,
                 "error": f"Persona '{persona_id}' not found.",
                 "available": list(PERSONA_MAP),
-            },
-            indent=2,
-        )
-    return json.dumps(persona.model_dump(), indent=2)
+            }
+        return {"ok": True, "persona": persona.model_dump()}
+
+    payload = run_instant_mcp_tool("get_persona", None, _run, stage="catalog")
+    if payload.get("ok") and "persona" in payload:
+        return json.dumps(payload["persona"], indent=2, default=str)
+    return json.dumps(payload, indent=2, default=str)
 
 
 if __name__ == "__main__":

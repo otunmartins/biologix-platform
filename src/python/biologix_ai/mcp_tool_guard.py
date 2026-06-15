@@ -9,9 +9,11 @@ persists events under ``<session>/tool_events.jsonl`` / ``tool_errors.log``.
 from __future__ import annotations
 
 import json
+import os
 import sys
 import time
 import traceback
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Dict, Optional, Union
@@ -157,6 +159,63 @@ def truncate_mcp_json(payload: Dict[str, Any], max_bytes: int = 65536) -> Dict[s
     return trimmed
 
 
+def instant_mcp_timeout_s() -> float:
+    """Wall-clock cap for session/audit/catalog MCP tools (default 30 s)."""
+    raw = os.environ.get("BIOLOGIX_AI_MCP_INSTANT_TIMEOUT_S", "30").strip()
+    try:
+        value = float(raw)
+    except ValueError:
+        value = 30.0
+    return value if value > 0 else 30.0
+
+
+def _invoke_with_timeout(fn: Callable[[], Dict[str, Any]], timeout_s: Optional[float]) -> Dict[str, Any]:
+    if timeout_s is None or timeout_s <= 0:
+        result = fn()
+        if not isinstance(result, dict):
+            return {"ok": True, "result": result}
+        return result
+    with ThreadPoolExecutor(max_workers=1) as executor:
+        future = executor.submit(fn)
+        try:
+            result = future.result(timeout=timeout_s)
+        except FuturesTimeoutError:
+            return {
+                "ok": False,
+                "error": f"MCP tool exceeded instant timeout ({timeout_s}s)",
+                "stage": "timeout",
+            }
+    if not isinstance(result, dict):
+        return {"ok": True, "result": result}
+    return result
+
+
+def run_instant_mcp_tool(
+    tool: str,
+    session_dir: Optional[Union[str, Path]],
+    fn: Callable[[], Dict[str, Any]],
+    *,
+    stage: str = "execute",
+    artifact_key: str = "",
+    failure_hint: str = "",
+) -> Dict[str, Any]:
+    """Run a fast session/audit MCP tool with ``BIOLOGIX_AI_MCP_INSTANT_TIMEOUT_S``."""
+    cap = instant_mcp_timeout_s()
+    hint = failure_hint or (
+        f"Instant MCP tool exceeded {cap}s — stdio may be blocked by a long-running call. "
+        "After any MCP timeout the session latches to CLI-only per .opencode/MCP_CLI_FALLBACK.md."
+    )
+    return run_guarded_tool(
+        tool,
+        session_dir,
+        fn,
+        stage=stage,
+        artifact_key=artifact_key,
+        failure_hint=hint,
+        timeout_s=cap,
+    )
+
+
 def log_tool_budget(
     session_dir: Optional[Union[str, Path]],
     *,
@@ -246,20 +305,20 @@ def run_guarded_tool(
     stage: str = "execute",
     artifact_key: str = "",
     failure_hint: str = "",
+    timeout_s: Optional[float] = None,
 ) -> Dict[str, Any]:
     """
     Run *fn* with start/complete/failed logging and structured error capture.
 
-    *fn* must return a dict (typically with ``ok`` bool).
+    *fn* must return a dict (typically with ``ok`` bool). When *timeout_s* is set, exceed
+    raises a structured ``stage=timeout`` failure (used for instant session/audit tools).
     """
     sess = Path(session_dir).resolve() if session_dir else None
     t0 = time.perf_counter()
     log_tool_event(sess, tool=tool, status="started", stage=stage)
 
     try:
-        result = fn()
-        if not isinstance(result, dict):
-            result = {"ok": True, "result": result}
+        result = _invoke_with_timeout(fn, timeout_s)
         elapsed = time.perf_counter() - t0
         ok = bool(result.get("ok", True))
         artifact = ""

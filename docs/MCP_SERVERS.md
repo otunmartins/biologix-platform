@@ -18,6 +18,7 @@ The launcher uses the `biologix-ai-sim` conda env. Session outputs go to `runs/<
 ### Stdio serialization and progress (v0.5.11+)
 
 - **One tool at a time:** [`mcp_stdio_guard.py`](../src/python/biologix_ai/mcp_stdio_guard.py) wraps every handler. A second concurrent call returns `{"ok": false, "error": "MCP_BUSY"}` immediately.
+- **Instant tool timeout:** session/audit/catalog tools (`save_pipeline_stage`, `get_pipeline_audit`, `save_funnel_context`, `get_funnel_context`, discovery world, transcripts, etc.) enforce **`BIOLOGIX_AI_MCP_INSTANT_TIMEOUT_S`** (Docker default **30 s**) in-process via [`run_instant_mcp_tool`](../src/python/biologix_ai/mcp_tool_guard.py). Exceeding the cap returns `stage=timeout` JSON instead of hanging until the OpenCode transport limit.
 - **Progress keepalive:** long tools (`openmm_evaluate_psmiles`, `generate_psmiles_from_name`, guarded PDF paths) emit MCP `notifications/progress` every ~15s plus `runs/<session>/tool_events.jsonl` entries.
 - **Stdout rule:** MCP protocol uses stdout only; all logs go to stderr (`PYTHONUNBUFFERED=1` in `scripts/run_mcp_server.sh`).
 - **Response cap:** large OpenMM JSON is truncated (`truncated: true`); full detail remains in `tool_events.jsonl`.

@@ -43,6 +43,46 @@ def test_run_guarded_tool_failure(tmp_path):
     assert (sess / "tool_errors.log").is_file()
 
 
+def test_run_guarded_tool_times_out(tmp_path, monkeypatch):
+    import time
+
+    monkeypatch.setenv("BIOLOGIX_AI_MCP_INSTANT_TIMEOUT_S", "0.2")
+    sess = tmp_path / "run3"
+
+    def _slow() -> dict:
+        time.sleep(1.0)
+        return {"ok": True}
+
+    r = run_guarded_tool("save_pipeline_stage", sess, _slow, timeout_s=0.2)
+    assert r["ok"] is False
+    assert r["stage"] == "timeout"
+    assert r["status"] == "failed"
+
+
+def test_instant_mcp_timeout_from_env(monkeypatch) -> None:
+    from biologix_ai.mcp_tool_guard import instant_mcp_timeout_s
+
+    monkeypatch.setenv("BIOLOGIX_AI_MCP_INSTANT_TIMEOUT_S", "45")
+    assert instant_mcp_timeout_s() == 45.0
+
+
+def test_run_instant_mcp_tool_uses_env_cap(tmp_path, monkeypatch):
+    import time
+
+    from biologix_ai.mcp_tool_guard import run_instant_mcp_tool
+
+    monkeypatch.setenv("BIOLOGIX_AI_MCP_INSTANT_TIMEOUT_S", "0.15")
+    sess = tmp_path / "run4"
+
+    def _slow() -> dict:
+        time.sleep(0.5)
+        return {"ok": True}
+
+    r = run_instant_mcp_tool("get_pipeline_audit", sess, _slow)
+    assert r["ok"] is False
+    assert r["stage"] == "timeout"
+
+
 def test_truncate_mcp_json_in_guard_module() -> None:
     from biologix_ai.mcp_tool_guard import truncate_mcp_json
 

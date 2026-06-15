@@ -194,6 +194,7 @@ The entrypoint sets interactive defaults (override with `docker run -e …`):
 | `BIOLOGIX_AI_OPENMM_AUTO` | `yes` | `yes` = run OpenMM on ≤3 pass candidates without a mid-pipeline prompt; `skip` = skip OpenMM |
 | `BIOLOGIX_AI_OPENMM_CANDIDATE_TIMEOUT_S` | `840` | Per-candidate OpenMM wall-clock limit (below MCP transport) |
 | `BIOLOGIX_AI_MCP_TIMEOUT_MS` | `960000` | OpenCode MCP transport budget (ms) |
+| `BIOLOGIX_AI_MCP_INSTANT_TIMEOUT_S` | `30` | In-process cap for session/audit/catalog MCP tools |
 | `BIOLOGIX_AI_OPENMM_MAX_MINIMIZE_STEPS` | `1500` | Shorter minimization for faster turns |
 | `BIOLOGIX_AI_EVAL_MAX_WORKERS` | **`1`** (MCP-safe) | Parallel OpenMM **candidates**; use `-e BIOLOGIX_AI_EVAL_MAX_WORKERS=N` for batch HPC |
 | `OMP_NUM_THREADS` | **`nproc`** when `workers=1` | OpenMM threads per worker |
