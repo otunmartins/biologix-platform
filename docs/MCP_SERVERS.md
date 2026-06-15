@@ -9,7 +9,9 @@ This page describes the biologix-ai MCP tools and what each one needs. For setup
 | Command | `bash scripts/run_mcp_server.sh` |
 |---------|----------------------------------|
 
-The launcher uses the `biologix-ai-sim` conda env. Session outputs go to `runs/<session_id>/`. Screening details: [OPENMM_SCREENING.md](OPENMM_SCREENING.md).
+In Docker the launcher **`exec`s `/opt/conda/envs/biologix-ai-sim/bin/python`** directly (no `mamba run`) so stdout stays JSON-RPC-only. Local dev falls back to `mamba run` / `conda run` when that env is not on disk.
+
+OpenCode config (`.opencode/opencode.jsonc`): local server **`cwd: "."`**, catalog **`timeout: 60000` ms**, tool-call budget **`experimental.mcp_timeout: 600000` ms**.
 
 ### MCP timeout → CLI latch
 

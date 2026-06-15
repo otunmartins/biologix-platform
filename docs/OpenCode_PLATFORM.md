@@ -46,7 +46,7 @@ If **any** biologix-ai MCP call **times out for any reason**, the session **latc
 **OpenCode pin:** Docker records installed version in `/app/.opencode-version`. Verify with
 `bash scripts/verify_opencode_mcp_host.sh` (fast) or `… full` for sleep-server import check.
 Build with `docker build --build-arg OPENCODE_VERSION=x.y.z` after a release passes the >130s MCP smoke.
-Documented minimum: **`OPENCODE_MIN_VERSION=1.14.31`** (needs `onprogress` + stepMs fixes).
+Documented minimum: **`OPENCODE_MIN_VERSION=1.17.4`** (MCP abort/cleanup, local `cwd`/`timeout`, catalog timeouts).
 
 If the model provider still cuts long steps, set provider `"timeout": false` in OpenCode config
 (see OpenCode #8701).

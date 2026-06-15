@@ -7,7 +7,7 @@ cd "$REPO_ROOT"
 
 OPENCODE_BIN="${OPENCODE_BIN:-/root/.opencode/bin/opencode}"
 VERSION_FILE="${REPO_ROOT}/.opencode-version"
-MIN_VERSION="${OPENCODE_MIN_VERSION:-1.14.31}"
+MIN_VERSION="${OPENCODE_MIN_VERSION:-1.17.4}"
 MODE="${1:-fast}"
 
 if [[ ! -x "$OPENCODE_BIN" ]]; then

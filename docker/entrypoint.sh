@@ -115,11 +115,17 @@ cat <<EOF
  CPUs visible: $(nproc 2>/dev/null || echo ?) → OpenMM workers=${BIOLOGIX_AI_EVAL_MAX_WORKERS} OMP=${OMP_NUM_THREADS}
    (default workers=1 for MCP; batch HPC: -e BIOLOGIX_AI_EVAL_MAX_WORKERS=4)
  OpenMM timeouts: candidate=${BIOLOGIX_AI_OPENMM_CANDIDATE_TIMEOUT_S}s MCP=${BIOLOGIX_AI_MCP_TIMEOUT_MS}ms instant=${BIOLOGIX_AI_MCP_INSTANT_TIMEOUT_S}s
+ OpenCode: $(opencode --version 2>/dev/null | head -1 || echo unknown)
+   Debug logs: OPENCODE_LOG_LEVEL=DEBUG (files under ~/.local/share/opencode/log/)
 ────────────────────────────────────────────────────────────────────────
 EOF
 
 set +e
-opencode .
+if [[ -n "${OPENCODE_LOG_LEVEL:-}" ]]; then
+  opencode --log-level "$OPENCODE_LOG_LEVEL" .
+else
+  opencode .
+fi
 exit_code=$?
 set -e
 restore_host_terminal

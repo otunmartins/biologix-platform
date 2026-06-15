@@ -3,17 +3,22 @@
   "default_agent": "biologics-delivery-discovery",
   // Agents: any MCP timeout → session latches to CLI-only per .opencode/MCP_CLI_FALLBACK.md (no MCP after).
   "experimental": {
-    // Stdio MCP: server rejects parallel calls (MCP_BUSY); mcp_timeout 600000 ms aligned with candidate cap.
+    // Whole MCP tool call budget (ms); aligned with BIOLOGIX_AI_MCP_TIMEOUT_MS / candidate cap.
     "mcp_timeout": 600000
   },
   "mcp": {
     "biologix-ai": {
       "type": "local",
       "command": ["bash", "scripts/run_mcp_server.sh"],
+      "cwd": ".",
+      // Server setup / catalog fetch timeout (ms); tool calls use experimental.mcp_timeout above.
+      "timeout": 60000,
       "environment": {
         "PAPER_DIRECTORY": "./papers",
         "RETRO_LLM_BACKEND": "skip",
-        "BIOLOGIX_AI_AIZYNTH_CONFIG": "./data/aizynthfinder/config.yml"
+        "BIOLOGIX_AI_AIZYNTH_CONFIG": "./data/aizynthfinder/config.yml",
+        "PYTHONUNBUFFERED": "1",
+        "PYTHONIOENCODING": "utf-8"
       },
       "enabled": true
     },

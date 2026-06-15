@@ -14,6 +14,7 @@ services:
       args:
         # Set SLIM=1 to build a smaller image that downloads models on first run
         SLIM: ${SLIM:-0}
+        OPENCODE_VERSION: ${OPENCODE_VERSION:-1.17.4}
     image: biologix-ai:local
     init: true         # tini as PID 1 — better signal forwarding for the OpenCode TUI
     stdin_open: true   # keeps STDIN open for the TUI

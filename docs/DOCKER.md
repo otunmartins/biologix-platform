@@ -181,7 +181,7 @@ docker run --platform linux/amd64 -it --rm --init `
 | Precursor DB rebuilds for 30–90+ minutes on every `docker run --rm` | Fixed in images built after the entrypoint path correction (`data/retrosynthesis/precursors.json`). Mount **`biologix-data:/app/data`** (Compose does this) so Molport/AiZynth data persists across `--rm`. |
 | `monomer.png` files are SVG / PIL cannot open them | Headless `psmiles` may write SVG to `.png` paths. Rebuild the image after the `psmiles_drawing` fix, or upgrade to a tagged release that includes it. |
 | `setup_aizynthfinder.sh` failed during `docker build` / GitHub Actions | Usually a transient Zenodo/Figshare download error. Re-run the workflow (re-push the tag or use **Actions → Build and publish Docker image → Run workflow** with push enabled). Builds after the curl-based downloader fix are more resilient. |
-| OpenCode looks stuck on a tool (OpenMM, PDF, PNG) | The tool may still be running. In a second shell: `docker ps`, `docker logs --tail 50 <container>`, or `docker exec <container> tail -f /app/runs/<session>/tool_events.jsonl`. Expensive tools log **`started` / `completed` / `failed`** there and in MCP stderr. |
+| OpenCode looks stuck on a tool (OpenMM, PDF, PNG) | The tool may still be running. In a second shell: `docker ps`, `docker logs --tail 50 <container>`, or `docker exec <container> tail -f /app/runs/<session>/tool_events.jsonl`. Expensive tools log **`started` / `completed` / `failed`** there and in MCP stderr. For MCP setup/catalog hangs, rebuild **≥ 0.5.15** (OpenCode **≥ 1.17.4** pin, per-server `cwd`/`timeout`, direct conda python launcher). Run with **`-e OPENCODE_LOG_LEVEL=DEBUG`** and inspect `/root/.local/share/opencode/log/` (persist with `-v opencode-auth:/root/.local/share/opencode`). |
 | `save_pipeline_stage` red icon / timeout | Before latch: usually **parallel MCP calls** blocked stdio. After **any MCP timeout**, the session **latches to CLI-only** — use the `save_pipeline_stage` CLI one-liner in `.opencode/MCP_CLI_FALLBACK.md`; do not call MCP again. |
 | PDF compile failed on Markdown tables | Upgrade to an image with the `plain_tables_fallback` PDF path, or check `tool_errors.log` in the session folder. `SUMMARY_REPORT.md` is still valid even if PDF fails. |
 
@@ -216,13 +216,19 @@ The startup banner prints `CPUs visible`, `OpenMM workers`, `OMP`, and timeout b
 
 ### OpenCode CLI pin (recommended)
 
-The image records the installed OpenCode version in **`/app/.opencode-version`**. For reproducible TUI/MCP behavior, build with a verified pin:
+The image records the installed OpenCode version in **`/app/.opencode-version`**. Default build pin is **`1.17.4`** (MCP abort signals, clean setup failures, local `cwd`/`timeout`).
 
 ```bash
-docker build --build-arg OPENCODE_VERSION=1.14.31 -t biologix-ai:local .
+docker build --build-arg OPENCODE_VERSION=1.17.4 -t biologix-ai:local .
 ```
 
-Minimum tested: **`OPENCODE_MIN_VERSION=1.14.31`** (see `scripts/verify_opencode_mcp_host.sh`). Unpinned installs track `opencode.ai/install` and may change between image builds.
+Minimum tested: **`OPENCODE_MIN_VERSION=1.17.4`** (see `scripts/verify_opencode_mcp_host.sh`).
+
+**Debug logs:** set `-e OPENCODE_LOG_LEVEL=DEBUG` and persist OpenCode state (compose already mounts `opencode-auth` → `/root/.local/share/opencode`; logs live under `log/` there):
+
+```bash
+docker run ... -e OPENCODE_LOG_LEVEL=DEBUG -v biologix-opencode:/root/.local/share/opencode ...
+```
 
 **Container CPU count** depends on Docker, not the image:
 

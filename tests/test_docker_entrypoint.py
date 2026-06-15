@@ -79,3 +79,35 @@ def test_entrypoint_mcp_safe_worker_and_timeout_defaults() -> None:
     assert 'BIOLOGIX_AI_OPENMM_CANDIDATE_TIMEOUT_S="${BIOLOGIX_AI_OPENMM_CANDIDATE_TIMEOUT_S:-540}"' in text
     assert 'BIOLOGIX_AI_MCP_TIMEOUT_MS="${BIOLOGIX_AI_MCP_TIMEOUT_MS:-600000}"' in text
     assert 'BIOLOGIX_AI_MCP_INSTANT_TIMEOUT_S="${BIOLOGIX_AI_MCP_INSTANT_TIMEOUT_S:-30}"' in text
+
+
+def test_entrypoint_opencode_version_and_debug_log_level() -> None:
+    text = ENTRYPOINT.read_text(encoding="utf-8")
+    assert "opencode --version" in text
+    assert "OPENCODE_LOG_LEVEL" in text
+    assert 'opencode --log-level "$OPENCODE_LOG_LEVEL"' in text
+
+
+def test_run_mcp_server_prefers_direct_conda_python() -> None:
+    script = REPO_ROOT / "scripts" / "run_mcp_server.sh"
+    text = script.read_text(encoding="utf-8")
+    assert "/opt/conda/envs/${env_name}/bin/python" in text
+    assert "_resolve_python" in text
+    assert 'exec "$_py"' in text
+    assert "mamba run" in text  # local dev fallback
+
+
+def test_opencode_jsonc_local_mcp_hardening() -> None:
+    cfg = REPO_ROOT / ".opencode" / "opencode.jsonc"
+    text = cfg.read_text(encoding="utf-8")
+    assert '"cwd": "."' in text
+    assert '"timeout": 60000' in text
+    assert '"PYTHONUNBUFFERED": "1"' in text
+    assert '"mcp_timeout": 600000' in text
+
+
+def test_dockerfile_pins_opencode_version() -> None:
+    dockerfile = REPO_ROOT / "Dockerfile"
+    text = dockerfile.read_text(encoding="utf-8")
+    assert 'OPENCODE_VERSION="1.17.4"' in text
+    assert "opencode upgrade" in text
