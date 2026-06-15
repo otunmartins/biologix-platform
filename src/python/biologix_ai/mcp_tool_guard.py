@@ -13,6 +13,7 @@ import os
 import sys
 import time
 import traceback
+import contextlib
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError
 from datetime import datetime, timezone
 from pathlib import Path
@@ -170,21 +171,29 @@ def instant_mcp_timeout_s() -> float:
 
 
 def _invoke_with_timeout(fn: Callable[[], Dict[str, Any]], timeout_s: Optional[float]) -> Dict[str, Any]:
+    def _run_with_stdout_guard() -> Dict[str, Any]:
+        with contextlib.redirect_stdout(sys.stderr):
+            return fn()
+
     if timeout_s is None or timeout_s <= 0:
-        result = fn()
+        result = _run_with_stdout_guard()
         if not isinstance(result, dict):
             return {"ok": True, "result": result}
         return result
-    with ThreadPoolExecutor(max_workers=1) as executor:
-        future = executor.submit(fn)
-        try:
-            result = future.result(timeout=timeout_s)
-        except FuturesTimeoutError:
-            return {
-                "ok": False,
-                "error": f"MCP tool exceeded instant timeout ({timeout_s}s)",
-                "stage": "timeout",
-            }
+
+    executor = ThreadPoolExecutor(max_workers=1)
+    future = executor.submit(_run_with_stdout_guard)
+    try:
+        result = future.result(timeout=timeout_s)
+    except FuturesTimeoutError:
+        executor.shutdown(wait=False, cancel_futures=True)
+        return {
+            "ok": False,
+            "error": f"MCP tool exceeded instant timeout ({timeout_s}s)",
+            "stage": "timeout",
+        }
+    else:
+        executor.shutdown(wait=True, cancel_futures=False)
     if not isinstance(result, dict):
         return {"ok": True, "result": result}
     return result

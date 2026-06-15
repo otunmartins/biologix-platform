@@ -580,7 +580,7 @@ def openmm_evaluate_psmiles(
         session,
         tool="openmm_evaluate_psmiles",
         candidate_timeout_s=_candidate_timeout_s(),
-        mcp_timeout_ms=int(os.environ.get("BIOLOGIX_AI_MCP_TIMEOUT_MS", "960000")),
+        mcp_timeout_ms=int(os.environ.get("BIOLOGIX_AI_MCP_TIMEOUT_MS", "600000")),
     )
     reporter = McpProgressReporter(
         ctx,

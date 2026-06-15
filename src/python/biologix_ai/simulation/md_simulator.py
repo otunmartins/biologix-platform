@@ -229,11 +229,11 @@ def _candidate_timeout_s() -> Optional[float]:
     """
     Per-candidate wall-clock budget for OpenMM matrix evaluation.
 
-    ``BIOLOGIX_AI_OPENMM_CANDIDATE_TIMEOUT_S`` (default 840). Set ``0`` to disable.
+    ``BIOLOGIX_AI_OPENMM_CANDIDATE_TIMEOUT_S`` (default 540). Set ``0`` to disable.
     """
-    raw = os.environ.get("BIOLOGIX_AI_OPENMM_CANDIDATE_TIMEOUT_S", "840").strip()
+    raw = os.environ.get("BIOLOGIX_AI_OPENMM_CANDIDATE_TIMEOUT_S", "540").strip()
     if not raw:
-        return 840.0
+        return 540.0
     val = float(raw)
     if val <= 0:
         return None
@@ -547,7 +547,7 @@ class MDSimulator:
             + ", interaction energy (kJ/mol)."
             + (f" workers={effective_workers}" if effective_workers > 1 else "")
         )
-        print(f"  Evaluating {n_total} via OpenMM Packmol matrix...")
+        print(f"  Evaluating {n_total} via OpenMM Packmol matrix...", file=sys.stderr, flush=True)
         if verbose:
             _progress_log(msg)
 

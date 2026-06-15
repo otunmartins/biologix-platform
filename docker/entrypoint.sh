@@ -33,8 +33,8 @@ export OPENBLAS_NUM_THREADS="${OPENBLAS_NUM_THREADS:-${OMP_NUM_THREADS}}"
 export NUMEXPR_NUM_THREADS="${NUMEXPR_NUM_THREADS:-${OMP_NUM_THREADS}}"
 
 # Interactive safety profile for Docker/OpenCode sessions (override with docker run -e …)
-export BIOLOGIX_AI_OPENMM_CANDIDATE_TIMEOUT_S="${BIOLOGIX_AI_OPENMM_CANDIDATE_TIMEOUT_S:-840}"
-export BIOLOGIX_AI_MCP_TIMEOUT_MS="${BIOLOGIX_AI_MCP_TIMEOUT_MS:-960000}"
+export BIOLOGIX_AI_OPENMM_CANDIDATE_TIMEOUT_S="${BIOLOGIX_AI_OPENMM_CANDIDATE_TIMEOUT_S:-540}"
+export BIOLOGIX_AI_MCP_TIMEOUT_MS="${BIOLOGIX_AI_MCP_TIMEOUT_MS:-600000}"
 export BIOLOGIX_AI_MCP_INSTANT_TIMEOUT_S="${BIOLOGIX_AI_MCP_INSTANT_TIMEOUT_S:-30}"
 export BIOLOGIX_AI_OPENMM_MAX_MINIMIZE_STEPS="${BIOLOGIX_AI_OPENMM_MAX_MINIMIZE_STEPS:-1500}"
 export BIOLOGIX_PDF_TIMEOUT="${BIOLOGIX_PDF_TIMEOUT:-30}"
@@ -113,8 +113,8 @@ cat <<EOF
  MCP: agent must call biologix-ai tools one-at-a-time (parallel calls return MCP_BUSY).
 
  CPUs visible: $(nproc 2>/dev/null || echo ?) → OpenMM workers=${BIOLOGIX_AI_EVAL_MAX_WORKERS} OMP=${OMP_NUM_THREADS}
-   (default workers=1 for MCP; override -e BIOLOGIX_AI_EVAL_MAX_WORKERS=N for batch HPC)
- OpenMM timeouts: candidate=${BIOLOGIX_AI_OPENMM_CANDIDATE_TIMEOUT_S}s MCP=${BIOLOGIX_AI_MCP_TIMEOUT_MS}ms
+   (default workers=1 for MCP; batch HPC: -e BIOLOGIX_AI_EVAL_MAX_WORKERS=4)
+ OpenMM timeouts: candidate=${BIOLOGIX_AI_OPENMM_CANDIDATE_TIMEOUT_S}s MCP=${BIOLOGIX_AI_MCP_TIMEOUT_MS}ms instant=${BIOLOGIX_AI_MCP_INSTANT_TIMEOUT_S}s
 ────────────────────────────────────────────────────────────────────────
 EOF
 

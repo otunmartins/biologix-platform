@@ -76,6 +76,6 @@ def test_entrypoint_auto_cpu_defaults() -> None:
 def test_entrypoint_mcp_safe_worker_and_timeout_defaults() -> None:
     text = ENTRYPOINT.read_text(encoding="utf-8")
     assert 'export BIOLOGIX_AI_EVAL_MAX_WORKERS=1' in text
-    assert 'BIOLOGIX_AI_OPENMM_CANDIDATE_TIMEOUT_S="${BIOLOGIX_AI_OPENMM_CANDIDATE_TIMEOUT_S:-840}"' in text
-    assert 'BIOLOGIX_AI_MCP_TIMEOUT_MS="${BIOLOGIX_AI_MCP_TIMEOUT_MS:-960000}"' in text
+    assert 'BIOLOGIX_AI_OPENMM_CANDIDATE_TIMEOUT_S="${BIOLOGIX_AI_OPENMM_CANDIDATE_TIMEOUT_S:-540}"' in text
+    assert 'BIOLOGIX_AI_MCP_TIMEOUT_MS="${BIOLOGIX_AI_MCP_TIMEOUT_MS:-600000}"' in text
     assert 'BIOLOGIX_AI_MCP_INSTANT_TIMEOUT_S="${BIOLOGIX_AI_MCP_INSTANT_TIMEOUT_S:-30}"' in text

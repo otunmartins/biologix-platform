@@ -38,8 +38,8 @@ If **any** biologix-ai MCP call **times out for any reason**, the session **latc
 
 | Layer | Default | Notes |
 |-------|---------|-------|
-| OpenCode `experimental.mcp_timeout` | **960000 ms** | Whole tool call (`.opencode/opencode.jsonc`) |
-| `BIOLOGIX_AI_OPENMM_CANDIDATE_TIMEOUT_S` | **840 s** | In-process per candidate; fails before transport |
+| OpenCode `experimental.mcp_timeout` | **600000 ms** | Whole tool call (`.opencode/opencode.jsonc`) |
+| `BIOLOGIX_AI_OPENMM_CANDIDATE_TIMEOUT_S` | **540 s** | In-process per candidate; fails before transport |
 | MCP progress keepalive | **~15 s** | `Context.report_progress` + `tool_events.jsonl` |
 | Stdio serialization | **`MCP_BUSY`** | Second parallel call rejected immediately |
 

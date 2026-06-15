@@ -40,8 +40,8 @@ MCP **`openmm_evaluate_psmiles`** and [`MDSimulator.evaluate_candidates`](../src
 | **Verbose / quiet:** `BIOLOGIX_AI_EVAL_QUIET=1` or `BIOLOGIX_AI_EVAL_VERBOSE=0` | | Smaller JSON / no stderr progress (also disables stderr heartbeat) |
 | **Stderr heartbeat** (implicit) | *(on)* | When **`verbose=False`** on `openmm_evaluate_psmiles` / `evaluate_candidates` but **quiet env is not set**, stderr still prints **`[biologix-ai] i/n matrix eval starting: …`** and **`… finished …`** per candidate. Parallel runs also log **`Submitting N candidate(s) to W worker process(es).`** |
 | `BIOLOGIX_AI_EVAL_MAX_WORKERS` | `1` | Number of parallel worker processes. Docker entrypoint defaults to **1** for MCP-safe stdio (override for batch HPC). |
-| `BIOLOGIX_AI_OPENMM_CANDIDATE_TIMEOUT_S` | `840` (Docker default) | Per-candidate wall-clock budget for the full matrix eval (Packmol + minimize + energy). Set `0` to disable. Timed-out candidates return `stage=timeout` in `candidate_outcomes` instead of blocking the whole batch indefinitely. |
-| `BIOLOGIX_AI_MCP_TIMEOUT_MS` | `960000` (16 min) | Documented OpenCode transport budget; candidate timeout is set below this so JSON returns in-process first. |
+| `BIOLOGIX_AI_OPENMM_CANDIDATE_TIMEOUT_S` | `540` (Docker default) | Per-candidate wall-clock budget for the full matrix eval (Packmol + minimize + energy). Set `0` to disable. Timed-out candidates return `stage=timeout` in `candidate_outcomes` instead of blocking the whole batch indefinitely. |
+| `BIOLOGIX_AI_MCP_TIMEOUT_MS` | `600000` (10 min) | Documented OpenCode transport budget; candidate timeout is set below this so JSON returns in-process first. |
 
 **Note:** NPT is **off** by default so MCP runs finish in minutes; turn on for sampling-averaged interaction energy at the cost of runtime.
 
@@ -61,7 +61,8 @@ MCP **`openmm_evaluate_psmiles`** and [`MDSimulator.evaluate_candidates`](../src
 
 - **Single tool response:** The MCP tool returns **one** JSON only after **every** candidate in the batch finishes. OpenCode’s tool panel does not stream partial JSON. With **`response_format=concise`**, the returned payload is smaller, but the client still waits for the full batch.
 - **`verbose=false` vs quiet:** Passing **`verbose=false`** (common with concise mode) **does not** silence stderr on the MCP server unless you also set **`BIOLOGIX_AI_EVAL_QUIET=1`** or **`BIOLOGIX_AI_EVAL_VERBOSE=0`**. By default, **`verbose=false`** still emits the **stderr heartbeat** lines described in the environment table so the terminal running **`biologix_ai_mcp_server.py`** shows which candidate is running. OpenCode’s UI may still look idle if you are not watching that server terminal.
-- **Per-candidate timeout:** Docker sets **`BIOLOGIX_AI_OPENMM_CANDIDATE_TIMEOUT_S=840`** by default (below **`experimental.mcp_timeout` 960000 ms**). When exceeded, that candidate is marked **`failed`** with **`stage=timeout`** and the batch continues. Override with `-e BIOLOGIX_AI_OPENMM_CANDIDATE_TIMEOUT_S=0` for no limit.
+- **Per-candidate timeout:** Docker sets **`BIOLOGIX_AI_OPENMM_CANDIDATE_TIMEOUT_S=540`** by default (below **`experimental.mcp_timeout` 600000 ms**). When exceeded, that candidate is marked **`failed`** with **`stage=timeout`** and the batch continues. Override with `-e BIOLOGIX_AI_OPENMM_CANDIDATE_TIMEOUT_S=0` for no limit.
+- **Stdout rule:** OpenMM progress must go to **stderr** only; stdout is reserved for MCP JSON-RPC. Bare `print()` during matrix eval corrupts the OpenCode TUI (keyboard freeze).
 - **Stage heartbeats:** stderr lines like **`[biologix-ai] stage=packmol …`**, **`stage=minimize`**, **`stage=energy_eval`** are emitted during matrix evaluation (unless **`BIOLOGIX_AI_EVAL_QUIET=1`**). Session logs also land in **`runs/<session>/tool_events.jsonl`**.
 - **Minimize step count:** [`run_openmm_matrix_relax_and_energy`](../src/python/biologix_ai/simulation/openmm_complex.py) calls **`openmm.LocalEnergyMinimizer.minimize(..., maxIterations=BIOLOGIX_AI_OPENMM_MAX_MINIMIZE_STEPS)`** (Docker default **1500**). Each iteration can mean many force evaluations on a **large** system. The **`BIOLOGIX_AI_OPENMM_MATRIX_WALL_CLOCK_S`** limit applies only to the **optional NPT** loop after minimize—not to minimization itself.
 - **Parallel workers:** **`max_workers=4`** runs four full matrix builds at once. That multiplies **RAM** and **CPU** contention; with **swap**, wall time explodes. Prefer **`max_workers=1`** or **`2`** unless you have confirmed headroom (see default in `BIOLOGIX_AI_EVAL_MAX_WORKERS`).
@@ -102,7 +103,7 @@ print(r['evaluation_progress'][0])
 
 ## MCP timeout → CLI latch (OpenCode agents)
 
-OpenCode **`experimental.mcp_timeout`** (**960000 ms / 16 min** in `.opencode/opencode.jsonc`) applies to the **whole** MCP tool response. Per-candidate timeout (**840 s**) is set **below** transport so failures return JSON in-process first.
+OpenCode **`experimental.mcp_timeout`** (**600000 ms / 10 min** in `.opencode/opencode.jsonc`) applies to the **whole** MCP tool response. Per-candidate timeout (**540 s**) is set **below** transport so failures return JSON in-process first.
 
 **Session latch:** The **first** MCP timeout (any reason) switches the **entire remaining session** to CLI-only — agents must **not** call any `biologix-ai` MCP tool again after latch.
 

@@ -545,7 +545,7 @@ def run_openmm_matrix_relax_and_energy(
 
     def _log(msg: str) -> None:
         if verbose:
-            print(msg, flush=True)
+            print(msg, file=sys.stderr, flush=True)
 
     if packing_mode not in ("shell", "bulk"):
         packing_mode = "bulk"

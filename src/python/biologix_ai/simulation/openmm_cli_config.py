@@ -84,7 +84,7 @@ def resolve_openmm_cli_kwargs(
     if candidate_timeout_flag is not None:
         kw["candidate_timeout_s"] = candidate_timeout_flag
     else:
-        raw = os.environ.get("BIOLOGIX_AI_OPENMM_CANDIDATE_TIMEOUT_S", "840").strip()
+        raw = os.environ.get("BIOLOGIX_AI_OPENMM_CANDIDATE_TIMEOUT_S", "540").strip()
         if raw and float(raw) > 0:
             kw["candidate_timeout_s"] = float(raw)
 

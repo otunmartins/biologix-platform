@@ -192,11 +192,11 @@ The entrypoint sets interactive defaults (override with `docker run -e …`):
 | Variable | Docker default | Purpose |
 |----------|----------------|---------|
 | `BIOLOGIX_AI_OPENMM_AUTO` | `yes` | `yes` = run OpenMM on ≤3 pass candidates without a mid-pipeline prompt; `skip` = skip OpenMM |
-| `BIOLOGIX_AI_OPENMM_CANDIDATE_TIMEOUT_S` | `840` | Per-candidate OpenMM wall-clock limit (below MCP transport) |
-| `BIOLOGIX_AI_MCP_TIMEOUT_MS` | `960000` | OpenCode MCP transport budget (ms) |
+| `BIOLOGIX_AI_OPENMM_CANDIDATE_TIMEOUT_S` | `540` | Per-candidate OpenMM wall-clock limit (below MCP transport) |
+| `BIOLOGIX_AI_MCP_TIMEOUT_MS` | `600000` | OpenCode MCP transport budget (ms); aligned with `.opencode/opencode.jsonc` |
 | `BIOLOGIX_AI_MCP_INSTANT_TIMEOUT_S` | `30` | In-process cap for session/audit/catalog MCP tools |
 | `BIOLOGIX_AI_OPENMM_MAX_MINIMIZE_STEPS` | `1500` | Shorter minimization for faster turns |
-| `BIOLOGIX_AI_EVAL_MAX_WORKERS` | **`1`** (MCP-safe) | Parallel OpenMM **candidates**; use `-e BIOLOGIX_AI_EVAL_MAX_WORKERS=N` for batch HPC |
+| `BIOLOGIX_AI_EVAL_MAX_WORKERS` | **`1`** (MCP-safe) | Parallel OpenMM **candidates**; use `-e BIOLOGIX_AI_EVAL_MAX_WORKERS=N` for batch HPC (e.g. `-e BIOLOGIX_AI_EVAL_MAX_WORKERS=4`) |
 | `OMP_NUM_THREADS` | **`nproc`** when `workers=1` | OpenMM threads per worker |
 | `BIOLOGIX_AI_EVAL_CPU_FRACTION` | `1.0` | Fraction of container CPUs for workers (e.g. `0.75` for headroom) |
 | `DOCKER_CPU_PCT` | `75` (host scripts only) | Optional `--cpus` quota via `scripts/docker_run.sh` |
@@ -212,7 +212,17 @@ docker run --platform linux/amd64 -it --rm --init \
   ghcr.io/otunmartins/biologix-ai:latest
 ```
 
-The startup banner prints `CPUs visible`, `OpenMM workers`, and `OMP`.
+The startup banner prints `CPUs visible`, `OpenMM workers`, `OMP`, and timeout budgets.
+
+### OpenCode CLI pin (recommended)
+
+The image records the installed OpenCode version in **`/app/.opencode-version`**. For reproducible TUI/MCP behavior, build with a verified pin:
+
+```bash
+docker build --build-arg OPENCODE_VERSION=1.14.31 -t biologix-ai:local .
+```
+
+Minimum tested: **`OPENCODE_MIN_VERSION=1.14.31`** (see `scripts/verify_opencode_mcp_host.sh`). Unpinned installs track `opencode.ai/install` and may change between image builds.
 
 **Container CPU count** depends on Docker, not the image:
 

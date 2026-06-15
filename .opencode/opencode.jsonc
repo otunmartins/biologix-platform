@@ -3,8 +3,8 @@
   "default_agent": "biologics-delivery-discovery",
   // Agents: any MCP timeout → session latches to CLI-only per .opencode/MCP_CLI_FALLBACK.md (no MCP after).
   "experimental": {
-    // Stdio MCP: server rejects parallel calls (MCP_BUSY); align with candidate timeout stack.
-    "mcp_timeout": 960000
+    // Stdio MCP: server rejects parallel calls (MCP_BUSY); mcp_timeout 600000 ms aligned with candidate cap.
+    "mcp_timeout": 600000
   },
   "mcp": {
     "biologix-ai": {
