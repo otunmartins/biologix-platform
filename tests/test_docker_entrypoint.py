@@ -104,6 +104,13 @@ def test_opencode_jsonc_local_mcp_hardening() -> None:
     assert '"timeout": 60000' in text
     assert '"PYTHONUNBUFFERED": "1"' in text
     assert '"mcp_timeout": 600000' in text
+    assert '"snapshot": false' in text
+    assert '"autoupdate": false' in text
+
+
+def test_entrypoint_disables_opencode_autoupdate() -> None:
+    text = ENTRYPOINT.read_text(encoding="utf-8")
+    assert "OPENCODE_DISABLE_AUTOUPDATE" in text
 
 
 def test_host_docker_tty_guard_wires_restore_on_host() -> None:
@@ -125,3 +132,5 @@ def test_dockerfile_pins_opencode_version() -> None:
     text = dockerfile.read_text(encoding="utf-8")
     assert 'OPENCODE_VERSION="1.17.4"' in text
     assert "opencode upgrade" in text
+    assert "OPENCODE_DISABLE_AUTOUPDATE=true" in text
+    assert 'git>=2.40' in text

@@ -43,6 +43,9 @@ export BIOLOGIX_AIZYNTH_TIMEOUT="${BIOLOGIX_AIZYNTH_TIMEOUT:-180}"
 export OPENMM_CPU_THREADS="${OPENMM_CPU_THREADS:-1}"
 export BIOLOGIX_SKIP_ZINC_BRIDGE="${BIOLOGIX_SKIP_ZINC_BRIDGE:-1}"
 
+# Keep OpenCode at the Dockerfile-pinned version (auto-update breaks reproducibility).
+export OPENCODE_DISABLE_AUTOUPDATE="${OPENCODE_DISABLE_AUTOUPDATE:-true}"
+
 # Docker session markers — agents read these instead of blocking on mid-pipeline HITL prompts.
 export BIOLOGIX_AI_DOCKER=1
 export BIOLOGIX_AI_OPENMM_AUTO="${BIOLOGIX_AI_OPENMM_AUTO:-yes}"

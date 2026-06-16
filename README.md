@@ -85,14 +85,14 @@ No Anthropic (or other) API key is required before you start — configure the L
 
 ### Pull the pre-built image and run
 
-**Recommended release:** `ghcr.io/otunmartins/biologix-ai:0.5.18` (tag `v0.5.18`). Pin this tag for reproducible runs; `latest` tracks the same build but can change when a new release ships.
+**Recommended release:** `ghcr.io/otunmartins/biologix-ai:0.5.19` (tag `v0.5.19`). Pin this tag for reproducible runs; `latest` tracks the same build but can change when a new release ships.
 
 From any directory where you want session folders:
 
 ```bash
 mkdir -p runs papers
 
-docker pull --platform linux/amd64 ghcr.io/otunmartins/biologix-ai:0.5.18
+docker pull --platform linux/amd64 ghcr.io/otunmartins/biologix-ai:0.5.19
 
 # Recommended — host TTY cleanup when OpenCode exits (avoids mouse gibberish after docker kill):
 # Option A: clone repo and use the launcher (CPU quota + timeouts + TTY restore)
@@ -101,7 +101,7 @@ cd biologix-platform
 ./scripts/docker_run.sh
 
 # Option B: standalone one-liner (no clone) — downloads launcher then runs it
-curl -fsSL https://raw.githubusercontent.com/otunmartins/biologix-platform/biologix-main/scripts/docker_ghcr_run.sh | bash
+curl -fsSL https://raw.githubusercontent.com/otunmartins/biologix-platform/main/scripts/docker_ghcr_run.sh | bash
 
 # Option C: raw docker run — MUST use host EXIT trap + stability env vars (Mac/Rosetta)
 trap 'printf "\e[?1000l\e[?1002l\e[?1003l\e[?1006l"; stty sane 2>/dev/null || true' EXIT
@@ -112,14 +112,14 @@ docker run --platform linux/amd64 -it --rm --init \
   -v "$(pwd)/runs:/app/runs" \
   -v "$(pwd)/papers:/app/papers" \
   -v biologix-data:/app/data \
-  ghcr.io/otunmartins/biologix-ai:0.5.18
+  ghcr.io/otunmartins/biologix-ai:0.5.19
 ```
 
 **Windows (PowerShell)** — same flow; use `${PWD}` instead of `$(pwd)`:
 
 ```powershell
 mkdir runs, papers -Force
-docker pull --platform linux/amd64 ghcr.io/otunmartins/biologix-ai:0.5.18
+docker pull --platform linux/amd64 ghcr.io/otunmartins/biologix-ai:0.5.19
 docker run --platform linux/amd64 -it --rm --init `
   -e OPENMM_CPU_THREADS=1 `
   -e BIOLOGIX_SKIP_ZINC_BRIDGE=1 `
@@ -127,12 +127,12 @@ docker run --platform linux/amd64 -it --rm --init `
   -v "${PWD}/runs:/app/runs" `
   -v "${PWD}/papers:/app/papers" `
   -v biologix-data:/app/data `
-  ghcr.io/otunmartins/biologix-ai:0.5.18
+  ghcr.io/otunmartins/biologix-ai:0.5.19
 ```
 
 **What happens:** the entrypoint activates the conda env, runs first-run data setup if needed, then starts **OpenCode** with the default **`biologics-delivery-discovery`** agent. Discovery outputs land in `./runs/` on your host.
 
-**LLM access:** sign in or attach a provider from inside OpenCode (`opencode auth login`, or your usual model/provider switch). Optional: pass a key at launch with `-e OPENAI_API_KEY=...` / `-e OPENROUTER_API_KEY=...` / `-e ANTHROPIC_API_KEY=...` if you prefer env-based auth.
+**LLM access:** sign in or attach a provider from inside OpenCode (`opencode auth login`, or your usual model/provider switch). Optional: pass a key at launch with `-e OPENAI_API_KEY=...` / `-e OPENROUTER_API_KEY=...` / `-e ANTHROPIC_API_KEY=...` if you prefer env-based auth. For **multi-hour discovery runs**, avoid relying on the free OpenCode Zen model (`big-pickle`) — it can stall mid-stream; use Anthropic, OpenAI, or OpenRouter with a configured key.
 
 ### Alternative: build locally with Compose
 

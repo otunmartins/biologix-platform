@@ -10,16 +10,36 @@
 #
 # Usage (from any directory — creates ./runs and ./papers here):
 #   bash docker_ghcr_run.sh
-#   curl -fsSL https://raw.githubusercontent.com/otunmartins/biologix-platform/biologix-main/scripts/docker_ghcr_run.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/otunmartins/biologix-platform/main/scripts/docker_ghcr_run.sh | bash
 #
 # Optional:
-#   BIOLOGIX_AI_IMAGE=ghcr.io/otunmartins/biologix-ai:0.5.18 bash docker_ghcr_run.sh
+#   BIOLOGIX_AI_IMAGE=ghcr.io/otunmartins/biologix-ai:0.5.19 bash docker_ghcr_run.sh
 #   bash docker_ghcr_run.sh -e ANTHROPIC_API_KEY=sk-ant-...
 set -euo pipefail
 
-IMAGE="${BIOLOGIX_AI_IMAGE:-ghcr.io/otunmartins/biologix-ai:0.5.18}"
+IMAGE="${BIOLOGIX_AI_IMAGE:-ghcr.io/otunmartins/biologix-ai:0.5.19}"
 RUN_DIR="${PWD}"
-CPUS="${DOCKER_CPU_LIMIT:-}"
+
+_host_logical_cpus() {
+  if [[ "$(uname -s)" == "Darwin" ]]; then
+    sysctl -n hw.logicalcpu 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 1
+  elif [[ -f /proc/cpuinfo ]]; then
+    grep -c ^processor /proc/cpuinfo
+  elif command -v nproc &>/dev/null; then
+    nproc --all 2>/dev/null || nproc
+  else
+    echo 1
+  fi
+}
+
+if [[ -z "${DOCKER_CPU_LIMIT:-}" ]]; then
+  _host="$(_host_logical_cpus)"
+  _pct="${DOCKER_CPU_PCT:-75}"
+  CPUS=$(( _host * _pct / 100 ))
+  [[ "$CPUS" -lt 1 ]] && CPUS=1
+else
+  CPUS="${DOCKER_CPU_LIMIT}"
+fi
 
 _restore_host_tty() {
   local tty_dev=/dev/tty
@@ -38,16 +58,12 @@ trap '_restore_host_tty' EXIT INT TERM HUP
 
 mkdir -p "${RUN_DIR}/runs" "${RUN_DIR}/papers"
 
-cpu_args=()
-if [[ -n "$CPUS" ]]; then
-  cpu_args=(--cpus "$CPUS")
-fi
-
 echo "Image: ${IMAGE}"
+echo "Container CPU quota: --cpus=${CPUS} (${DOCKER_CPU_PCT:-75}% of host logical CPUs)"
 echo "Host TTY will be restored when this session ends (including after docker kill)."
 
 docker run --platform linux/amd64 -it --rm --init \
-  "${cpu_args[@]}" \
+  --cpus "${CPUS}" \
   -e TERM=xterm-256color \
   -e LC_ALL=C.UTF-8 \
   -e OPENMM_CPU_THREADS="${OPENMM_CPU_THREADS:-1}" \

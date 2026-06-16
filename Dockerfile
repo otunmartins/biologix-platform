@@ -50,6 +50,8 @@ COPY environment-simulation.yml ./
 # install_submodules.sh already runs: pip install -e ".[retro,admet,dev]"
 RUN sed '/^[[:space:]]*- -e \.$/d' environment-simulation.yml > /tmp/environment-docker.yml \
     && mamba env create -f /tmp/environment-docker.yml \
+    && mamba install -n biologix-ai-sim -y -c conda-forge "git>=2.40" \
+    && /opt/conda/envs/biologix-ai-sim/bin/git --version \
     && mamba clean --all --yes
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -80,6 +82,7 @@ ENV CONDA_DEFAULT_ENV=biologix-ai-sim
 # Conda-forge C++ libs (libLerc, graphviz) require newer libstdc++ than the base image.
 ENV LD_LIBRARY_PATH=/opt/conda/envs/biologix-ai-sim/lib
 ENV BIOLOGIX_AI_IMAGE_VERSION=${IMAGE_VERSION}
+ENV OPENCODE_DISABLE_AUTOUPDATE=true
 # Make conda activate work inside RUN steps
 ENV BASH_ENV=/opt/conda/etc/profile.d/conda.sh
 

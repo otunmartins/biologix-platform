@@ -1,6 +1,10 @@
 {
   "$schema": "https://opencode.ai/config.json",
   "default_agent": "biologics-delivery-discovery",
+  // Disable per-step git snapshots: old apt git (2.25.x) rejects `git add --sparse`
+  // and indexing /app + submodules stalls the agent loop (OpenCode #21302).
+  "snapshot": false,
+  "autoupdate": false,
   // Agents: any MCP timeout → session latches to CLI-only per .opencode/MCP_CLI_FALLBACK.md (no MCP after).
   "experimental": {
     // Whole MCP tool call budget (ms); aligned with BIOLOGIX_AI_MCP_TIMEOUT_MS / candidate cap.
