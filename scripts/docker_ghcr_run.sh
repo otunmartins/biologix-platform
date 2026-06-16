@@ -56,23 +56,41 @@ _restore_host_tty() {
 
 trap '_restore_host_tty' EXIT INT TERM HUP
 
+# Clear leftover OpenTUI mouse-tracking from a prior hung/killed session.
+_restore_host_tty
+
 mkdir -p "${RUN_DIR}/runs" "${RUN_DIR}/papers"
 
-echo "Image: ${IMAGE}"
-echo "Container CPU quota: --cpus=${CPUS} (${DOCKER_CPU_PCT:-75}% of host logical CPUs)"
-echo "Host TTY will be restored when this session ends (including after docker kill)."
+echo "Image: ${IMAGE}" >&2
+echo "Container CPU quota: --cpus=${CPUS} (${DOCKER_CPU_PCT:-75}% of host logical CPUs)" >&2
+echo "Host TTY will be restored when this session ends (including after docker kill)." >&2
 
-docker run --platform linux/amd64 -it --rm --init \
-  --cpus "${CPUS}" \
-  -e TERM=xterm-256color \
-  -e LC_ALL=C.UTF-8 \
-  -e OPENMM_CPU_THREADS="${OPENMM_CPU_THREADS:-1}" \
-  -e BIOLOGIX_SKIP_ZINC_BRIDGE="${BIOLOGIX_SKIP_ZINC_BRIDGE:-1}" \
-  -e BIOLOGIX_PDF_TIMEOUT="${BIOLOGIX_PDF_TIMEOUT:-60}" \
-  -e BIOLOGIX_TREE_TIMEOUT="${BIOLOGIX_TREE_TIMEOUT:-300}" \
-  -e BIOLOGIX_AIZYNTH_TIMEOUT="${BIOLOGIX_AIZYNTH_TIMEOUT:-180}" \
-  -v "${RUN_DIR}/runs:/app/runs" \
-  -v "${RUN_DIR}/papers:/app/papers" \
-  -v biologix-data:/app/data \
-  "$@" \
-  "${IMAGE}"
+# curl | bash connects stdin to a pipe, not the terminal — docker run -it then fails with
+# "the input device is not a TTY". Attach /dev/tty explicitly when stdin is not a TTY.
+_run_docker() {
+  docker run --platform linux/amd64 -it --rm --init \
+    --cpus "${CPUS}" \
+    -e TERM=xterm-256color \
+    -e LC_ALL=C.UTF-8 \
+    -e OPENMM_CPU_THREADS="${OPENMM_CPU_THREADS:-1}" \
+    -e BIOLOGIX_SKIP_ZINC_BRIDGE="${BIOLOGIX_SKIP_ZINC_BRIDGE:-1}" \
+    -e BIOLOGIX_PDF_TIMEOUT="${BIOLOGIX_PDF_TIMEOUT:-60}" \
+    -e BIOLOGIX_TREE_TIMEOUT="${BIOLOGIX_TREE_TIMEOUT:-300}" \
+    -e BIOLOGIX_AIZYNTH_TIMEOUT="${BIOLOGIX_AIZYNTH_TIMEOUT:-180}" \
+    -v "${RUN_DIR}/runs:/app/runs" \
+    -v "${RUN_DIR}/papers:/app/papers" \
+    -v biologix-data:/app/data \
+    "$@" \
+    "${IMAGE}"
+}
+
+if [[ -t 0 ]]; then
+  _run_docker "$@"
+else
+  if [[ ! -r /dev/tty ]]; then
+    echo "error: stdin is not a TTY (e.g. curl | bash) and /dev/tty is unavailable." >&2
+    echo "Save and run directly: curl -fsSL ... -o docker_ghcr_run.sh && bash docker_ghcr_run.sh" >&2
+    exit 1
+  fi
+  _run_docker "$@" < /dev/tty
+fi

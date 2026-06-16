@@ -113,6 +113,17 @@ def test_entrypoint_disables_opencode_autoupdate() -> None:
     assert "OPENCODE_DISABLE_AUTOUPDATE" in text
 
 
+def test_docker_ghcr_run_supports_curl_pipe_tty() -> None:
+    script = REPO_ROOT / "scripts" / "docker_ghcr_run.sh"
+    text = script.read_text(encoding="utf-8")
+    assert "_run_docker" in text
+    assert "< /dev/tty" in text
+    assert "[[ -t 0 ]]" in text
+    assert "_restore_host_tty" in text
+    # Startup restore before docker (not only EXIT trap)
+    assert text.index("_restore_host_tty") < text.index("_run_docker")
+
+
 def test_host_docker_tty_guard_wires_restore_on_host() -> None:
     guard = REPO_ROOT / "scripts" / "host_docker_tty_guard.sh"
     run_sh = REPO_ROOT / "scripts" / "docker_run.sh"

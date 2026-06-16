@@ -101,6 +101,7 @@ cd biologix-platform
 ./scripts/docker_run.sh
 
 # Option B: standalone one-liner (no clone) — downloads launcher then runs it
+# If the terminal shows gibberish from a prior session, run `reset` first.
 curl -fsSL https://raw.githubusercontent.com/otunmartins/biologix-platform/main/scripts/docker_ghcr_run.sh | bash
 
 # Option C: raw docker run — MUST use host EXIT trap + stability env vars (Mac/Rosetta)
