@@ -1,30 +1,77 @@
----
-name: OpenMM geometry and energy
-overview: "Implement a complete, robust OpenMM path for insulin + ligand geometry relaxation and interaction energy using RDKit/OpenFF Gasteiger charges (no antechamber). Disulfide bonds are handled explicitly per OpenMM best practice. No fallbacks: the OpenMM path is the deliverable and must work end-to-end. TDD throughout."
-todos: []
-isProject: false
----
+# Retrosynthesis Hang Fix Plan
 
-# OpenMM path: disulfides, RDKit charges, minimization, interaction energy (all-or-nothing, TDD)
+## Problem
 
-## Principles
+OpenCode hangs at the retrosynthesis step in Docker container deployments. The root cause is an inconsistency between where retrosynthesis timeout environment variables are set:
 
-- **No fallbacks**: Do not implement "try OpenMM, else GROMACS" or "optional OpenMM." The deliverable is a working OpenMM pipeline; fix issues until it works. Dependencies (openmm, openmmforcefields, openff-toolkit) are required for this path.
-- **Robust solutions only**: Use documented best practices (OpenMM issue #4420, user guide, OpenFF/openmmforcefields docs). No ad-hoc or fragile logic.
-- **TDD**: Write tests first (or in lockstep); catch syntax, trivial, and runtime errors; do not stop until geometry relaxation and interaction energy both work in tests.
+| Variable | Python default (`retrosynthesis_service.py`) | `entrypoint.sh` fallback | `docker-compose.yml` |
+|---|---|---|---|
+| `BIOLOGIX_TREE_TIMEOUT` | 120 | 90 | **NOT SET** |
+| `BIOLOGIX_PDF_TIMEOUT` | 60 | 30 | **NOT SET** |
+| `BIOLOGIX_AIZYNTH_TIMEOUT` | 180 | **NOT SET** | 180 |
 
----
+The Python defaults (lines 46–48 of `retrosynthesis_service.py`) are:
+```python
+_PDF_DOWNLOAD_TIMEOUT = int(os.environ.get("BIOLOGIX_PDF_TIMEOUT", "60"))
+_TREE_CONSTRUCT_TIMEOUT = int(os.environ.get("BIOLOGIX_TREE_TIMEOUT", "120"))
+_AIZYNTH_TIMEOUT = int(os.environ.get("BIOLOGIX_AIZYNTH_TIMEOUT", "180"))
+```
 
-## 1. Disulfide bonds (solved first, robust)
+## Analysis
 
-**Context**: 4F1C has 6 SSBOND lines; for one monomer use chains **A+B only** (3 disulfides: A6–A11, A7–B7, A20–B19). OpenMM creates bonds from PDB when **SG–SG < 3 Å** and neither residue has HG ([openmm/topology.py](https://github.com/openmm/openmm/blob/2b8ad70394f38d296497215da757aa31ac36b87b/wrappers/python/openmm/app/topology.py#L357)). [Issue #4420](https://github.com/openmm/openmm/issues/4420): Modeller uses **existing bond information** when adding hydrogens (CYS vs CYX); so topology must have correct SS bonds before `addHydrogens(forcefield)`.
+- **`entrypoint.sh` (lines 40–41)** exports `BIOLOGIX_PDF_TIMEOUT=30` and `BIOLOGIX_TREE_TIMEOUT=90` — so timeouts *do* get set when running via the entrypoint.
+- **`docker-compose.yml`** only declares `BIOLOGIX_AIZYNTH_TIMEOUT`. The other two are invisible to anyone deploying via compose, not overrideable via `.env`, and inconsistent with the entrypoint's values.
+- **`entrypoint.sh`** does NOT set `BIOLOGIX_AIZYNTH_TIMEOUT` — so `docker run` without compose falls back to the Python default of 180s, but tree/PDF timeouts use the entrypoint's tighter 90/30 values.
 
-**Robust approach** (two parts):
+The hang described (retrosynthesis process appearing stuck) is most likely a **very deep graph expansion** in `tree.construct_tree()` that simply needs the timeout to fire and kill the subprocess. The `_run_tree_with_timeout` function already has proper `os.killpg(SIGTERM)` → `proc.kill()` logic, so the timeout *should* work if the timeout value is honored.
 
-1. **Prepare PDB**: Write a PDB that contains **only chains A and B** (and only ATOM lines for them), plus **SSBOND lines that reference only A and B** (3 lines). This avoids duplicate chains (C/D) and wrong/missing bonds. Optionally use **PDBFixer** to add missing atoms (e.g. OXT) before passing to Model*Ensure disulfide bonds in topology**:
-  - **Option A (preferred)**: Load the prepared PDB with `openmm.app.PDBFile`. If crystal SG–SG distances are < 3 Å (4F1C SSBOND lines show ~2.01–2.05 Å), OpenMM will create the bonds automatically. Verify in tests that the topology has the expected number of SS bonds.  
-  - **Option B (explicit)**: If we ever use a structure where proximity fails, parse SSBOND from the PDB, map (chain, resseq) → SG atom index in the loaded Topology, and call `Modeller.addBond(i, j)` for each pair before `addHydrogens`. Implement Option B so we are not dependent on proximity; use it when automatic bond count is wrong.
+## Fix
 
-**Concrete steps**:
+### 1. `docker-compose.yml` — add missing timeout vars
 
-- Add `prepare_insulin_pdb_openmm(pdb_in, pdb_out)`: ke
+Add two missing environment variables to the `biologix` service:
+
+```yaml
+- BIOLOGIX_TREE_TIMEOUT=${BIOLOGIX_TREE_TIMEOUT:-120}
+- BIOLOGIX_PDF_TIMEOUT=${BIOLOGIX_PDF_TIMEOUT:-60}
+```
+
+**Effect**: Compose now declares all three timeouts, defaults match Python code (120/60/180), and all three are overridable via `.env` or `-e`.
+
+### 2. `entrypoint.sh` — add AIZYNTH timeout for parity
+
+Add to the entrypoint's timeouts block (around lines 40–41):
+
+```bash
+export BIOLOGIX_AIZYNTH_TIMEOUT="${BIOLOGIX_AIZYNTH_TIMEOUT:-180}"
+```
+
+**Effect**: `docker run` without compose also has a consistent AiZynth timeout, matching the Python default.
+
+### 3. Verification
+
+After the changes:
+
+```bash
+# Check all three are set inside the container
+docker compose run --rm biologix bash -lc \
+  'echo TREE=$BIOLOGIX_TREE_TIMEOUT PDF=$BIOLOGIX_PDF_TIMEOUT AIZ=$BIOLOGIX_AIZYNTH_TIMEOUT'
+```
+
+Expected output:
+```
+TREE=120 PDF=60 AIZ=180
+```
+
+## Hardening (if hang persists)
+
+If the timeout fires (`_run_tree_with_timeout` logs "killed after Xs") but the subprocess still hangs, the issue is in the process group kill path. Potential fixes:
+
+1. Use `concurrent.futures.ProcessPoolExecutor` with `wait(..., timeout=X)` for more reliable subprocess termination.
+2. Add a Python `signal.alarm()` inside `_tree_worker` to catch even C-extension hangs (SIGALARM interrupts syscalls).
+3. Log `tree.construct_tree()` progress to stdout periodically so we can see where it's stuck.
+
+## Files Changed
+
+- `docker-compose.yml` — add `BIOLOGIX_TREE_TIMEOUT` and `BIOLOGIX_PDF_TIMEOUT`
+- `docker/entrypoint.sh` — add `BIOLOGIX_AIZYNTH_TIMEOUT`
