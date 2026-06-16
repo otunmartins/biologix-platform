@@ -174,14 +174,14 @@ docker run --platform linux/amd64 -it --rm --init `
 | `mamba: command not found` inside container | `/opt/conda/bin` should be on PATH; rebuild with `--no-cache` |
 | `does not appear to be a Python project: neither 'setup.py' nor 'pyproject.toml' found` during build | The conda-env stage runs before the repo is copied; the Dockerfile strips `-e .` from the env YAML for this reason. Rebuild with the current Dockerfile — the project is installed later by `install_submodules.sh`. |
 | `bad interpreter: ...bash^M: no such file or directory` on startup | Windows CRLF in shell scripts. The bundled `.gitattributes` prevents this on fresh clones. If already affected: `git config core.autocrlf false` then re-checkout, or rebuild the image — the Dockerfile strips CRs automatically. |
-| OpenCode TUI frozen — cannot type, Esc/Ctrl+C useless | OpenCode OpenTUI can stop reading keyboard while still drawing (especially `linux/amd64` on Apple Silicon). The session may be **waiting at a prompt**, not running a tool. Recovery: second shell → `docker ps` → `docker kill <container_id>` → in the original tab run **`reset`**. Images **≥ 0.5.7** also run `docker/restore_terminal.sh` on exit via the entrypoint trap. Prefer **Terminal.app** / **iTerm** over IDE-embedded terminals. |
-| Terminal prints garbage like `35;95;8M` after OpenCode exits | OpenTUI left **mouse-tracking** enabled. Run **`reset`**, or `bash /app/docker/restore_terminal.sh` on the host if you copied the script. Entrypoint **≥ 0.5.7** disables mouse modes on normal exit. |
+| OpenCode TUI frozen — cannot type, Esc/Ctrl+C useless | OpenCode OpenTUI can stop reading keyboard while still drawing (especially `linux/amd64` on Apple Silicon). The session may be **waiting at a prompt**, not running a tool. Recovery: second shell → `docker ps` → `docker kill <container_id>` → the original tab restores automatically if you launched via `./scripts/docker_run.sh` or `./scripts/docker_compose_run.sh`; otherwise run **`reset`**. Prefer **Terminal.app** / **iTerm** over IDE-embedded terminals. |
+| Terminal prints garbage like `35;95;8M` after OpenCode exits | OpenTUI left **mouse-tracking** enabled on your host TTY. Run **`reset`**, or `bash scripts/host_docker_tty_guard.sh` from the repo. **Prevention:** launch via `./scripts/docker_run.sh` or `./scripts/docker_compose_run.sh` — they install a host EXIT trap that disables mouse modes when the container returns (including after `docker kill`). Raw `docker compose run` does not. |
 | Stuck at "Run OpenMM on top ≤3 candidates?" | Mid-pipeline Yes/No prompts are removed in Docker **≥ 0.5.7**. Set **`BIOLOGIX_AI_OPENMM_AUTO=yes`** (default) to auto-run, or **`skip`** to skip without typing. |
 | Frozen during Step 3 (`generate_psmiles_from_name` × many) | OpenCode batched **parallel** MCP calls → **stdio pipe deadlock** (not slow chemistry). OpenCode log shows `CallToolRequest` with no completion; MCP server idle. Recovery: `docker kill` + `reset`. Agent **≥ 0.5.8** enforces **sequential** MCP calls. Until then: restart the session — literature is saved under `runs/<session>/`. |
 | Precursor DB rebuilds for 30–90+ minutes on every `docker run --rm` | Fixed in images built after the entrypoint path correction (`data/retrosynthesis/precursors.json`). Mount **`biologix-data:/app/data`** (Compose does this) so Molport/AiZynth data persists across `--rm`. |
 | `monomer.png` files are SVG / PIL cannot open them | Headless `psmiles` may write SVG to `.png` paths. Rebuild the image after the `psmiles_drawing` fix, or upgrade to a tagged release that includes it. |
 | `setup_aizynthfinder.sh` failed during `docker build` / GitHub Actions | Usually a transient Zenodo/Figshare download error. Re-run the workflow (re-push the tag or use **Actions → Build and publish Docker image → Run workflow** with push enabled). Builds after the curl-based downloader fix are more resilient. |
-| OpenCode looks stuck on a tool (OpenMM, PDF, PNG) | The tool may still be running. In a second shell: `docker ps`, `docker logs --tail 50 <container>`, or `docker exec <container> tail -f /app/runs/<session>/tool_events.jsonl`. Expensive tools log **`started` / `completed` / `failed`** there and in MCP stderr. **≥ 0.5.16** fixes ProcessPoolExecutor shutdown hangs after OpenMM timeouts, adds MCP tool wall-clock caps, and sets `OPENMM_CPU_THREADS=1` for Rosetta. **≥ 0.5.17** sets explicit retrosynthesis subprocess caps (`BIOLOGIX_PDF_TIMEOUT`, `BIOLOGIX_TREE_TIMEOUT`, `BIOLOGIX_AIZYNTH_TIMEOUT`) in compose/entrypoint/`docker_run.sh`. For MCP setup/catalog hangs, use **≥ 0.5.15** (OpenCode **≥ 1.17.4** pin, per-server `cwd`/`timeout`, direct conda python launcher). Run with **`-e OPENCODE_LOG_LEVEL=DEBUG`** and inspect `/root/.local/share/opencode/log/` (persist with `-v opencode-auth:/root/.local/share/opencode`). |
+| OpenCode looks stuck on a tool (OpenMM, PDF, PNG, retrosynthesis) | The tool may still be running. In a second shell: `docker ps`, `docker logs --tail 50 <container>`, or `docker exec <container> tail -f /app/runs/<session>/tool_events.jsonl`. Expensive tools log **`started` / `completed` / `failed`** there and in MCP stderr. **≥ 0.5.16** fixes ProcessPoolExecutor shutdown hangs after OpenMM timeouts, adds MCP tool wall-clock caps, and sets `OPENMM_CPU_THREADS=1` for Rosetta. **≥ 0.5.17** sets explicit retrosynthesis subprocess caps (`BIOLOGIX_PDF_TIMEOUT`, `BIOLOGIX_TREE_TIMEOUT`, `BIOLOGIX_AIZYNTH_TIMEOUT`) in compose/entrypoint/`docker_run.sh`. **≥ 0.5.18** fixes subprocess `killpg` via `setsid`, adds `scripts/run_plan_retrosynthesis.py` for CLI-latch Step 5, defaults `BIOLOGIX_SKIP_ZINC_BRIDGE=1` and `BIOLOGIX_TREE_TIMEOUT=300` in the entrypoint. For MCP setup/catalog hangs, use **≥ 0.5.15** (OpenCode **≥ 1.17.4** pin, per-server `cwd`/`timeout`, direct conda python launcher). Run with **`-e OPENCODE_LOG_LEVEL=DEBUG`** and inspect `/root/.local/share/opencode/log/` (persist with `-v opencode-auth:/root/.local/share/opencode`). |
 | `save_pipeline_stage` red icon / timeout | Before latch: usually **parallel MCP calls** blocked stdio. After **any MCP timeout**, the session **latches to CLI-only** — use the `save_pipeline_stage` CLI one-liner in `.opencode/MCP_CLI_FALLBACK.md`; do not call MCP again. |
 | PDF compile failed on Markdown tables | Upgrade to an image with the `plain_tables_fallback` PDF path, or check `tool_errors.log` in the session folder. `SUMMARY_REPORT.md` is still valid even if PDF fails. |
 
@@ -198,8 +198,30 @@ The entrypoint sets interactive defaults (override with `docker run -e …`):
 | `BIOLOGIX_AI_OPENMM_MAX_MINIMIZE_STEPS` | `1500` | Shorter minimization for faster turns |
 | `BIOLOGIX_AI_EVAL_MAX_WORKERS` | **`1`** (MCP-safe) | Parallel OpenMM **candidates**; use `-e BIOLOGIX_AI_EVAL_MAX_WORKERS=N` for batch HPC (e.g. `-e BIOLOGIX_AI_EVAL_MAX_WORKERS=4`) |
 | `OMP_NUM_THREADS` | **`nproc`** when `workers=1` | OpenMM threads per worker |
-| `BIOLOGIX_AI_EVAL_CPU_FRACTION` | `1.0` | Fraction of container CPUs for workers (e.g. `0.75` for headroom) |
+| `OPENMM_CPU_THREADS` | **`1`** | Prevents FFTW deadlock under Rosetta (`linux/amd64` on Apple Silicon) |
+| `BIOLOGIX_TREE_TIMEOUT` | **`300`** | RetroSyn KG tree subprocess wall clock (seconds) |
+| `BIOLOGIX_SKIP_ZINC_BRIDGE` | **`1`** | Skip 1–1.5 GB ZINC HDF5 load during tree build (use bundled + PubChem) |
+| `BIOLOGIX_PLAN_TIMEOUT_S` | **`420`** (CLI script) | Total wall clock for `run_plan_retrosynthesis.py` |
 | `DOCKER_CPU_PCT` | `75` (host scripts only) | Optional `--cpus` quota via `scripts/docker_run.sh` |
+
+### Raw `docker run` on Mac (no wrapper script)
+
+If you use **`docker pull` + `docker run`** directly (no `docker_run.sh` / `docker_ghcr_run.sh`), add a **host EXIT trap** so OpenCode mouse-tracking modes are disabled when the container ends (including after `docker kill`):
+
+```bash
+trap 'printf "\e[?1000l\e[?1002l\e[?1003l\e[?1006l"; stty sane 2>/dev/null || true' EXIT
+
+docker run --platform linux/amd64 -it --rm --init \
+  -e OPENMM_CPU_THREADS=1 \
+  -e BIOLOGIX_SKIP_ZINC_BRIDGE=1 \
+  -e BIOLOGIX_TREE_TIMEOUT=300 \
+  -v "$(pwd)/runs:/app/runs" \
+  -v "$(pwd)/papers:/app/papers" \
+  -v biologix-data:/app/data \
+  ghcr.io/otunmartins/biologix-ai:0.5.18
+```
+
+Without the trap, run **`reset`** in the host tab after killing a stuck container.
 
 ### CPU auto-detection (GHCR — no wrapper required)
 

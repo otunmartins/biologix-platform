@@ -35,6 +35,8 @@ services:
       # to deadlock on initialisation — the random hang you see at session start or
       # mid-simulation.  Single-threaded is slower but deterministic.
       - OPENMM_CPU_THREADS=1
+      # Skip 1–1.5 GB ZINC HDF5 load during tree build (Rosetta Docker stability)
+      - BIOLOGIX_SKIP_ZINC_BRIDGE=${BIOLOGIX_SKIP_ZINC_BRIDGE:-1}
       # MCP tool wall-clock caps (seconds) — return before OpenCode transport timeout
       - BIOLOGIX_AI_MCP_RETRO_TIMEOUT_S=${BIOLOGIX_AI_MCP_RETRO_TIMEOUT_S:-360}
       - BIOLOGIX_AI_MCP_ADMET_TIMEOUT_S=${BIOLOGIX_AI_MCP_ADMET_TIMEOUT_S:-90}
@@ -43,7 +45,7 @@ services:
       - BIOLOGIX_AI_MCP_INDEX_TIMEOUT_S=${BIOLOGIX_AI_MCP_INDEX_TIMEOUT_S:-600}
       # Retrosynthesis subprocess wall clocks (PDF download, KG tree, AiZynthFinder)
       - BIOLOGIX_PDF_TIMEOUT=${BIOLOGIX_PDF_TIMEOUT:-60}
-      - BIOLOGIX_TREE_TIMEOUT=${BIOLOGIX_TREE_TIMEOUT:-120}
+      - BIOLOGIX_TREE_TIMEOUT=${BIOLOGIX_TREE_TIMEOUT:-300}
       - BIOLOGIX_AIZYNTH_TIMEOUT=${BIOLOGIX_AIZYNTH_TIMEOUT:-180}
       # Pass through provider keys from host env if not already in .env
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}

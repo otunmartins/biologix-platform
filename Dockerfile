@@ -111,6 +111,6 @@ RUN if [ -d /app/data ]; then cp -a /app/data /app/.data-seed; fi
 # Strip Windows CRLF line-endings that a Windows clone may have introduced,
 # then make the entrypoint executable.
 RUN sed -i 's/\r$//' /app/docker/entrypoint.sh /app/docker/restore_terminal.sh /app/docker/cpu_defaults.sh /app/scripts/*.sh 2>/dev/null || true \
-    && chmod +x /app/docker/entrypoint.sh /app/docker/restore_terminal.sh /app/scripts/docker_cpu_limit.sh /app/scripts/docker_run.sh /app/scripts/docker_compose_run.sh
+    && chmod +x /app/docker/entrypoint.sh /app/docker/restore_terminal.sh /app/scripts/docker_cpu_limit.sh /app/scripts/docker_run.sh /app/scripts/docker_compose_run.sh /app/scripts/host_docker_tty_guard.sh
 
 ENTRYPOINT ["/app/docker/entrypoint.sh"]

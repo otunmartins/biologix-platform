@@ -13,4 +13,9 @@ export DOCKER_CPU_LIMIT="${DOCKER_CPU_LIMIT:-$("${SCRIPT_DIR}/docker_cpu_limit.s
 echo "DOCKER_CPU_LIMIT=${DOCKER_CPU_LIMIT} (${DOCKER_CPU_PCT:-75}% of host logical CPUs)"
 
 cd "${REPO_ROOT}"
-exec docker compose run --rm --cpus "${DOCKER_CPU_LIMIT}" biologix "$@"
+
+# Restore host TTY when compose session ends (including after docker kill).
+# shellcheck source=host_docker_tty_guard.sh
+source "${SCRIPT_DIR}/host_docker_tty_guard.sh"
+
+docker compose run --rm --cpus "${DOCKER_CPU_LIMIT}" biologix "$@"

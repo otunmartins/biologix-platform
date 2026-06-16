@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import multiprocessing
 import time
 from pathlib import Path
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -12,6 +14,75 @@ from biologix_ai.retrosynthesis.models import (
     RetrosynthesisRequest,
 )
 from biologix_ai.services import retrosynthesis_service as rs
+
+
+class TestWorkerSessionIsolation:
+    def test_isolate_worker_session_calls_setsid(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        setsid_called: list[bool] = []
+        monkeypatch.setattr(rs.os, "setsid", lambda: setsid_called.append(True))
+        rs._isolate_worker_session()
+        assert setsid_called
+
+    def test_pdf_worker_calls_setsid(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        setsid_called: list[bool] = []
+
+        monkeypatch.setattr(rs.os, "setsid", lambda: setsid_called.append(True))
+        monkeypatch.setattr(rs.os, "chdir", lambda _path: None)
+
+        pdf_module = MagicMock()
+        pdf_module.PDFDownloader.side_effect = RuntimeError("stop after setsid")
+        monkeypatch.setitem(
+            __import__("sys").modules,
+            "RetroSynAgent",
+            MagicMock(pdfDownloader=pdf_module),
+        )
+        monkeypatch.setitem(
+            __import__("sys").modules,
+            "RetroSynAgent.pdfDownloader",
+            pdf_module,
+        )
+
+        queue: multiprocessing.Queue[list[str]] = multiprocessing.Queue()
+        rs._pdf_download_worker("polyethylene", "/tmp", "/tmp/pdfs", 1, queue)
+
+        assert setsid_called
+
+    def test_tree_worker_calls_setsid(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        setsid_called: list[bool] = []
+
+        monkeypatch.setattr(rs.os, "setsid", lambda: setsid_called.append(True))
+        monkeypatch.setattr(rs.os, "chdir", lambda _path: None)
+        monkeypatch.setattr(
+            "biologix_ai.retrosynthesis.retrosyn_bootstrap.ensure_retrosyn_agent_ready",
+            lambda: (_ for _ in ()).throw(RuntimeError("stop after setsid")),
+        )
+
+        queue: multiprocessing.Queue[dict[str, object]] = multiprocessing.Queue()
+        rs._tree_worker("chitosan", "/tmp", "/tmp/pdfs", "/tmp/results", queue)
+
+        assert setsid_called
+
+    def test_aizynth_worker_calls_setsid(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        setsid_called: list[bool] = []
+
+        monkeypatch.setattr(rs.os, "setsid", lambda: setsid_called.append(True))
+        monkeypatch.setitem(
+            __import__("sys").modules,
+            "aizynthfinder",
+            MagicMock(),
+        )
+        monkeypatch.setitem(
+            __import__("sys").modules,
+            "aizynthfinder.aizynthfinder",
+            MagicMock(
+                AiZynthFinder=MagicMock(side_effect=RuntimeError("stop after setsid"))
+            ),
+        )
+
+        queue: multiprocessing.Queue[dict[str, object]] = multiprocessing.Queue()
+        rs._aizynthfinder_worker("CCO", "/tmp/config.yml", queue)
+
+        assert setsid_called
 
 
 class TestIsSmilesLike:
@@ -201,6 +272,57 @@ class TestTreeConstructTimeout:
         assert error is not None
         assert "timed out" in error.lower()
         assert elapsed < 5
+
+
+class TestRunPlanRetrosynthesisCli:
+    def test_run_with_timeout_returns_error_on_hung_worker(
+        self, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        import importlib.util
+        from pathlib import Path as _Path
+
+        script = _Path(__file__).resolve().parents[1] / "scripts" / "run_plan_retrosynthesis.py"
+        spec = importlib.util.spec_from_file_location("run_plan_retrosynthesis", script)
+        assert spec and spec.loader
+        cli = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(cli)
+
+        class _HungProcess:
+            pid = 4242
+
+            def start(self) -> None:
+                return
+
+            def join(self, timeout: float | None = None) -> None:
+                return
+
+            def is_alive(self) -> bool:
+                return True
+
+            def terminate(self) -> None:
+                return
+
+            def kill(self) -> None:
+                return
+
+        class _MockCtx:
+            def Process(self, target, args):  # noqa: ANN001
+                return _HungProcess()
+
+            def Queue(self):
+                return multiprocessing.Queue()
+
+        monkeypatch.setattr(cli.multiprocessing, "get_context", lambda _name: _MockCtx())
+        monkeypatch.setattr(cli.os, "killpg", lambda *_args, **_kwargs: None)
+        monkeypatch.setattr(cli.os, "getpgid", lambda pid: pid)
+
+        start = time.monotonic()
+        payload = cli._run_with_timeout({"target": "Chitosan"}, timeout_s=2)
+        elapsed = time.monotonic() - start
+
+        assert payload.get("ok") is False
+        assert "timed out" in str(payload.get("error", "")).lower()
+        assert elapsed < 10
 
 
 class TestPubchempyBootstrapPatch:

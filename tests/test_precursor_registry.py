@@ -399,3 +399,21 @@ class TestValidateExtractionsLeafWarnings:
         warnings = result.get("warnings", [])
         leaf_warnings = [w for w in warnings if "leaf coverage" in w.lower() or "purchasable" in w.lower()]
         assert len(leaf_warnings) > 0
+
+
+class TestZincBridgeSkip:
+    def test_skip_zinc_bridge_env(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        from biologix_ai.retrosynthesis import precursor_registry as pr
+
+        monkeypatch.setenv("BIOLOGIX_SKIP_ZINC_BRIDGE", "1")
+        pr._zinc_attempted = False
+        pr._zinc_inchikeys = None
+        assert pr._load_zinc_inchikeys() is None
+
+    def test_skip_molport_bridge_env(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        from biologix_ai.retrosynthesis import precursor_registry as pr
+
+        monkeypatch.setenv("BIOLOGIX_SKIP_MOLPORT_BRIDGE", "1")
+        pr._molport_attempted = False
+        pr._molport_inchikeys = None
+        assert pr._load_molport_inchikeys() is None

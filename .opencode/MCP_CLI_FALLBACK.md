@@ -40,7 +40,8 @@ Run from repo root `/app` in Docker. Set `PYTHONPATH=src/python` when using Pyth
 | **`render_psmiles_png`** | `python3 scripts/generate_psmiles_images.py` or `biologix_ai.psmiles_drawing.save_psmiles_png` via `-c` |
 | **`save_pipeline_stage`** | `python3 -c "from pathlib import Path; from biologix_ai.services.pipeline_audit import save_pipeline_stage; import json; print(json.dumps(save_pipeline_stage(Path('runs/SESSION'), 'PSMILES', 'STAGE', 'pass', 'detail'), indent=2))"` |
 | **`save_funnel_context`** | `python3 -c "from pathlib import Path; from biologix_ai.services.funnel_context import save_funnel_context; import json; print(json.dumps({'path': str(save_funnel_context('STAGE', {}, Path('runs/SESSION')))}, indent=2))"` |
-| **`mine_literature`**, **`screen_candidate_library`**, **`plan_retrosynthesis`** | No single script — invoke the matching `biologix_ai` Python module via `python3 -c` or a one-off script; **do not** call MCP after latch. |
+| **`mine_literature`**, **`screen_candidate_library`** | No single script — invoke the matching `biologix_ai` Python module via `python3 -c` or a one-off script; **do not** call MCP after latch. |
+| **`plan_retrosynthesis`** | `python3 scripts/run_plan_retrosynthesis.py '<TARGET>' --biologic-target insulin --run-dir runs/SESSION --max-routes 3 2>&1` (wall-clock cap `BIOLOGIX_PLAN_TIMEOUT_S`, stderr heartbeats; omit `--run-dir` when `BIOLOGIX_AI_SESSION_DIR` is set) |
 
 ## OpenMM CLI template (most common latch trigger)
 
@@ -52,6 +53,15 @@ cd /app && python3 scripts/run_openmm_matrix.py '<PSMILES>' \
 ```
 
 Parse trailing JSON for `interaction_energy_kj_mol` and structure paths (`complex_chemviz_png_path`, `structure_artifacts_dir`). When the session env is already set, `--run-dir` may be omitted.
+
+**Retrosynthesis CLI template (Step 5 after latch):**
+
+```bash
+cd /app && python3 scripts/run_plan_retrosynthesis.py 'Chitosan' \
+  --biologic-target insulin --run-dir runs/SESSION --max-routes 3 2>&1
+```
+
+Parse trailing JSON for `polymer_routes`. Heartbeats print to stderr every 30s; hard cap `BIOLOGIX_PLAN_TIMEOUT_S` (default 420).
 
 Record audit via CLI (not MCP) after latch:
 

@@ -164,6 +164,19 @@ resolves to a polymer name).
 
 5. `plan_retrosynthesis(target, biologic_target, run_dir=<session>)` → must produce `retrosynthesis/plan_*.json`
 
+**CLI latch** (when Step 4 or earlier latched the session — no MCP for retro):
+
+Run **one polymer at a time** via bash (progress heartbeats on stderr with `2>&1`):
+
+```bash
+cd /app && python3 scripts/run_plan_retrosynthesis.py '<material_name>' \
+  --biologic-target <biologic> --run-dir runs/SESSION --max-routes 3 2>&1
+```
+
+- Hard wall-clock cap: `BIOLOGIX_PLAN_TIMEOUT_S` (default 420s); tree subprocess: `BIOLOGIX_TREE_TIMEOUT` (default 300s in Docker).
+- Parse trailing JSON for `polymer_routes`; same artifact paths as MCP when `--run-dir` is set.
+- In the report, note: *"MCP latched — retrosynthesis via CLI fallback."*
+
 6. `check_monomers_batch(smiles_list` from plan monomers, `run_dir=<session>)`
 
 7. `check_excipient_compliance(psmiles, jurisdiction="FDA,EMA", run_dir=<session>)`

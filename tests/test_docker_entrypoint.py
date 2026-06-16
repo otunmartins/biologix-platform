@@ -106,6 +106,20 @@ def test_opencode_jsonc_local_mcp_hardening() -> None:
     assert '"mcp_timeout": 600000' in text
 
 
+def test_host_docker_tty_guard_wires_restore_on_host() -> None:
+    guard = REPO_ROOT / "scripts" / "host_docker_tty_guard.sh"
+    run_sh = REPO_ROOT / "scripts" / "docker_run.sh"
+    compose_sh = REPO_ROOT / "scripts" / "docker_compose_run.sh"
+    assert guard.is_file()
+    guard_text = guard.read_text(encoding="utf-8")
+    assert "restore_terminal.sh" in guard_text
+    assert "trap" in guard_text and "restore_host_terminal" in guard_text
+    for script in (run_sh, compose_sh):
+        text = script.read_text(encoding="utf-8")
+        assert "host_docker_tty_guard.sh" in text
+        assert "exec docker" not in text
+
+
 def test_dockerfile_pins_opencode_version() -> None:
     dockerfile = REPO_ROOT / "Dockerfile"
     text = dockerfile.read_text(encoding="utf-8")

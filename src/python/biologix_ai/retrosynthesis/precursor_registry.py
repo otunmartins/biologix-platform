@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import re
 from pathlib import Path
 from typing import Dict, Iterable, Optional, Set
@@ -212,6 +213,10 @@ def _pubchem_inchikey(name: str) -> Optional[str]:
 # ZINC stock bridge (optional, requires h5py)
 # ─────────────────────────────────────────────────────────────
 
+def _env_flag(name: str) -> bool:
+    return os.environ.get(name, "").strip().lower() in ("1", "true", "yes")
+
+
 def _load_zinc_inchikeys() -> Optional[Set[str]]:
     """Load InChIKey set from the AiZynthFinder zinc_stock.hdf5 (lazy, cached).
 
@@ -219,6 +224,9 @@ def _load_zinc_inchikeys() -> Optional[Set[str]]:
     ~17M InChIKeys.  Both h5py and pandas are required at runtime; both are
     installed by install_submodules.sh.  Memory cost ~1–1.5 GB once loaded.
     """
+    if _env_flag("BIOLOGIX_SKIP_ZINC_BRIDGE"):
+        logger.info("ZINC bridge disabled (BIOLOGIX_SKIP_ZINC_BRIDGE=1)")
+        return None
     path = _zinc_stock_path()
     if not path.is_file():
         logger.debug("zinc_stock.hdf5 not found; ZINC bridge disabled")
@@ -255,6 +263,9 @@ _molport_attempted = False
 
 def _load_molport_inchikeys() -> Optional[Set[str]]:
     """Load Molport InChIKey set from molport_inchikeys.pkl (built by build_precursor_db.py)."""
+    if _env_flag("BIOLOGIX_SKIP_MOLPORT_BRIDGE"):
+        logger.info("Molport bridge disabled (BIOLOGIX_SKIP_MOLPORT_BRIDGE=1)")
+        return None
     import pickle
 
     path = _molport_inchikeys_path()

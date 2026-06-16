@@ -38,8 +38,10 @@ export BIOLOGIX_AI_MCP_TIMEOUT_MS="${BIOLOGIX_AI_MCP_TIMEOUT_MS:-600000}"
 export BIOLOGIX_AI_MCP_INSTANT_TIMEOUT_S="${BIOLOGIX_AI_MCP_INSTANT_TIMEOUT_S:-30}"
 export BIOLOGIX_AI_OPENMM_MAX_MINIMIZE_STEPS="${BIOLOGIX_AI_OPENMM_MAX_MINIMIZE_STEPS:-1500}"
 export BIOLOGIX_PDF_TIMEOUT="${BIOLOGIX_PDF_TIMEOUT:-60}"
-export BIOLOGIX_TREE_TIMEOUT="${BIOLOGIX_TREE_TIMEOUT:-120}"
+export BIOLOGIX_TREE_TIMEOUT="${BIOLOGIX_TREE_TIMEOUT:-300}"
 export BIOLOGIX_AIZYNTH_TIMEOUT="${BIOLOGIX_AIZYNTH_TIMEOUT:-180}"
+export OPENMM_CPU_THREADS="${OPENMM_CPU_THREADS:-1}"
+export BIOLOGIX_SKIP_ZINC_BRIDGE="${BIOLOGIX_SKIP_ZINC_BRIDGE:-1}"
 
 # Docker session markers — agents read these instead of blocking on mid-pipeline HITL prompts.
 export BIOLOGIX_AI_DOCKER=1
@@ -105,7 +107,10 @@ cat <<EOF
 ────────────────────────────────────────────────────────────────────────
  Terminal: if input stops or you see garbage like "35;95;8M":
    1) Second terminal → docker ps → docker kill <container_id>
-   2) In this tab → reset   (or: bash /app/docker/restore_terminal.sh)
+   2) Host tab auto-fixes if you launched via ./scripts/docker_run.sh,
+      ./scripts/docker_compose_run.sh, or docker_ghcr_run.sh; else run: reset
+      (or: bash scripts/host_docker_tty_guard.sh from the repo on your Mac)
+   3) Raw docker pull + docker run? Add a host EXIT trap — see README Option C
 
  OpenMM this session: BIOLOGIX_AI_OPENMM_AUTO=${BIOLOGIX_AI_OPENMM_AUTO}
    yes  = auto-run on ≤3 pass candidates (no mid-pipeline Yes/No prompt)

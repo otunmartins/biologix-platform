@@ -53,6 +53,14 @@ def _is_smiles_like(name: str) -> bool:
     return bool(_SMILES_TOKENS.search(name))
 
 
+def _isolate_worker_session() -> None:
+    """Put worker in a new session so killpg can terminate the full subtree on timeout."""
+    try:
+        os.setsid()
+    except OSError:
+        pass
+
+
 def _pdf_download_worker(
     material_name: str,
     workspace: str,
@@ -61,10 +69,7 @@ def _pdf_download_worker(
     result_queue: "multiprocessing.Queue[Any]",
 ) -> None:
     """Run PDFDownloader in a subprocess (may spawn geckodriver via scholarly)."""
-    try:
-        os.setpgrp()
-    except OSError:
-        pass
+    _isolate_worker_session()
     os.chdir(workspace)
     try:
         from RetroSynAgent.pdfDownloader import PDFDownloader
@@ -88,10 +93,7 @@ def _tree_worker(
     result_queue: "multiprocessing.Queue[Any]",
 ) -> None:
     """Run RetroSyn tree construction in an isolated subprocess (killable on timeout)."""
-    try:
-        os.setpgrp()
-    except OSError:
-        pass
+    _isolate_worker_session()
     os.chdir(workspace)
     try:
         from biologix_ai.retrosynthesis.retrosyn_bootstrap import ensure_retrosyn_agent_ready
@@ -344,10 +346,7 @@ def _aizynthfinder_worker(
     result_queue: "multiprocessing.Queue[Any]",
 ) -> None:
     """Run AiZynthFinder tree_search/build_routes in an isolated subprocess."""
-    try:
-        os.setpgrp()
-    except OSError:
-        pass
+    _isolate_worker_session()
     try:
         from aizynthfinder.aizynthfinder import AiZynthFinder
 
