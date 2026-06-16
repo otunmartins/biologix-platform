@@ -12,7 +12,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CPUS="$("${SCRIPT_DIR}/docker_cpu_limit.sh")"
-IMAGE="${BIOLOGIX_AI_IMAGE:-ghcr.io/otunmartins/biologix-ai:0.5.16}"
+IMAGE="${BIOLOGIX_AI_IMAGE:-ghcr.io/otunmartins/biologix-ai:0.5.17}"
 RUN_DIR="${PWD}"
 
 mkdir -p "${RUN_DIR}/runs" "${RUN_DIR}/papers"
@@ -24,6 +24,9 @@ exec docker run --platform linux/amd64 -it --rm --init \
   --cpus "${CPUS}" \
   -e TERM=xterm-256color \
   -e LC_ALL=C.UTF-8 \
+  -e BIOLOGIX_PDF_TIMEOUT="${BIOLOGIX_PDF_TIMEOUT:-60}" \
+  -e BIOLOGIX_TREE_TIMEOUT="${BIOLOGIX_TREE_TIMEOUT:-120}" \
+  -e BIOLOGIX_AIZYNTH_TIMEOUT="${BIOLOGIX_AIZYNTH_TIMEOUT:-180}" \
   -v "${RUN_DIR}/runs:/app/runs" \
   -v "${RUN_DIR}/papers:/app/papers" \
   -v biologix-data:/app/data \
