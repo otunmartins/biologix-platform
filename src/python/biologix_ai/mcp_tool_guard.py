@@ -170,6 +170,53 @@ def instant_mcp_timeout_s() -> float:
     return value if value > 0 else 30.0
 
 
+def _env_timeout_s(key: str, default: float) -> float:
+    """Read a positive wall-clock timeout (seconds) from the environment."""
+    raw = os.environ.get(key, "").strip()
+    if not raw:
+        return default
+    try:
+        value = float(raw)
+    except ValueError:
+        return default
+    return value if value > 0 else default
+
+
+def mcp_retro_timeout_s() -> float:
+    """Wall-clock cap for prepare/plan/compile retrosynthesis MCP tools."""
+    return _env_timeout_s("BIOLOGIX_AI_MCP_RETRO_TIMEOUT_S", 360.0)
+
+
+def mcp_admet_timeout_s() -> float:
+    """Wall-clock cap for single-monomer ADMET MCP tools."""
+    return _env_timeout_s("BIOLOGIX_AI_MCP_ADMET_TIMEOUT_S", 90.0)
+
+
+def mcp_admet_batch_timeout_s() -> float:
+    """Wall-clock cap for batch ADMET MCP tools."""
+    return _env_timeout_s("BIOLOGIX_AI_MCP_ADMET_BATCH_TIMEOUT_S", 180.0)
+
+
+def mcp_mine_timeout_s() -> float:
+    """Wall-clock cap for mine_literature MCP tool."""
+    return _env_timeout_s("BIOLOGIX_AI_MCP_MINE_TIMEOUT_S", 120.0)
+
+
+def mcp_index_timeout_s() -> float:
+    """Wall-clock cap for index_papers MCP tool."""
+    return _env_timeout_s("BIOLOGIX_AI_MCP_INDEX_TIMEOUT_S", 600.0)
+
+
+def mcp_openmm_timeout_s() -> float:
+    """Wall-clock cap for openmm_evaluate_psmiles — slightly below transport budget."""
+    raw_ms = os.environ.get("BIOLOGIX_AI_MCP_TIMEOUT_MS", "600000").strip()
+    try:
+        ms = float(raw_ms)
+    except ValueError:
+        ms = 600000.0
+    return max(60.0, ms / 1000.0 - 15.0)
+
+
 def _invoke_with_timeout(fn: Callable[[], Dict[str, Any]], timeout_s: Optional[float]) -> Dict[str, Any]:
     def _run_with_stdout_guard() -> Dict[str, Any]:
         with contextlib.redirect_stdout(sys.stderr):

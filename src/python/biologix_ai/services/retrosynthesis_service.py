@@ -45,6 +45,7 @@ _SMILES_TOKENS = re.compile(r"\[\*\]|\[C|=O|=S|#N|\(C\)|\(=")
 
 _PDF_DOWNLOAD_TIMEOUT = int(os.environ.get("BIOLOGIX_PDF_TIMEOUT", "60"))
 _TREE_CONSTRUCT_TIMEOUT = int(os.environ.get("BIOLOGIX_TREE_TIMEOUT", "120"))
+_AIZYNTH_TIMEOUT = int(os.environ.get("BIOLOGIX_AIZYNTH_TIMEOUT", "180"))
 
 
 def _is_smiles_like(name: str) -> bool:
@@ -288,19 +289,65 @@ def _check_purchasability(smiles: str) -> MonomerSource:
     return MonomerSource.UNKNOWN
 
 
-def _run_aizynthfinder(target_smiles: str) -> Optional[SmallMolRoute]:
-    """Run AiZynthFinder on a single monomer target."""
-    if not _is_aizynthfinder_available():
-        logger.warning("AiZynthFinder not installed; skipping monomer route planning")
-        return None
+def _small_mol_route_from_finder(finder: Any, target_smiles: str) -> SmallMolRoute:
+    """Convert an AiZynthFinder instance (after tree_search/build_routes) to SmallMolRoute."""
+    if not len(finder.routes):
+        return SmallMolRoute(target_smiles=target_smiles, is_solved=False)
 
-    configfile = get_configfile()
-    if not configfile:
-        logger.warning(
-            "AiZynthFinder models not found; run scripts/setup_aizynthfinder.sh"
-        )
-        return None
+    top_tree = finder.routes.reaction_trees[0]
+    route_dict = top_tree.to_dict()
 
+    steps: List[SmallMolStep] = []
+    building_blocks: List[str] = []
+
+    def _walk_route(node: dict) -> None:
+        if node.get("type") == "reaction":
+            child_smiles = [
+                c["smiles"]
+                for c in node.get("children", [])
+                if c.get("type") == "mol"
+            ]
+            steps.append(
+                SmallMolStep(
+                    reaction_smarts=node.get("smiles", ""),
+                    reactants=child_smiles,
+                    product=node.get("smiles", ""),
+                )
+            )
+        elif node.get("type") == "mol" and node.get("in_stock"):
+            building_blocks.append(node["smiles"])
+        for child in node.get("children", []):
+            _walk_route(child)
+
+    _walk_route(route_dict)
+
+    score = 0.0
+    if finder.routes.scores:
+        first_scores = finder.routes.scores[0]
+        if isinstance(first_scores, dict) and first_scores:
+            score = list(first_scores.values())[0]
+        elif isinstance(first_scores, (int, float)):
+            score = float(first_scores)
+
+    return SmallMolRoute(
+        target_smiles=target_smiles,
+        steps=steps,
+        score=score,
+        is_solved=top_tree.is_solved,
+        building_blocks=list(set(building_blocks)),
+    )
+
+
+def _aizynthfinder_worker(
+    target_smiles: str,
+    configfile: str,
+    result_queue: "multiprocessing.Queue[Any]",
+) -> None:
+    """Run AiZynthFinder tree_search/build_routes in an isolated subprocess."""
+    try:
+        os.setpgrp()
+    except OSError:
+        pass
     try:
         from aizynthfinder.aizynthfinder import AiZynthFinder
 
@@ -314,54 +361,70 @@ def _run_aizynthfinder(target_smiles: str) -> Optional[SmallMolRoute]:
         finder.target_smiles = target_smiles
         finder.tree_search()
         finder.build_routes()
-
-        if not len(finder.routes):
-            return SmallMolRoute(target_smiles=target_smiles, is_solved=False)
-
-        top_tree = finder.routes.reaction_trees[0]
-        route_dict = top_tree.to_dict()
-
-        steps: List[SmallMolStep] = []
-        building_blocks: List[str] = []
-
-        def _walk_route(node: dict) -> None:
-            if node.get("type") == "reaction":
-                child_smiles = [
-                    c["smiles"]
-                    for c in node.get("children", [])
-                    if c.get("type") == "mol"
-                ]
-                steps.append(
-                    SmallMolStep(
-                        reaction_smarts=node.get("smiles", ""),
-                        reactants=child_smiles,
-                        product=node.get("smiles", ""),
-                    )
-                )
-            elif node.get("type") == "mol" and node.get("in_stock"):
-                building_blocks.append(node["smiles"])
-            for child in node.get("children", []):
-                _walk_route(child)
-
-        _walk_route(route_dict)
-
-        score = 0.0
-        if finder.routes.scores:
-            first_scores = finder.routes.scores[0]
-            if isinstance(first_scores, dict) and first_scores:
-                score = list(first_scores.values())[0]
-            elif isinstance(first_scores, (int, float)):
-                score = float(first_scores)
-
-        return SmallMolRoute(
-            target_smiles=target_smiles,
-            steps=steps,
-            score=score,
-            is_solved=top_tree.is_solved,
-            building_blocks=list(set(building_blocks)),
-        )
+        route = _small_mol_route_from_finder(finder, target_smiles)
+        result_queue.put({"ok": True, "route": route.model_dump()})
     except Exception as exc:
-        logger.error("AiZynthFinder failed for %s: %s", target_smiles, exc)
+        result_queue.put({"ok": False, "error": str(exc)})
+
+
+def _run_aizynthfinder(target_smiles: str) -> Optional[SmallMolRoute]:
+    """Run AiZynthFinder on a single monomer target."""
+    if not _is_aizynthfinder_available():
+        logger.warning("AiZynthFinder not installed; skipping monomer route planning")
+        return None
+
+    configfile = get_configfile()
+    if not configfile:
+        logger.warning(
+            "AiZynthFinder models not found; run scripts/setup_aizynthfinder.sh"
+        )
+        return None
+
+    ctx = multiprocessing.get_context("spawn")
+    result_queue: multiprocessing.Queue[Any] = ctx.Queue()
+    proc = ctx.Process(
+        target=_aizynthfinder_worker,
+        args=(target_smiles, str(configfile), result_queue),
+    )
+    proc.start()
+    proc.join(timeout=_AIZYNTH_TIMEOUT)
+    if proc.is_alive():
+        try:
+            os.killpg(os.getpgid(proc.pid), signal.SIGTERM)
+        except (ProcessLookupError, PermissionError, OSError):
+            proc.terminate()
+        proc.join(5)
+        if proc.is_alive():
+            proc.kill()
+            proc.join(2)
+        logger.warning(
+            "AiZynthFinder killed after %ds for %s",
+            _AIZYNTH_TIMEOUT,
+            target_smiles,
+        )
+        return None
+
+    if result_queue.empty():
+        return None
+
+    payload = result_queue.get_nowait()
+    if not isinstance(payload, dict):
+        return None
+    if not payload.get("ok"):
+        logger.error(
+            "AiZynthFinder failed for %s: %s",
+            target_smiles,
+            payload.get("error", "unknown error"),
+        )
+        return None
+
+    route_raw = payload.get("route")
+    if not isinstance(route_raw, dict):
+        return None
+    try:
+        return SmallMolRoute.model_validate(route_raw)
+    except Exception as exc:
+        logger.error("AiZynthFinder route parse failed for %s: %s", target_smiles, exc)
         return None
 
 

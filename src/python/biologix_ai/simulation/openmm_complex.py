@@ -48,6 +48,27 @@ def register_stage_heartbeat_hook(hook: Optional[Any]) -> None:
     _STAGE_HEARTBEAT_HOOK = hook
 
 
+def _cpu_platform():
+    """Return the OpenMM CPU platform with a fixed thread count.
+
+    Under Rosetta 2 (linux/amd64 Docker on Apple Silicon), sched_getaffinity
+    returns inconsistent values across process boundaries.  OpenMM's CPU
+    platform probes that syscall to size its FFTW thread pool; when the count
+    is wrong the pool deadlocks on initialisation — producing the random hang
+    seen at session start or mid-simulation.
+
+    OPENMM_CPU_THREADS=1 (set in docker-compose.yml) is the primary guard.
+    This helper applies the same constraint in-process so subprocess invocations
+    that may not inherit the env var are also protected.
+    """
+    import openmm  # noqa: PLC0415 — lazy to avoid import at module level before optional dep check
+
+    n_threads = os.environ.get("OPENMM_CPU_THREADS", "1")
+    platform = openmm.Platform.getPlatformByName("CPU")
+    platform.setPropertyDefaultValue("Threads", n_threads)
+    return platform
+
+
 def clear_stage_heartbeat_hook() -> None:
     """Remove any registered stage heartbeat hook."""
     register_stage_heartbeat_hook(None)
@@ -147,7 +168,7 @@ def run_protein_minimization(
         constraints=app.HBonds,
     )
     integ = openmm.LangevinIntegrator(300 * unit.kelvin, 1 / unit.picosecond, 0.002 * unit.picoseconds)
-    platform = openmm.Platform.getPlatformByName("CPU")
+    platform = _cpu_platform()
     ctx = openmm.Context(system, integ, platform)
     ctx.setPositions(positions)
     openmm.LocalEnergyMinimizer.minimize(ctx, maxIterations=max_steps)
@@ -226,7 +247,7 @@ def interaction_energy_three_systems(
 
     def _e_sys(system, positions):
         integ = openmm.LangevinIntegrator(300 * unit.kelvin, 1 / unit.picosecond, 0.002 * unit.picoseconds)
-        ctx = openmm.Context(system, integ, openmm.Platform.getPlatformByName("CPU"))
+        ctx = openmm.Context(system, integ, _cpu_platform())
         ctx.setPositions(positions)
         e = ctx.getState(getEnergy=True).getPotentialEnergy().value_in_unit(unit.kilojoules_per_mole)
         return e
@@ -348,7 +369,7 @@ def run_openmm_relax_and_energy(
     )
 
     integ = openmm.LangevinIntegrator(300 * unit.kelvin, 1 / unit.picosecond, 0.002 * unit.picoseconds)
-    platform = openmm.Platform.getPlatformByName("CPU")
+    platform = _cpu_platform()
     ctx = openmm.Context(combined_sys, integ, platform)
     ctx.setPositions(combined_pos)
     openmm.LocalEnergyMinimizer.minimize(ctx, maxIterations=max_minimize_steps)
@@ -751,7 +772,7 @@ def run_openmm_matrix_relax_and_energy(
         )
 
         integ = openmm.LangevinIntegrator(300 * unit.kelvin, 1 / unit.picosecond, 0.002 * unit.picoseconds)
-        platform = openmm.Platform.getPlatformByName("CPU")
+        platform = _cpu_platform()
         ctx = openmm.Context(combined_sys, integ, platform)
         ctx.setPeriodicBoxVectors(box_vec_omm[0], box_vec_omm[1], box_vec_omm[2])
         ctx.setPositions(combined_pos)

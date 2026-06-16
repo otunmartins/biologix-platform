@@ -46,6 +46,12 @@ from biologix_ai.mcp_stdio_guard import install_stdio_guards
 from biologix_ai.mcp_tool_guard import (
     McpProgressReporter,
     log_tool_budget,
+    mcp_admet_batch_timeout_s,
+    mcp_admet_timeout_s,
+    mcp_index_timeout_s,
+    mcp_mine_timeout_s,
+    mcp_openmm_timeout_s,
+    mcp_retro_timeout_s,
     run_guarded_tool,
     run_instant_mcp_tool,
     truncate_mcp_json,
@@ -231,32 +237,39 @@ def mine_literature(
       limitations: comma-separated problems to avoid (e.g. "high_crystallinity")
     use_paper_qa: if True and papers are indexed, appends PaperQA2 synthesis to results.
     """
-    out = []
-    # Optional: PaperQA2 deep reading first (if indexed)
-    if use_paper_qa and _paper_qa_available():
-        status = _paper_qa_index_status()
-        if status.get("ready"):
-            try:
-                import asyncio
-                from paperqa import agent_query
-                pqa_query = f"What polymer materials and stabilization mechanisms are effective for insulin delivery or transdermal patches? Query focus: {query}"
-                if top_candidates or stability_mechanisms:
-                    pqa_query += f". Prior high performers: {top_candidates or 'none'}. Mechanisms: {stability_mechanisms or 'none'}."
-                settings = _paper_qa_settings()
-                response = asyncio.run(agent_query(query=pqa_query, settings=settings))
-                if response.session.formatted_answer:
-                    out.append("--- PaperQA2 synthesis (from your indexed PDFs) ---")
-                    out.append(response.session.formatted_answer)
-                    out.append("")
-            except Exception as e:
-                out.append(f"(PaperQA2 skipped: {e})")
-                out.append("")
-        elif status.get("message"):
-            out.append(f"(PaperQA2: {status['message']})")
-            out.append("")
+    session = session_dir_from_env(Path(ROOT))
 
-    try:
-        import os
+    def _run() -> Dict[str, Any]:
+        out: List[str] = []
+        if use_paper_qa and _paper_qa_available():
+            status = _paper_qa_index_status()
+            if status.get("ready"):
+                try:
+                    import asyncio
+                    from paperqa import agent_query
+
+                    pqa_query = (
+                        f"What polymer materials and stabilization mechanisms are effective for "
+                        f"insulin delivery or transdermal patches? Query focus: {query}"
+                    )
+                    if top_candidates or stability_mechanisms:
+                        pqa_query += (
+                            f". Prior high performers: {top_candidates or 'none'}. "
+                            f"Mechanisms: {stability_mechanisms or 'none'}."
+                        )
+                    settings = _paper_qa_settings()
+                    response = asyncio.run(agent_query(query=pqa_query, settings=settings))
+                    if response.session.formatted_answer:
+                        out.append("--- PaperQA2 synthesis (from your indexed PDFs) ---")
+                        out.append(response.session.formatted_answer)
+                        out.append("")
+                except Exception as e:
+                    out.append(f"(PaperQA2 skipped: {e})")
+                    out.append("")
+            elif status.get("message"):
+                out.append(f"(PaperQA2: {status['message']})")
+                out.append("")
+
         from biologix_ai.literature.literature_scholar_only import (
             format_mine_literature_text,
             run_scholar_mine,
@@ -292,9 +305,23 @@ def mine_literature(
                 num_candidates=max_candidates,
             )
         out.append(format_mine_literature_text(results))
-        return "\n".join(out)
-    except Exception as e:
-        return "\n".join(out) + f"\n\nError (mining): {e}" if out else f"Error: {e}"
+        return {"ok": True, "text": "\n".join(out)}
+
+    payload = run_guarded_tool(
+        "mine_literature",
+        session,
+        _run,
+        stage="mine_literature",
+        timeout_s=mcp_mine_timeout_s(),
+        failure_hint=(
+            "If MCP timed out, session latches to CLI-only — use bash CLI per "
+            ".opencode/MCP_CLI_FALLBACK.md."
+        ),
+    )
+    if payload.get("ok") and "text" in payload:
+        return str(payload["text"])
+    err = payload.get("error", "mine_literature failed")
+    return f"Error: {err}" if payload.get("stage") == "timeout" else json.dumps(payload, indent=2, default=str)
 
 
 @mcp.tool()
@@ -331,11 +358,29 @@ def index_papers() -> str:
     """Build PaperQA2 search index over papers in papers/. Run once before using paper_qa. May take minutes for many PDFs."""
     if not _paper_qa_available():
         return "paper-qa not installed. pip install paper-qa"
-    try:
+
+    def _run() -> Dict[str, Any]:
         from biologix_ai.paper_qa_config import build_index
-        return build_index()
-    except Exception as e:
-        return f"Index error: {e}"
+
+        message = build_index()
+        return {"ok": True, "text": message}
+
+    payload = run_guarded_tool(
+        "index_papers",
+        None,
+        _run,
+        stage="index_papers",
+        timeout_s=mcp_index_timeout_s(),
+        failure_hint=(
+            "If MCP timed out, session latches to CLI-only — use bash CLI per "
+            ".opencode/MCP_CLI_FALLBACK.md."
+        ),
+    )
+    if payload.get("ok") and "text" in payload:
+        return str(payload["text"])
+    if payload.get("stage") == "timeout":
+        return f"Index error: {payload.get('error', 'timeout')}"
+    return f"Index error: {payload.get('error', 'unknown')}"
 
 
 @mcp.tool()
@@ -717,6 +762,7 @@ def openmm_evaluate_psmiles(
         session,
         _run,
         stage="openmm_matrix_eval",
+        timeout_s=mcp_openmm_timeout_s(),
         failure_hint=(
             "If MCP timed out for any reason, the session latches to CLI-only — do not call any "
             "biologix-ai MCP tool again; run scripts/run_openmm_matrix.py via bash for OpenMM and "
@@ -1869,13 +1915,30 @@ def prepare_retrosynthesis(
             },
             indent=2,
         )
-    out = prepare_retrosynthesis_workspace(
-        target=target,
-        session_dir=session,
-        max_pdfs=max_pdfs,
+
+    def _run() -> Dict[str, Any]:
+        out = prepare_retrosynthesis_workspace(
+            target=target,
+            session_dir=session,
+            max_pdfs=max_pdfs,
+        )
+        out["biologic_target"] = biologic_target
+        return {"ok": True, "result": out}
+
+    payload = run_guarded_tool(
+        "prepare_retrosynthesis",
+        session,
+        _run,
+        stage="prepare_retrosynthesis",
+        timeout_s=mcp_retro_timeout_s(),
+        failure_hint=(
+            "If MCP timed out, session latches to CLI-only — use bash CLI per "
+            ".opencode/MCP_CLI_FALLBACK.md."
+        ),
     )
-    out["biologic_target"] = biologic_target
-    return json.dumps(out, indent=2, default=str)
+    if payload.get("ok") and "result" in payload:
+        return json.dumps(payload["result"], indent=2, default=str)
+    return json.dumps(payload, indent=2, default=str)
 
 
 @mcp.tool()
@@ -2009,15 +2072,31 @@ def plan_retrosynthesis(
         ),
     )
 
-    result = _plan(request)
-    out = result.model_dump()
-    if session is not None:
-        try:
-            art = _persist_retrosynthesis_plan(session, target, biologic_target, out)
-            out["session_artifact"] = art
-        except Exception as exc:
-            out["session_persist_warning"] = str(exc)
-    return json.dumps(out, indent=2, default=str)
+    def _run() -> Dict[str, Any]:
+        result = _plan(request)
+        out = result.model_dump()
+        if session is not None:
+            try:
+                art = _persist_retrosynthesis_plan(session, target, biologic_target, out)
+                out["session_artifact"] = art
+            except Exception as exc:
+                out["session_persist_warning"] = str(exc)
+        return {"ok": True, "result": out}
+
+    payload = run_guarded_tool(
+        "plan_retrosynthesis",
+        session,
+        _run,
+        stage="plan_retrosynthesis",
+        timeout_s=mcp_retro_timeout_s(),
+        failure_hint=(
+            "If MCP timed out, session latches to CLI-only — use bash CLI per "
+            ".opencode/MCP_CLI_FALLBACK.md."
+        ),
+    )
+    if payload.get("ok") and "result" in payload:
+        return json.dumps(payload["result"], indent=2, default=str)
+    return json.dumps(payload, indent=2, default=str)
 
 
 @mcp.tool()
@@ -2251,15 +2330,32 @@ def check_monomer_admet(
     """
     from biologix_ai.services.toxicity_service import screen_monomer
 
-    result = screen_monomer(smiles)
-    out = result.model_dump()
     session = _optional_session_dir(run_dir)
-    if session is not None:
-        try:
-            _persist_monomer_admet(session, smiles, out)
-        except Exception as exc:
-            out["session_persist_warning"] = str(exc)
-    return json.dumps(out, indent=2, default=str)
+
+    def _run() -> Dict[str, Any]:
+        result = screen_monomer(smiles)
+        out = result.model_dump()
+        if session is not None:
+            try:
+                _persist_monomer_admet(session, smiles, out)
+            except Exception as exc:
+                out["session_persist_warning"] = str(exc)
+        return {"ok": True, "result": out}
+
+    payload = run_guarded_tool(
+        "check_monomer_admet",
+        session,
+        _run,
+        stage="check_monomer_admet",
+        timeout_s=mcp_admet_timeout_s(),
+        failure_hint=(
+            "If MCP timed out, session latches to CLI-only — use bash CLI per "
+            ".opencode/MCP_CLI_FALLBACK.md."
+        ),
+    )
+    if payload.get("ok") and "result" in payload:
+        return json.dumps(payload["result"], indent=2, default=str)
+    return json.dumps(payload, indent=2, default=str)
 
 
 @mcp.tool()
@@ -2282,17 +2378,34 @@ def check_monomers_batch(
             "ADMET-AI not importable. Run ./install (includes ADMET-AI submodule)."
         )
 
-    parsed = _normalize_psmiles_list_for_eval(smiles_list)
-    results = screen_monomers_batch(parsed)
-    out = [r.model_dump() for r in results]
     session = _optional_session_dir(run_dir)
-    if session is not None:
-        for r in results:
-            try:
-                _persist_monomer_admet(session, r.smiles, r.model_dump())
-            except Exception:
-                pass
-    return json.dumps(out, indent=2, default=str)
+    parsed = _normalize_psmiles_list_for_eval(smiles_list)
+
+    def _run() -> Dict[str, Any]:
+        results = screen_monomers_batch(parsed)
+        out = [r.model_dump() for r in results]
+        if session is not None:
+            for r in results:
+                try:
+                    _persist_monomer_admet(session, r.smiles, r.model_dump())
+                except Exception:
+                    pass
+        return {"ok": True, "result": out}
+
+    payload = run_guarded_tool(
+        "check_monomers_batch",
+        session,
+        _run,
+        stage="check_monomers_batch",
+        timeout_s=mcp_admet_batch_timeout_s(),
+        failure_hint=(
+            "If MCP timed out, session latches to CLI-only — use bash CLI per "
+            ".opencode/MCP_CLI_FALLBACK.md."
+        ),
+    )
+    if payload.get("ok") and "result" in payload:
+        return json.dumps(payload["result"], indent=2, default=str)
+    return json.dumps(payload, indent=2, default=str)
 
 
 @mcp.tool()
@@ -2342,32 +2455,48 @@ def compile_results(
         constraints=RetrosynthesisConstraints(max_routes=max_routes),
     )
 
-    retro_result = None
-    if session is not None and use_cached_plan:
-        from biologix_ai.services.retrosynthesis_service import load_cached_plan_result
+    def _run() -> Dict[str, Any]:
+        retro_result = None
+        if session is not None and use_cached_plan:
+            from biologix_ai.services.retrosynthesis_service import load_cached_plan_result
 
-        retro_result = load_cached_plan_result(session, target)
-    if retro_result is None:
-        retro_result = _plan(request)
+            retro_result = load_cached_plan_result(session, target)
+        if retro_result is None:
+            retro_result = _plan(request)
 
-    tox_results = {}
-    if run_admet:
-        seen_smiles = set()
-        for route in retro_result.polymer_routes:
-            for monomer in route.monomers:
-                if monomer.smiles not in seen_smiles:
-                    seen_smiles.add(monomer.smiles)
-                    tox_results[monomer.smiles] = screen_monomer(monomer.smiles)
+        tox_results = {}
+        if run_admet:
+            seen_smiles = set()
+            for route in retro_result.polymer_routes:
+                for monomer in route.monomers:
+                    if monomer.smiles not in seen_smiles:
+                        seen_smiles.add(monomer.smiles)
+                        tox_results[monomer.smiles] = screen_monomer(monomer.smiles)
 
-    report = _compile(retro_result, tox_results=tox_results)
-    rep_dict = report.model_dump()
-    if session is not None:
-        try:
-            art = _persist_compiled_report(session, target, biologic_target, rep_dict)
-            rep_dict["session_artifact"] = art
-        except Exception as exc:
-            rep_dict["session_persist_warning"] = str(exc)
-    return json.dumps(rep_dict, indent=2, default=str)
+        report = _compile(retro_result, tox_results=tox_results)
+        rep_dict = report.model_dump()
+        if session is not None:
+            try:
+                art = _persist_compiled_report(session, target, biologic_target, rep_dict)
+                rep_dict["session_artifact"] = art
+            except Exception as exc:
+                rep_dict["session_persist_warning"] = str(exc)
+        return {"ok": True, "result": rep_dict}
+
+    payload = run_guarded_tool(
+        "compile_results",
+        session,
+        _run,
+        stage="compile_results",
+        timeout_s=mcp_retro_timeout_s(),
+        failure_hint=(
+            "If MCP timed out, session latches to CLI-only — use bash CLI per "
+            ".opencode/MCP_CLI_FALLBACK.md."
+        ),
+    )
+    if payload.get("ok") and "result" in payload:
+        return json.dumps(payload["result"], indent=2, default=str)
+    return json.dumps(payload, indent=2, default=str)
 
 
 @mcp.tool()

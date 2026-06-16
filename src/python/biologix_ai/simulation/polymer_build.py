@@ -21,7 +21,10 @@ def ensure_insulin_pdb() -> str:
         return INSULIN_PDB_PATH
     for url in (INSULIN_PDB_URL, INSULIN_PDB_ALT):
         try:
-            urllib.request.urlretrieve(url, INSULIN_PDB_PATH)
+            with urllib.request.urlopen(url, timeout=30) as response:
+                data = response.read()
+            with open(INSULIN_PDB_PATH, "wb") as pdb_file:
+                pdb_file.write(data)
             if os.path.isfile(INSULIN_PDB_PATH) and os.path.getsize(INSULIN_PDB_PATH) > 1000:
                 return INSULIN_PDB_PATH
         except Exception as e:

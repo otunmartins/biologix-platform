@@ -29,6 +29,19 @@ services:
       - LD_LIBRARY_PATH=/opt/conda/envs/biologix-ai-sim/lib
       # Avoid mid-pipeline OpenMM Yes/No prompts (OpenCode TUI can freeze in Docker)
       - BIOLOGIX_AI_OPENMM_AUTO=${BIOLOGIX_AI_OPENMM_AUTO:-yes}
+      # Pin OpenMM CPU thread count to 1.  Without this, OpenMM probes available
+      # cores via sched_getaffinity which is broken under Rosetta 2 (linux/amd64
+      # containers on Apple Silicon).  The broken probe causes the FFTW thread-pool
+      # to deadlock on initialisation — the random hang you see at session start or
+      # mid-simulation.  Single-threaded is slower but deterministic.
+      - OPENMM_CPU_THREADS=1
+      # MCP tool wall-clock caps (seconds) — return before OpenCode transport timeout
+      - BIOLOGIX_AI_MCP_RETRO_TIMEOUT_S=${BIOLOGIX_AI_MCP_RETRO_TIMEOUT_S:-360}
+      - BIOLOGIX_AI_MCP_ADMET_TIMEOUT_S=${BIOLOGIX_AI_MCP_ADMET_TIMEOUT_S:-90}
+      - BIOLOGIX_AI_MCP_ADMET_BATCH_TIMEOUT_S=${BIOLOGIX_AI_MCP_ADMET_BATCH_TIMEOUT_S:-180}
+      - BIOLOGIX_AI_MCP_MINE_TIMEOUT_S=${BIOLOGIX_AI_MCP_MINE_TIMEOUT_S:-120}
+      - BIOLOGIX_AI_MCP_INDEX_TIMEOUT_S=${BIOLOGIX_AI_MCP_INDEX_TIMEOUT_S:-600}
+      - BIOLOGIX_AIZYNTH_TIMEOUT=${BIOLOGIX_AIZYNTH_TIMEOUT:-180}
       # Pass through provider keys from host env if not already in .env
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}

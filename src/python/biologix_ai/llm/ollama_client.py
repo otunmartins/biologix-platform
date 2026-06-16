@@ -1,6 +1,16 @@
-import ollama
-from typing import List, Dict, Optional
 import json
+import os
+from typing import Dict, List, Optional
+
+import httpx
+import ollama
+
+
+def _ollama_client_timeout() -> httpx.Timeout:
+    """Bounded HTTP timeouts for Ollama chat/list/pull calls."""
+    read_s = float(os.environ.get("BIOLOGIX_AI_OLLAMA_READ_TIMEOUT_S", "120"))
+    connect_s = float(os.environ.get("BIOLOGIX_AI_OLLAMA_CONNECT_TIMEOUT_S", "10"))
+    return httpx.Timeout(connect=connect_s, read=read_s, write=30.0, pool=5.0)
 
 
 class OllamaClient:
@@ -19,7 +29,7 @@ class OllamaClient:
         """
         self.model_name = model_name
         self.host = host
-        self.client = ollama.Client(host=host)
+        self.client = ollama.Client(host=host, timeout=_ollama_client_timeout())
         
         # Check if model is available
         self._ensure_model_available()

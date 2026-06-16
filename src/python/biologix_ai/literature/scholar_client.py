@@ -247,7 +247,9 @@ class SemanticScholarClient:
         }
         
         try:
-            response = requests.post(endpoint, json=data, params=params, headers=self.headers)
+            response = requests.post(
+                endpoint, json=data, params=params, headers=self.headers, timeout=30
+            )
             response.raise_for_status()
             
             # Rate limiting

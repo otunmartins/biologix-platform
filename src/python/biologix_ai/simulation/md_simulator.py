@@ -225,6 +225,27 @@ def attach_matrix_structure_artifacts(
     return out
 
 
+def _shutdown_process_pool(
+    executor: ProcessPoolExecutor,
+    *,
+    kill_alive: bool = True,
+) -> None:
+    """Release ProcessPoolExecutor without blocking on stuck workers.
+
+    ``ProcessPoolExecutor`` context managers call ``shutdown(wait=True)`` on
+    exit, which blocks indefinitely when a worker is hung in OpenMM/Packmol even
+    after ``future.result(timeout=...)`` raised ``FuturesTimeoutError``.
+    """
+    if kill_alive:
+        for proc in list(getattr(executor, "_processes", {}).values()):
+            if proc.is_alive():
+                try:
+                    proc.kill()
+                except OSError:
+                    pass
+    executor.shutdown(wait=False, cancel_futures=True)
+
+
 def _candidate_timeout_s() -> Optional[float]:
     """
     Per-candidate wall-clock budget for OpenMM matrix evaluation.
@@ -254,19 +275,22 @@ def _run_matrix_eval_with_timeout(
             return {"ok": False, "error": "unknown failure", "stage": "openmm"}
         return res
 
-    with ProcessPoolExecutor(max_workers=1) as executor:
-        future = executor.submit(run_openmm_matrix_relax_and_energy, psmiles, **matrix_kw)
-        try:
-            res = future.result(timeout=timeout_s)
-        except FuturesTimeoutError:
-            return {
-                "ok": False,
-                "error": (
-                    f"candidate exceeded BIOLOGIX_AI_OPENMM_CANDIDATE_TIMEOUT_S={timeout_s}s"
-                ),
-                "stage": "timeout",
-                "psmiles": psmiles,
-            }
+    executor = ProcessPoolExecutor(max_workers=1)
+    future = executor.submit(run_openmm_matrix_relax_and_energy, psmiles, **matrix_kw)
+    try:
+        res = future.result(timeout=timeout_s)
+    except FuturesTimeoutError:
+        _shutdown_process_pool(executor, kill_alive=True)
+        return {
+            "ok": False,
+            "error": (
+                f"candidate exceeded BIOLOGIX_AI_OPENMM_CANDIDATE_TIMEOUT_S={timeout_s}s"
+            ),
+            "stage": "timeout",
+            "psmiles": psmiles,
+        }
+    else:
+        _shutdown_process_pool(executor, kill_alive=False)
     if res is None:
         return {"ok": False, "error": "unknown failure", "stage": "openmm"}
     return res
@@ -855,7 +879,8 @@ class MDSimulator:
             # strip verbose from the template; workers always run quietly
             worker_kw = {k: v for k, v in matrix_kw_template.items() if k != "verbose"}
 
-            with ProcessPoolExecutor(max_workers=effective_workers) as executor:
+            executor = ProcessPoolExecutor(max_workers=effective_workers)
+            try:
                 future_map = {
                     executor.submit(
                         _evaluate_one_matrix_candidate,
@@ -929,6 +954,8 @@ class MDSimulator:
                                     f"[biologix-ai] {idx + 1}/{n_total} finished in {sec}s "
                                     f"status={status}"
                                 )
+            finally:
+                _shutdown_process_pool(executor, kill_alive=True)
 
         feedback = self.extractor.extract_feedback(md_results, material_names)
         out: Dict[str, Any] = {
