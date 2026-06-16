@@ -100,9 +100,11 @@ git clone https://github.com/otunmartins/biologix-platform.git
 cd biologix-platform
 ./scripts/docker_run.sh
 
-# Option B: standalone one-liner (no clone) — downloads launcher then runs it
-# If the terminal shows gibberish from a prior session, run `reset` first.
-curl -fsSL https://raw.githubusercontent.com/otunmartins/biologix-platform/main/scripts/docker_ghcr_run.sh | bash
+# Option B (recommended, no clone) — download launcher then run it
+# Avoids `curl | bash` TTY issues and GitHub raw-cache surprises. If the terminal
+# shows gibberish from a prior hung session, run `reset` first.
+curl -fsSL https://raw.githubusercontent.com/otunmartins/biologix-platform/main/scripts/docker_ghcr_run.sh -o docker_ghcr_run.sh
+bash docker_ghcr_run.sh
 
 # Option C: raw docker run — MUST use host EXIT trap + stability env vars (Mac/Rosetta)
 trap 'printf "\e[?1000l\e[?1002l\e[?1003l\e[?1006l"; stty sane 2>/dev/null || true' EXIT
@@ -132,6 +134,8 @@ docker run --platform linux/amd64 -it --rm --init `
 ```
 
 **What happens:** the entrypoint activates the conda env, runs first-run data setup if needed, then starts **OpenCode** with the default **`biologics-delivery-discovery`** agent. Discovery outputs land in `./runs/` on your host.
+
+**Option B notes:** Prefer `curl … -o docker_ghcr_run.sh && bash docker_ghcr_run.sh` over `curl … | bash` — piping stdin breaks Docker `-it` on some setups. After `docker kill`, run **`reset`** in the host tab if keyboard input looks wrong.
 
 **LLM access:** sign in or attach a provider from inside OpenCode (`opencode auth login`, or your usual model/provider switch). Optional: pass a key at launch with `-e OPENAI_API_KEY=...` / `-e OPENROUTER_API_KEY=...` / `-e ANTHROPIC_API_KEY=...` if you prefer env-based auth. For **multi-hour discovery runs**, avoid relying on the free OpenCode Zen model (`big-pickle`) — it can stall mid-stream; use Anthropic, OpenAI, or OpenRouter with a configured key.
 

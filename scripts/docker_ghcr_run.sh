@@ -10,7 +10,13 @@
 #
 # Usage (from any directory — creates ./runs and ./papers here):
 #   bash docker_ghcr_run.sh
-#   curl -fsSL https://raw.githubusercontent.com/otunmartins/biologix-platform/main/scripts/docker_ghcr_run.sh | bash
+#
+# Recommended (no clone):
+#   curl -fsSL https://raw.githubusercontent.com/otunmartins/biologix-platform/main/scripts/docker_ghcr_run.sh -o docker_ghcr_run.sh
+#   bash docker_ghcr_run.sh
+#
+# Avoid `curl … | bash` — stdin is a pipe and Docker `-it` may fail with
+# "the input device is not a TTY" unless /dev/tty is available.
 #
 # Optional:
 #   BIOLOGIX_AI_IMAGE=ghcr.io/otunmartins/biologix-ai:0.5.19 bash docker_ghcr_run.sh
