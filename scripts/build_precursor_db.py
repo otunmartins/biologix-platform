@@ -5,9 +5,9 @@ Tiers:
   Tier 1 (manual, ~244 entries): already in precursors.json — always kept.
   Tier 2 (SMiPoly, ~1,083 polymer monomers): fetched from GitHub, merged into
           precursors.json as names + SMILES.
-  Tier 3 (Molport, 1M+ building blocks): streamed from HuggingFace, filtered
-          to MW ≤ 500 Da; InChIKeys computed via RDKit and saved to
-          data/retrosynthesis/molport_inchikeys.pkl (gitignored).
+  Tier 3 (Molport, 1M+ building blocks): downloaded from HuggingFace (resumable
+          snapshot), filtered to MW ≤ 500 Da; InChIKeys computed via RDKit and
+          saved to data/retrosynthesis/molport_inchikeys.pkl (gitignored).
   Tier 4 (ZINC bridge verification): verifies h5py + zinc_stock.hdf5 are
           present so the runtime ZINC InChIKey lookup is operational.
 
@@ -17,7 +17,7 @@ Usage:
     --max-molport 0  (default) = no limit; use all Molport entries passing MW filter.
 
 Requires for Tier 2:  pip install requests
-Requires for Tier 3:  pip install datasets rdkit (rdkit is included in conda env)
+Requires for Tier 3:  pip install huggingface-hub rdkit (rdkit is included in conda env)
 Requires for Tier 4:  pip install h5py
 """
 
@@ -46,6 +46,8 @@ SMIPOLY_CSV_URL = (
     "https://raw.githubusercontent.com/PEJpOhno/SMiPoly/main/"
     "sample_data/202207_smip_monset.csv"
 )
+MOLPORT_DATASET_ID = "molport/In-stock-Building-Block-Database"
+MOLPORT_SNAPSHOT_MAX_ATTEMPTS = 5
 
 # ─────────────────────────────────────────────
 # Helpers
@@ -173,65 +175,86 @@ def _inchikey_from_smiles(smiles: str) -> Optional[str]:
         return None
 
 
-def build_molport_inchikey_set(max_entries: int = 0) -> int:
-    """Stream Molport from HuggingFace, compute InChIKeys, save to pkl.
+def molport_smiles_from_tsv_line(text: str) -> Optional[str]:
+    """Parse one Molport TSV row and return canonical SMILES column, or None."""
+    text = (text or "").strip()
+    if not text or "\t" not in text:
+        return None
+    parts = text.split("\t")
+    if len(parts) < 2 or parts[0].upper().startswith("SMILES"):
+        return None
+    smiles = parts[1].strip() if len(parts) > 1 else parts[0].strip()
+    return smiles or None
 
-    The Molport HuggingFace dataset stores rows as tab-separated text in the
-    format: ``SMILES\\tSMILES_CANONICAL\\tMOLPORTID`` (row 0 is the header).
-    We read SMILES_CANONICAL (index 1), filter MW ≤ 500 Da via RDKit, compute
-    InChIKeys, and persist a frozenset to molport_inchikeys.pkl.
 
-    Args:
-        max_entries: 0 = no limit (process all rows passing MW filter).
+def download_molport_snapshot(
+    *,
+    max_attempts: int = MOLPORT_SNAPSHOT_MAX_ATTEMPTS,
+) -> Path:
+    """Download Molport dataset shards with resume/retry; return local ``data/`` dir."""
+    from huggingface_hub import snapshot_download
 
-    Returns:
-        Number of InChIKeys saved.
-    """
-    try:
-        from datasets import load_dataset
-    except ImportError:
-        logger.error("pip install datasets  to build Molport InChIKey set")
-        return 0
+    last_exc: Optional[Exception] = None
+    for attempt in range(1, max_attempts + 1):
+        try:
+            cache_path = snapshot_download(
+                repo_id=MOLPORT_DATASET_ID,
+                repo_type="dataset",
+                allow_patterns=["data/*"],
+                max_workers=4,
+            )
+            root = Path(cache_path)
+            data_dir = root / "data"
+            if not data_dir.is_dir():
+                raise FileNotFoundError(f"Molport data/ missing under {root}")
+            txt_files = sorted(data_dir.glob("*.txt"))
+            if not txt_files:
+                raise FileNotFoundError(f"No Molport .txt shards under {data_dir}")
+            logger.info(
+                "Molport snapshot ready: %d shard(s) in %s",
+                len(txt_files),
+                data_dir,
+            )
+            return data_dir
+        except Exception as exc:
+            last_exc = exc
+            if attempt >= max_attempts:
+                break
+            wait_s = 60 * attempt
+            logger.warning(
+                "Molport snapshot attempt %d/%d failed: %s — retrying in %ds …",
+                attempt,
+                max_attempts,
+                exc,
+                wait_s,
+            )
+            time.sleep(wait_s)
+    assert last_exc is not None
+    raise last_exc
 
-    try:
-        from rdkit import Chem
-        from rdkit.Chem import Descriptors
-    except ImportError:
-        logger.error("rdkit required for Tier 3 — install via conda: conda install -c conda-forge rdkit")
-        return 0
 
-    logger.info("Streaming Molport building blocks from HuggingFace …")
+def _collect_molport_inchikeys_from_shards(
+    data_dir: Path,
+    *,
+    max_entries: int,
+) -> tuple[Set[str], int, int, int]:
+    """Process local Molport ``*.txt`` shards; return (inchikeys, processed, skipped_mw, skipped_invalid)."""
+    from rdkit import Chem
+    from rdkit.Chem import Descriptors
+
     inchikeys: Set[str] = set()
     processed = 0
     skipped_mw = 0
     skipped_invalid = 0
-    max_attempts = 3
 
-    for attempt in range(1, max_attempts + 1):
-        inchikeys = set()
-        processed = 0
-        skipped_mw = 0
-        skipped_invalid = 0
-        try:
-            ds = load_dataset(
-                "molport/In-stock-Building-Block-Database",
-                split="train",
-                streaming=True,
-            )
-            for row in ds:
+    for shard in sorted(data_dir.glob("*.txt")):
+        logger.info("Processing Molport shard %s …", shard.name)
+        with shard.open(encoding="utf-8", errors="replace") as fh:
+            for line in fh:
                 if max_entries > 0 and processed >= max_entries:
-                    break
+                    return inchikeys, processed, skipped_mw, skipped_invalid
 
-                # Rows are tab-separated text: SMILES\tSMILES_CANONICAL\tMOLPORTID
-                text = (row.get("text") or "").strip()
-                if not text or "\t" not in text:
-                    continue
-                parts = text.split("\t")
-                if len(parts) < 2 or parts[0].upper().startswith("SMILES"):
-                    continue  # skip header row
-
-                # Prefer SMILES_CANONICAL (index 1) over raw SMILES (index 0)
-                smiles = parts[1].strip() if len(parts) > 1 else parts[0].strip()
+                smiles = molport_smiles_from_tsv_line(line)
                 if not smiles:
                     continue
 
@@ -240,8 +263,7 @@ def build_molport_inchikey_set(max_entries: int = 0) -> int:
                     skipped_invalid += 1
                     continue
 
-                mw = Descriptors.MolWt(mol)
-                if mw > 500:
+                if Descriptors.MolWt(mol) > 500:
                     skipped_mw += 1
                     continue
 
@@ -253,26 +275,51 @@ def build_molport_inchikey_set(max_entries: int = 0) -> int:
                 if processed % 100_000 == 0:
                     logger.info(
                         "  … %d processed, %d InChIKeys collected (skipped: %d high-MW, %d invalid)",
-                        processed, len(inchikeys), skipped_mw, skipped_invalid,
+                        processed,
+                        len(inchikeys),
+                        skipped_mw,
+                        skipped_invalid,
                     )
-            break
-        except Exception as exc:
-            if attempt >= max_attempts:
-                logger.error(
-                    "HuggingFace Molport stream failed after %d attempts: %s",
-                    max_attempts,
-                    exc,
-                )
-                return 0
-            wait_s = 30 * attempt
-            logger.warning(
-                "HuggingFace attempt %d/%d failed: %s — retrying in %ds …",
-                attempt,
-                max_attempts,
-                exc,
-                wait_s,
-            )
-            time.sleep(wait_s)
+
+    return inchikeys, processed, skipped_mw, skipped_invalid
+
+
+def build_molport_inchikey_set(max_entries: int = 0) -> int:
+    """Download Molport from HuggingFace, compute InChIKeys, save to pkl.
+
+    Uses ``huggingface_hub.snapshot_download`` (resumable file download) instead
+    of ``datasets`` streaming, which is prone to CDN 408 timeouts on ranged reads
+    during Docker/CI builds.
+
+    Args:
+        max_entries: 0 = no limit (process all rows passing MW filter).
+
+    Returns:
+        Number of InChIKeys saved.
+    """
+    try:
+        from rdkit import Chem  # noqa: F401
+    except ImportError:
+        logger.error("rdkit required for Tier 3 — install via conda: conda install -c conda-forge rdkit")
+        return 0
+
+    logger.info("Downloading Molport building blocks from HuggingFace (resumable snapshot) …")
+    try:
+        data_dir = download_molport_snapshot()
+    except Exception as exc:
+        logger.error("Molport snapshot download failed: %s", exc)
+        return 0
+
+    inchikeys, processed, skipped_mw, skipped_invalid = _collect_molport_inchikeys_from_shards(
+        data_dir,
+        max_entries=max_entries,
+    )
+    logger.info(
+        "Tier 3: processed %d rows (%d high-MW skipped, %d invalid skipped)",
+        processed,
+        skipped_mw,
+        skipped_invalid,
+    )
 
     if not inchikeys:
         logger.warning("Tier 3: no InChIKeys collected — skipping pkl write")
@@ -400,7 +447,8 @@ def main() -> None:
     if 3 in tiers:
         n = build_molport_inchikey_set(max_entries=args.max_molport)
         if n == 0:
-            logger.warning("Tier 3: no InChIKeys saved — check datasets/rdkit availability")
+            logger.error("Tier 3 failed: no Molport InChIKeys saved")
+            sys.exit(1)
 
     # ── Tier 4: ZINC bridge verification ─────────────────────────────────────
     if 4 in tiers:
