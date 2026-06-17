@@ -12,7 +12,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CPUS="$("${SCRIPT_DIR}/docker_cpu_limit.sh")"
-IMAGE="${BIOLOGIX_AI_IMAGE:-ghcr.io/otunmartins/biologix-ai:0.5.21}"
+IMAGE="${BIOLOGIX_AI_IMAGE:-ghcr.io/otunmartins/biologix-ai:0.5.22}"
 RUN_DIR="${PWD}"
 
 mkdir -p "${RUN_DIR}/runs" "${RUN_DIR}/papers"

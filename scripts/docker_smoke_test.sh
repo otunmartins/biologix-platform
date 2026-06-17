@@ -6,6 +6,10 @@ set -euo pipefail
 source /opt/conda/etc/profile.d/conda.sh
 conda activate biologix-ai-sim
 export LD_LIBRARY_PATH="${CONDA_PREFIX}/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+if [[ -d /opt/conda/envs/pymol-viz/lib ]]; then
+  export LD_LIBRARY_PATH="/opt/conda/envs/pymol-viz/lib:${LD_LIBRARY_PATH}"
+  export PATH="/opt/conda/envs/pymol-viz/bin:${PATH}"
+fi
 cd /app
 export MPLBACKEND=Agg
 
@@ -67,6 +71,15 @@ if [[ ! -f /app/data/retrosynthesis/precursors.json ]]; then
 fi
 if [[ ! -f /app/data/aizynthfinder/config.yml ]]; then
   echo "WARN: AiZynth config missing (SLIM image or first-run volume)"
+fi
+
+echo "=== Smoke: PyMOL (pymol-viz env) ==="
+if command -v pymol >/dev/null 2>&1; then
+  PYMOL_HEADLESS=1 pymol -c -d "quit"
+  echo "PyMOL OK"
+else
+  echo "ERROR: pymol not on PATH (expected /opt/conda/envs/pymol-viz/bin)" >&2
+  exit 1
 fi
 
 echo "=== Smoke: psmiles PNG (not SVG) ==="

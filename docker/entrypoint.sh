@@ -10,9 +10,18 @@ set -euo pipefail
 source /opt/conda/etc/profile.d/conda.sh
 conda activate biologix-ai-sim
 
+# PyMOL lives in an isolated env (pymol-open-source conflicts with ambertools in biologix-ai-sim).
+if [[ -x /opt/conda/envs/pymol-viz/bin/pymol ]]; then
+  export PATH="/opt/conda/envs/pymol-viz/bin:${PATH}"
+fi
+
 # Prefer conda libstdc++/libgcc (GLIBCXX_3.4.29+) over the Debian base image.
 # Without this, RetroSynAgent treeBuilder fails loading libLerc.so.4 via the MCP server.
 export LD_LIBRARY_PATH="${CONDA_PREFIX}/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+# pymol-viz may need its own libstdc++/GLEW alongside the sim env.
+if [[ -d /opt/conda/envs/pymol-viz/lib ]]; then
+  export LD_LIBRARY_PATH="/opt/conda/envs/pymol-viz/lib:${LD_LIBRARY_PATH}"
+fi
 
 # Headless matplotlib + RDKit drawing (psmiles savefig may otherwise write SVG to .png paths)
 export MPLBACKEND=Agg

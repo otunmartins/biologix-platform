@@ -52,9 +52,8 @@ RUN sed '/^[[:space:]]*- -e \.$/d' environment-simulation.yml > /tmp/environment
     && mamba env create -f /tmp/environment-docker.yml \
     && mamba install -n biologix-ai-sim -y -c conda-forge "git>=2.40" \
     && /opt/conda/envs/biologix-ai-sim/bin/git --version \
-    && mamba install -n biologix-ai-sim -y -c conda-forge pymol-open-source --freeze-installed \
-    && test -x /opt/conda/envs/biologix-ai-sim/bin/pymol \
-    && PYMOL_HEADLESS=1 /opt/conda/envs/biologix-ai-sim/bin/pymol -c -d "quit" \
+    && mamba create -n pymol-viz -y -c conda-forge python=3.11 pymol-open-source \
+    && PYMOL_HEADLESS=1 /opt/conda/envs/pymol-viz/bin/pymol -c -d "quit" \
     && mamba clean --all --yes
 
 # ─────────────────────────────────────────────────────────────────────────────
