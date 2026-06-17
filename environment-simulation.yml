@@ -18,6 +18,7 @@ dependencies:
   - openmm                       # molecular dynamics engine
   - pdbfixer                     # PDB structure repair
   - packmol                      # molecular packing (binary on PATH)
+  - pymol                        # insulin ribbon + polymer sticks for OpenMM chemviz PNGs
   - openff-toolkit>=0.18.0       # conda-forge only (not on PyPI)
   - openff-units>=0.2            # conda-forge only
   - ambertools                   # antechamber + parmchk2 (GAFF via openmmforcefields)

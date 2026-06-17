@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Render insulin cartoon + polymer ball-and-stick PNGs from OpenMM complex PDBs (PyMOL only).
+Render insulin cartoon + polymer bonded-stick PNGs from OpenMM complex PDBs (PyMOL only).
 
 Requires ``pymol`` on PATH (open-source: conda-forge or ``pip install pymol-open-source``).
 
@@ -11,6 +11,7 @@ Requires ``pymol`` on PATH (open-source: conda-forge or ``pip install pymol-open
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 from pathlib import Path
 
@@ -19,7 +20,7 @@ sys.path.insert(0, str(ROOT / "src" / "python"))
 
 
 def main() -> int:
-    ap = argparse.ArgumentParser(description="Ribbon + ball-stick PNG from complex PDB")
+    ap = argparse.ArgumentParser(description="Ribbon + bonded polymer sticks PNG from complex PDB")
     ap.add_argument(
         "path",
         help="PDB file or directory containing *_complex_minimized.pdb",
@@ -40,6 +41,16 @@ def main() -> int:
     chains = tuple(c.strip() for c in args.protein_chains.split(",") if c.strip())
 
     from biologix_ai.simulation.pymol_complex_viz import write_complex_pymol_png
+
+    def _n_protein_atoms_for(pdb: Path) -> int | None:
+        stem = pdb.stem.replace("_complex_minimized", "")
+        meta = pdb.parent / f"{stem}_complex_meta.json"
+        if meta.is_file():
+            try:
+                return int(json.loads(meta.read_text(encoding="utf-8"))["n_insulin_atoms"])
+            except (KeyError, TypeError, ValueError, json.JSONDecodeError):
+                return None
+        return None
 
     pdbs: list[Path] = []
     if p.is_file() and p.suffix.lower() == ".pdb":
@@ -65,7 +76,12 @@ def main() -> int:
             outp = pdb.with_name(pdb.stem.replace("_complex_minimized", "") + "_complex_chemviz.png")
             if "_complex_minimized" not in pdb.stem:
                 outp = pdb.with_suffix("").with_name(pdb.stem + "_chemviz.png").with_suffix(".png")
-        r = write_complex_pymol_png(str(pdb), str(outp), protein_chains=chains)
+        r = write_complex_pymol_png(
+            str(pdb),
+            str(outp),
+            protein_chains=chains,
+            n_protein_atoms=_n_protein_atoms_for(pdb),
+        )
         if not r.get("ok"):
             print(f"{pdb.name}: {r.get('error')}", file=sys.stderr)
             rc = 1

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Evaluate PSMILES via OpenMM Packmol matrix encapsulation + minimize (AMBER14SB + GAFF + Gasteiger)."""
 
+import json
 import os
 import sys
 import time
@@ -215,6 +216,28 @@ def attach_matrix_structure_artifacts(
         out["complex_chemviz_png_path"] = r_cv.get("path") if r_cv.get("ok") else None
         out["complex_chemviz_png_error"] = r_cv.get("error")
         out["complex_chemviz_backend"] = cv_backend
+        if r_cv.get("ok"):
+            _progress_log(f"[biologix-ai] stage=artifact_render chemviz OK {chemviz_png.name}")
+        else:
+            _progress_log(
+                f"[biologix-ai] stage=artifact_render chemviz FAILED: {r_cv.get('error')} "
+                "(install pymol; dot-cloud preview is NOT the report figure — use *_complex_chemviz.png)"
+            )
+        nprot_val = out.get("n_insulin_atoms")
+        if nprot_val is not None:
+            meta_path = struct / f"{slug}_complex_meta.json"
+            meta_path.write_text(
+                json.dumps(
+                    {
+                        "n_insulin_atoms": int(nprot_val),
+                        "psmiles": psmiles,
+                        "material_slug": slug,
+                    },
+                    indent=2,
+                ),
+                encoding="utf-8",
+            )
+            out["complex_meta_json_path"] = str(meta_path)
     else:
         out["complex_preview_png_path"] = None
         out["complex_preview_png_error"] = "complex PDB not written"

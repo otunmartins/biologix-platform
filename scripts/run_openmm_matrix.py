@@ -146,6 +146,12 @@ def main() -> None:
         metavar="N",
         help="Optional max chain count (cap progressive growth)",
     )
+    ap.add_argument(
+        "--render-chemviz-only",
+        action="store_true",
+        help="Skip OpenMM; re-render *_complex_chemviz.png from existing minimized PDB "
+        "(requires --run-dir and --material-name or --slug)",
+    )
     ap.add_argument("-v", "--verbose", action="store_true")
     args = ap.parse_args()
 
@@ -157,6 +163,50 @@ def main() -> None:
     )
     from biologix_ai.simulation.openmm_cli_config import resolve_openmm_cli_kwargs
     from biologix_ai.psmiles_drawing import safe_filename_basename
+
+    if args.render_chemviz_only:
+        if args.run_dir:
+            os.environ[ENV_SESSION] = str(Path(args.run_dir).resolve())
+        struct_dir = resolve_eval_structure_artifacts_dir(args.run_dir)
+        if struct_dir is None:
+            print("render-chemviz-only requires --run-dir or BIOLOGIX_AI_SESSION_DIR", file=sys.stderr)
+            sys.exit(1)
+        slug = (args.slug or "").strip() or safe_filename_basename(args.material_name)
+        pdb_path = struct_dir / f"{slug}_complex_minimized.pdb"
+        if not pdb_path.is_file():
+            print(f"PDB not found: {pdb_path}", file=sys.stderr)
+            sys.exit(1)
+        meta_path = struct_dir / f"{slug}_complex_meta.json"
+        n_prot: int | None = None
+        if meta_path.is_file():
+            meta = json.loads(meta_path.read_text(encoding="utf-8"))
+            n_prot = meta.get("n_insulin_atoms")
+        from biologix_ai.simulation.pymol_complex_viz import write_complex_viz_png_auto
+
+        chemviz_png = struct_dir / f"{slug}_complex_chemviz.png"
+        r_cv, backend = write_complex_viz_png_auto(
+            str(pdb_path),
+            str(chemviz_png),
+            n_protein_atoms=n_prot,
+        )
+        payload = {
+            "ok": r_cv.get("ok"),
+            "complex_pdb_path": str(pdb_path),
+            "complex_chemviz_png_path": r_cv.get("path") if r_cv.get("ok") else None,
+            "complex_chemviz_png_error": r_cv.get("error"),
+            "complex_chemviz_backend": backend,
+            "n_insulin_atoms": n_prot,
+        }
+        print(json.dumps(payload, indent=2))
+        if not r_cv.get("ok"):
+            print(
+                f"PyMOL chemviz failed: {r_cv.get('error')} "
+                "(Docker image ≥0.5.20 includes pymol; *_complex_preview.png is a dot cloud, not for reports)",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+        print(f"Wrote {chemviz_png}", file=sys.stderr)
+        return
 
     density_flag = True if args.density_driven else None
     no_npt_flag = True if args.no_npt else None
@@ -231,6 +281,15 @@ def main() -> None:
             struct_dir=struct_dir,
             pdb_out=pdb_out,
         )
+        if not result.get("complex_chemviz_png_path"):
+            print(
+                f"WARNING: PyMOL chemviz PNG missing: {result.get('complex_chemviz_png_error')} "
+                f"(re-run: python3 scripts/run_openmm_matrix.py --render-chemviz-only "
+                f"--run-dir {struct_dir.parent} --material-name {args.material_name!r})",
+                file=sys.stderr,
+            )
+        elif result.get("complex_chemviz_png_path"):
+            print(f"Structure figure: {result['complex_chemviz_png_path']}", file=sys.stderr)
 
     print(json.dumps(result, indent=2))
 

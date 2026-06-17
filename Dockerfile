@@ -50,8 +50,9 @@ COPY environment-simulation.yml ./
 # install_submodules.sh already runs: pip install -e ".[retro,admet,dev]"
 RUN sed '/^[[:space:]]*- -e \.$/d' environment-simulation.yml > /tmp/environment-docker.yml \
     && mamba env create -f /tmp/environment-docker.yml \
-    && mamba install -n biologix-ai-sim -y -c conda-forge "git>=2.40" \
+    && mamba install -n biologix-ai-sim -y -c conda-forge "git>=2.40" pymol \
     && /opt/conda/envs/biologix-ai-sim/bin/git --version \
+    && /opt/conda/envs/biologix-ai-sim/bin/pymol -c -Q -d "quit" \
     && mamba clean --all --yes
 
 # ─────────────────────────────────────────────────────────────────────────────

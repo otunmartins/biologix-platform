@@ -14,7 +14,8 @@ def test_build_pymol_complex_script_index_selection(tmp_path):
     assert "dss prot" in s
     assert "show cartoon, prot" in s
     assert "show sticks, poly" in s
-    assert "stick_ball, 1" in s
+    assert "stick_ball, 0" in s
+    assert "connect (poly)" in s
 
 
 def test_build_pymol_complex_script_chain_fallback(tmp_path):

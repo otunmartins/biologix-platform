@@ -184,7 +184,7 @@ def test_write_session_summary_reports_embeds_evaluate_style_pngs(monkeypatch, t
     md = (sess / "SUMMARY_REPORT.md").read_text(encoding="utf-8")
     assert "Molecular visualizations" in md
     assert "structures/Candidate_0_monomer.png" in md
-    assert "structures/Candidate_0_complex_preview.png" in md
+    assert "structures/Candidate_0_complex_preview.png" not in md
     assert "structures/Candidate_0_complex_chemviz.png" in md
     assert out.get("pdf")
     assert (sess / "SUMMARY_REPORT.pdf").is_file()

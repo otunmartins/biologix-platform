@@ -4,7 +4,7 @@ PyMOL (open-source) rendering for insulin–polymer complexes:
 
 - **Protein (insulin):** cartoon ribbon with ``dss``-assigned secondary structure
   (helix/sheet/coil).
-- **Polymer:** ball-and-stick (``stick_ball`` mode).
+- **Polymer:** bonded sticks (distance connect when CONECT records are missing).
 
 Requires the ``pymol`` executable on ``PATH`` (e.g. ``conda install -c conda-forge pymol``
 or ``pip install pymol-open-source``). Headless: ``pymol -c``.
@@ -61,13 +61,18 @@ def build_pymol_complex_script(
         "hide everything",
         f"select prot, {prot_expr}",
         "select poly, m and not prot",
+        # OpenMM PDBs may omit CONECT for polymer chains; connect by distance so
+        # sticks render as bonds rather than isolated spheres (dot cloud).
+        "set connect_mode, 4",
+        "connect (poly), 4.0",
         "dss prot",
         "show cartoon, prot",
         "cartoon automatic, prot",
+        "set cartoon_smooth_loops, 1",
+        "set cartoon_fancy_helices, 1",
         "show sticks, poly",
-        "set stick_ball, 1",
-        "set stick_radius, 0.12",
-        "set sphere_scale, 0.22",
+        "set stick_ball, 0",
+        "set stick_radius, 0.14",
         "color marine, prot",
         "color grey, elem C and poly",
         "color red, elem O and poly",

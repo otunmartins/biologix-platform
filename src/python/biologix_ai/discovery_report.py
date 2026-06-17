@@ -147,7 +147,11 @@ def _markdown_images_for_viz_group(base: str, kinds: Dict[str, str]) -> List[str
     """Markdown lines for one candidate's visualization set (fixed order)."""
     lines: List[str] = []
     label_base = _ascii_safe(base.replace("_", " "))
+    # Prefer PyMOL chemviz (ribbon + bonded polymer); skip matplotlib dot preview.
+    skip_preview = "chemviz" in kinds
     for _suffix, kind, caption in _STRUCTURE_VIZ_SUFFIXES:
+        if skip_preview and kind == "preview":
+            continue
         rel = kinds.get(kind)
         if not rel:
             continue
