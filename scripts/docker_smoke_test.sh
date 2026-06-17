@@ -29,7 +29,7 @@ print("libLerc load OK")
 PY
 
 echo "=== Smoke: MCP Python package ==="
-python -c "import mcp; print('mcp', mcp.__version__)"
+python -c "from importlib.metadata import version; from mcp.server.fastmcp import FastMCP; print('mcp', version('mcp'))"
 
 echo "=== Smoke: MCP server import ==="
 python - <<'PY'

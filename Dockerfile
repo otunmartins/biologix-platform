@@ -53,7 +53,7 @@ RUN sed '/^[[:space:]]*- -e \.$/d' environment-simulation.yml > /tmp/environment
     && mamba install -n biologix-ai-sim -y -c conda-forge "git>=2.40" \
     && /opt/conda/envs/biologix-ai-sim/bin/git --version \
     && /opt/conda/envs/biologix-ai-sim/bin/python -m pip install "mcp[cli]>=1.0.0" \
-    && /opt/conda/envs/biologix-ai-sim/bin/python -c "import mcp; print('mcp', mcp.__version__)" \
+    && /opt/conda/envs/biologix-ai-sim/bin/python -c "from importlib.metadata import version; from mcp.server.fastmcp import FastMCP; print('mcp', version('mcp'))" \
     && mamba create -n pymol-viz -y -c conda-forge python=3.11 pymol-open-source \
     && PYMOL_HEADLESS=1 /opt/conda/envs/pymol-viz/bin/pymol -c -d "quit" \
     && mamba clean --all --yes
@@ -93,7 +93,7 @@ ENV BASH_ENV=/opt/conda/etc/profile.d/conda.sh
 # Install submodules, torch, precursor DB, and the project package into the env
 RUN source /opt/conda/etc/profile.d/conda.sh && conda activate biologix-ai-sim \
     && bash scripts/install_submodules.sh \
-    && python -c "import mcp; import openmm; print('post-install OK: mcp', mcp.__version__)"
+    && python -c "from importlib.metadata import version; from mcp.server.fastmcp import FastMCP; import openmm; print('post-install OK: mcp', version('mcp'))"
 
 # Download AiZynth models (skipped when SLIM=1); then refresh precursor tier 4 (ZINC stock).
 RUN if [ "$SLIM" = "0" ]; then \
