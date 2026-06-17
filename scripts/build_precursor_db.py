@@ -29,6 +29,7 @@ import logging
 import pickle
 import re
 import sys
+import time
 from datetime import date
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set
@@ -200,58 +201,78 @@ def build_molport_inchikey_set(max_entries: int = 0) -> int:
         return 0
 
     logger.info("Streaming Molport building blocks from HuggingFace …")
-    try:
-        ds = load_dataset(
-            "molport/In-stock-Building-Block-Database",
-            split="train",
-            streaming=True,
-        )
-    except Exception as exc:
-        logger.error("HuggingFace load failed: %s", exc)
-        return 0
-
     inchikeys: Set[str] = set()
     processed = 0
     skipped_mw = 0
     skipped_invalid = 0
+    max_attempts = 3
 
-    for row in ds:
-        if max_entries > 0 and processed >= max_entries:
-            break
-
-        # Rows are tab-separated text: SMILES\tSMILES_CANONICAL\tMOLPORTID
-        text = (row.get("text") or "").strip()
-        if not text or "\t" not in text:
-            continue
-        parts = text.split("\t")
-        if len(parts) < 2 or parts[0].upper().startswith("SMILES"):
-            continue  # skip header row
-
-        # Prefer SMILES_CANONICAL (index 1) over raw SMILES (index 0)
-        smiles = parts[1].strip() if len(parts) > 1 else parts[0].strip()
-        if not smiles:
-            continue
-
-        mol = Chem.MolFromSmiles(smiles)
-        if mol is None:
-            skipped_invalid += 1
-            continue
-
-        mw = Descriptors.MolWt(mol)
-        if mw > 500:
-            skipped_mw += 1
-            continue
-
-        ik = _inchikey_from_smiles(smiles)
-        if ik:
-            inchikeys.add(ik)
-
-        processed += 1
-        if processed % 100_000 == 0:
-            logger.info(
-                "  … %d processed, %d InChIKeys collected (skipped: %d high-MW, %d invalid)",
-                processed, len(inchikeys), skipped_mw, skipped_invalid,
+    for attempt in range(1, max_attempts + 1):
+        inchikeys = set()
+        processed = 0
+        skipped_mw = 0
+        skipped_invalid = 0
+        try:
+            ds = load_dataset(
+                "molport/In-stock-Building-Block-Database",
+                split="train",
+                streaming=True,
             )
+            for row in ds:
+                if max_entries > 0 and processed >= max_entries:
+                    break
+
+                # Rows are tab-separated text: SMILES\tSMILES_CANONICAL\tMOLPORTID
+                text = (row.get("text") or "").strip()
+                if not text or "\t" not in text:
+                    continue
+                parts = text.split("\t")
+                if len(parts) < 2 or parts[0].upper().startswith("SMILES"):
+                    continue  # skip header row
+
+                # Prefer SMILES_CANONICAL (index 1) over raw SMILES (index 0)
+                smiles = parts[1].strip() if len(parts) > 1 else parts[0].strip()
+                if not smiles:
+                    continue
+
+                mol = Chem.MolFromSmiles(smiles)
+                if mol is None:
+                    skipped_invalid += 1
+                    continue
+
+                mw = Descriptors.MolWt(mol)
+                if mw > 500:
+                    skipped_mw += 1
+                    continue
+
+                ik = _inchikey_from_smiles(smiles)
+                if ik:
+                    inchikeys.add(ik)
+
+                processed += 1
+                if processed % 100_000 == 0:
+                    logger.info(
+                        "  … %d processed, %d InChIKeys collected (skipped: %d high-MW, %d invalid)",
+                        processed, len(inchikeys), skipped_mw, skipped_invalid,
+                    )
+            break
+        except Exception as exc:
+            if attempt >= max_attempts:
+                logger.error(
+                    "HuggingFace Molport stream failed after %d attempts: %s",
+                    max_attempts,
+                    exc,
+                )
+                return 0
+            wait_s = 30 * attempt
+            logger.warning(
+                "HuggingFace attempt %d/%d failed: %s — retrying in %ds …",
+                attempt,
+                max_attempts,
+                exc,
+                wait_s,
+            )
+            time.sleep(wait_s)
 
     if not inchikeys:
         logger.warning("Tier 3: no InChIKeys collected — skipping pkl write")

@@ -19,11 +19,11 @@
 # "the input device is not a TTY" unless /dev/tty is available.
 #
 # Optional:
-#   BIOLOGIX_AI_IMAGE=ghcr.io/otunmartins/biologix-ai:0.5.24 bash docker_ghcr_run.sh
+#   BIOLOGIX_AI_IMAGE=ghcr.io/otunmartins/biologix-ai:0.5.25 bash docker_ghcr_run.sh
 #   bash docker_ghcr_run.sh -e ANTHROPIC_API_KEY=sk-ant-...
 set -euo pipefail
 
-IMAGE="${BIOLOGIX_AI_IMAGE:-ghcr.io/otunmartins/biologix-ai:0.5.24}"
+IMAGE="${BIOLOGIX_AI_IMAGE:-ghcr.io/otunmartins/biologix-ai:0.5.25}"
 RUN_DIR="${PWD}"
 
 _host_logical_cpus() {

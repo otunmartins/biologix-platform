@@ -87,6 +87,8 @@ ENV CONDA_DEFAULT_ENV=biologix-ai-sim
 ENV LD_LIBRARY_PATH=/opt/conda/envs/biologix-ai-sim/lib
 ENV BIOLOGIX_AI_IMAGE_VERSION=${IMAGE_VERSION}
 ENV OPENCODE_DISABLE_AUTOUPDATE=true
+# Skip HuggingFace Molport tier-3 stream during image build (entrypoint builds it on first run).
+ENV BIOLOGIX_DOCKER_BUILD=1
 # Make conda activate work inside RUN steps
 ENV BASH_ENV=/opt/conda/etc/profile.d/conda.sh
 
