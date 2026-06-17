@@ -11,6 +11,7 @@ docker/entrypoint.sh text eol=lf
 *.jpg binary
 *.jpeg binary
 *.gif binary
+*.mp4 binary
 *.ico binary
 *.whl binary
 *.pkl binary

@@ -1,21 +1,80 @@
-# Biologics AI Platform — Any-biologic delivery materials discovery
+# Biologics AI Platform
 
-AI-driven discovery of **formulation and delivery materials for any biologic** (insulin, mAbs, enzymes, vaccines, peptides). A single discovery campaign produces: candidate polymer screening, retrosynthesis routes, residual-monomer ADMET, regulatory excipient compliance (EMA/FDA/GRAS), and an immutable GxP audit trail — all in one session via MCP (OpenCode) or FastAPI.
+**Agentic discovery of formulation and delivery materials for any biologic** — insulin, mAbs, enzymes, vaccines, peptides. One OpenCode session runs literature mining, OpenMM physics screening, retrosynthesis, monomer ADMET, excipient compliance, and a compiled audit-ready report.
 
-See [Publications](#publications) for preprints.
+<p align="center">
+  <a href="docs/assets/product_use.mp4">
+    <img src="docs/assets/product_demo.gif" alt="Biologix AI: OpenCode agent running the biologics delivery discovery pipeline" width="920"/>
+  </a>
+</p>
 
-### One session, one biologic
+<p align="center">
+  <strong>Product demo</strong> — OpenCode TUI + <code>biologics-delivery-discovery</code> agent (preview loops; click for full recording).<br/>
+  <a href="docs/assets/product_use.mp4">▶ Watch full demo (MP4, ~75s)</a>
+  ·
+  <a href="#run-with-docker-recommended">Try it with Docker ↓</a>
+</p>
 
-Start with the **`biologics-delivery-discovery`** OpenCode agent (default). It guides you through:
+---
+
+## At a glance
+
+| | |
+|---|---|
+| **Interface** | [OpenCode](https://opencode.ai) TUI + MCP tools (Cursor-compatible) |
+| **Physics** | OpenMM matrix packing, minimization, PyMOL structure figures |
+| **Chemistry** | PSMILES polymers, AiZynthFinder retrosynthesis, ADMET-AI |
+| **Outputs** | `runs/<session>/` — reports, structures, JSONL audit trail |
+| **Fastest start** | Pre-built Docker image — no local conda install |
+
+**Pipeline (one session, one biologic):**
 
 ```
 biologic name/PDB → candidates → OpenMM screening → retrosynthesis →
 monomer ADMET → excipient compliance → compiled report + audit trail
 ```
 
-Session state is persisted to `runs/<session_id>/` via `discovery_world.json`, funnel-context checkpoints, and an append-only JSONL audit trail. If the chat disconnects mid-pipeline, `get_funnel_context` resumes from the last checkpoint.
+Session state persists under `runs/<session_id>/` (`discovery_world.json`, funnel checkpoints, append-only audit JSONL). If the chat disconnects, `get_funnel_context` resumes from the last checkpoint.
 
-### OpenMM screening is expensive — skip it for quick iterations
+See [Publications](#publications) for preprints.
+
+### Quick start (Docker)
+
+```bash
+mkdir -p runs papers
+curl -fsSL https://raw.githubusercontent.com/otunmartins/biologix-platform/main/scripts/docker_ghcr_run.sh -o docker_ghcr_run.sh
+bash docker_ghcr_run.sh
+```
+
+Image: `ghcr.io/otunmartins/biologix-ai:0.5.27` — full options in [Run with Docker](#run-with-docker-recommended).
+
+---
+
+## Contents
+
+- [At a glance](#at-a-glance)
+- [Run with Docker (recommended)](#run-with-docker-recommended)
+- [Quick start (without Docker)](#quick-start-without-docker)
+- [MCP tools](#mcp-tools)
+- [OpenMM: skip for fast iterations](#openmm-screening-is-expensive--skip-it-for-quick-iterations)
+- [Publications](#publications)
+- [Documentation](#documentation)
+
+---
+
+## MCP tools
+
+| Tool | What it does |
+|------|-------------|
+| `get_candidate_profile` | Single-call dossier: validate + ADMET + retro routes + compliance |
+| `screen_candidate_library` | Batch screen up to 50 candidates with ADMET + compliance |
+| `check_excipient_compliance` | EMA/FDA/GRAS lookup + immunogenicity SMARTS alerts |
+| `save_funnel_context` / `get_funnel_context` | Named pipeline checkpoints for session resumption |
+| `save_pipeline_stage` / `get_pipeline_audit` | Per-candidate GxP audit trail (21 CFR Part 11 style) |
+
+---
+
+## OpenMM screening is expensive — skip it for quick iterations
 
 **`openmm_evaluate_psmiles`** runs Packmol matrix packing plus energy minimization (and optional short NPT) per candidate. That is the slowest step in the pipeline: on CPU or emulated `linux/amd64` (Docker on Apple Silicon), **one candidate can take minutes to hours**.
 
@@ -26,16 +85,6 @@ For **fast iteration** — literature mining, PSMILES validation, library screen
 - Re-run OpenMM on a shortlist once candidates look promising.
 
 The default **`biologics-delivery-discovery`** agent includes OpenMM in its fixed Steps 1–6; steering it to omit that step is intentional and supported. See [docs/OPENMM_SCREENING.md](docs/OPENMM_SCREENING.md) when you want full physics-based ranking (and env vars to shorten smoke tests).
-
-### New MCP tools (May 2026)
-
-| Tool | What it does |
-|------|-------------|
-| `get_candidate_profile` | Single-call dossier: validate + ADMET + retro routes + compliance |
-| `screen_candidate_library` | Batch screen up to 50 candidates with ADMET + compliance |
-| `check_excipient_compliance` | EMA/FDA/GRAS lookup + immunogenicity SMARTS alerts |
-| `save_funnel_context` / `get_funnel_context` | Named pipeline checkpoints for session resumption |
-| `save_pipeline_stage` / `get_pipeline_audit` | Per-candidate GxP audit trail (21 CFR Part 11 style) |
 
 ---
 
