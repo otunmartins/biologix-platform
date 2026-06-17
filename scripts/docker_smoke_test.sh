@@ -8,7 +8,8 @@ conda activate biologix-ai-sim
 export LD_LIBRARY_PATH="${CONDA_PREFIX}/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 if [[ -d /opt/conda/envs/pymol-viz/lib ]]; then
   export LD_LIBRARY_PATH="/opt/conda/envs/pymol-viz/lib:${LD_LIBRARY_PATH}"
-  export PATH="/opt/conda/envs/pymol-viz/bin:${PATH}"
+  # Append pymol-viz bin so biologix-ai-sim `python` (with mcp) stays first on PATH.
+  export PATH="${PATH}:/opt/conda/envs/pymol-viz/bin"
 fi
 cd /app
 export MPLBACKEND=Agg
@@ -29,6 +30,7 @@ print("libLerc load OK")
 PY
 
 echo "=== Smoke: MCP Python package ==="
+python -c "import os, sys; assert 'biologix-ai-sim' in sys.executable, sys.executable"
 python -c "from importlib.metadata import version; from mcp.server.fastmcp import FastMCP; print('mcp', version('mcp'))"
 
 echo "=== Smoke: MCP server import ==="

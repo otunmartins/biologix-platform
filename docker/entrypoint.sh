@@ -11,8 +11,9 @@ source /opt/conda/etc/profile.d/conda.sh
 conda activate biologix-ai-sim
 
 # PyMOL lives in an isolated env (pymol-open-source conflicts with ambertools in biologix-ai-sim).
+# Append (do not prepend): pymol-viz also ships python without mcp/openmm — prepending breaks `python`.
 if [[ -x /opt/conda/envs/pymol-viz/bin/pymol ]]; then
-  export PATH="/opt/conda/envs/pymol-viz/bin:${PATH}"
+  export PATH="${PATH}:/opt/conda/envs/pymol-viz/bin"
 fi
 
 # Prefer conda libstdc++/libgcc (GLIBCXX_3.4.29+) over the Debian base image.

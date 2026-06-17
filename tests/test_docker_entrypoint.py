@@ -147,3 +147,9 @@ def test_dockerfile_pins_opencode_version() -> None:
     assert 'git>=2.40' in text
     assert "pymol-viz" in text and "pymol-open-source" in text
     assert "from mcp.server.fastmcp import FastMCP" in text
+
+
+def test_entrypoint_appends_pymol_viz_to_path() -> None:
+    text = ENTRYPOINT.read_text(encoding="utf-8")
+    assert 'PATH="${PATH}:/opt/conda/envs/pymol-viz/bin"' in text
+    assert 'PATH="/opt/conda/envs/pymol-viz/bin:${PATH}"' not in text
