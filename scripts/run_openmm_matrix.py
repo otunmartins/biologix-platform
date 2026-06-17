@@ -201,7 +201,7 @@ def main() -> None:
         if not r_cv.get("ok"):
             print(
                 f"PyMOL chemviz failed: {r_cv.get('error')} "
-                "(Docker image ≥0.5.22 includes pymol-viz env; *_complex_preview.png is a dot cloud, not for reports)",
+                "(Docker image ≥0.5.23 includes pymol-viz env; *_complex_preview.png is a dot cloud, not for reports)",
                 file=sys.stderr,
             )
             sys.exit(1)

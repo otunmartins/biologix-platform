@@ -146,3 +146,4 @@ def test_dockerfile_pins_opencode_version() -> None:
     assert "OPENCODE_DISABLE_AUTOUPDATE=true" in text
     assert 'git>=2.40' in text
     assert "pymol-viz" in text and "pymol-open-source" in text
+    assert "import mcp" in text

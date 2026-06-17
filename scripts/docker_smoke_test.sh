@@ -28,6 +28,9 @@ assert str(prefix / "lib") in ld, f"LD_LIBRARY_PATH missing conda lib: {ld!r}"
 print("libLerc load OK")
 PY
 
+echo "=== Smoke: MCP Python package ==="
+python -c "import mcp; print('mcp', mcp.__version__)"
+
 echo "=== Smoke: MCP server import ==="
 python - <<'PY'
 import importlib.util
