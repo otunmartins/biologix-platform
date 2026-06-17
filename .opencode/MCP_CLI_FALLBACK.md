@@ -54,7 +54,7 @@ cd /app && python3 scripts/run_openmm_matrix.py '<PSMILES>' \
 
 Parse trailing JSON for `interaction_energy_kj_mol` and structure paths (`complex_chemviz_png_path`, `structure_artifacts_dir`). When the session env is already set, `--run-dir` may be omitted.
 
-**Report figures:** embed `structures/*_complex_chemviz.png` (insulin ribbon + polymer bonded sticks via PyMOL). Do **not** use `*_complex_preview.png` — that file is a matplotlib 3D dot cloud for quick debugging only. Docker image **≥ 0.5.20** ships `pymol` in `biologix-ai-sim`.
+**Report figures:** embed `structures/*_complex_chemviz.png` (insulin ribbon + polymer bonded sticks via PyMOL). Do **not** use `*_complex_preview.png` — that file is a matplotlib 3D dot cloud for quick debugging only. Docker image **≥ 0.5.21** ships `pymol-open-source` in `biologix-ai-sim`.
 
 Re-render chemviz from an existing minimized PDB (no OpenMM rerun):
 
