@@ -9,6 +9,18 @@ Docker is the recommended way to run Biologix AI. It packages the full conda sim
 
 That is it.
 
+## GHCR image (no build)
+
+Published images: `ghcr.io/otunmartins/biologix-ai:0.5.27` (pin `v0.5.27` for reproducibility).
+
+```bash
+mkdir -p runs papers
+curl -fsSL https://raw.githubusercontent.com/otunmartins/biologix-platform/main/scripts/docker_ghcr_run.sh -o docker_ghcr_run.sh
+BIOLOGIX_AI_IMAGE=ghcr.io/otunmartins/biologix-ai:0.5.27 bash docker_ghcr_run.sh
+```
+
+On Apple Silicon, pre-pull: `docker pull --platform linux/amd64 ghcr.io/otunmartins/biologix-ai:0.5.27`. Prefer download-then-run over `curl | bash` (TTY). See [README — Run with Docker](../README.md#run-with-docker-recommended) for details.
+
 ## Quick start (two commands)
 
 **macOS / Linux:**
@@ -221,7 +233,7 @@ docker run --platform linux/amd64 -it --rm --init \
   -v "$(pwd)/runs:/app/runs" \
   -v "$(pwd)/papers:/app/papers" \
   -v biologix-data:/app/data \
-  ghcr.io/otunmartins/biologix-ai:0.5.19
+  ghcr.io/otunmartins/biologix-ai:0.5.27
 ```
 
 Without the trap, run **`reset`** in the host tab after killing a stuck container.

@@ -85,28 +85,58 @@ No Anthropic (or other) API key is required before you start — configure the L
 
 ### Pull the pre-built image and run
 
-**Recommended release:** `ghcr.io/otunmartins/biologix-ai:0.5.19` (tag `v0.5.19`). Pin this tag for reproducible runs; `latest` tracks the same build but can change when a new release ships.
+**Recommended release:** `ghcr.io/otunmartins/biologix-ai:0.5.27` (tag `v0.5.27`). Pin this tag for reproducible runs; `latest` and `0.5` move when new releases ship.
 
-From any directory where you want session folders:
+**Fastest start (no clone)** — from any directory where you want `runs/` and `papers/`:
 
 ```bash
 mkdir -p runs papers
 
-docker pull --platform linux/amd64 ghcr.io/otunmartins/biologix-ai:0.5.19
+curl -fsSL https://raw.githubusercontent.com/otunmartins/biologix-platform/main/scripts/docker_ghcr_run.sh -o docker_ghcr_run.sh
+bash docker_ghcr_run.sh
+```
 
-# Recommended — host TTY cleanup when OpenCode exits (avoids mouse gibberish after docker kill):
-# Option A: clone repo and use the launcher (CPU quota + timeouts + TTY restore)
+The launcher pulls `ghcr.io/otunmartins/biologix-ai:0.5.27` (or whatever `BIOLOGIX_AI_IMAGE` is set to), applies Rosetta-friendly CPU/timeouts on Apple Silicon, mounts `./runs` and `./papers`, and restores your host TTY when the container exits.
+
+**Pin the image explicitly** (recommended after upgrading):
+
+```bash
+mkdir -p runs papers
+
+curl -fsSL https://raw.githubusercontent.com/otunmartins/biologix-platform/main/scripts/docker_ghcr_run.sh -o docker_ghcr_run.sh
+BIOLOGIX_AI_IMAGE=ghcr.io/otunmartins/biologix-ai:0.5.27 bash docker_ghcr_run.sh
+```
+
+**Apple Silicon** — pull with the platform flag first to avoid a slow first launch:
+
+```bash
+docker pull --platform linux/amd64 ghcr.io/otunmartins/biologix-ai:0.5.27
+BIOLOGIX_AI_IMAGE=ghcr.io/otunmartins/biologix-ai:0.5.27 bash docker_ghcr_run.sh
+```
+
+**Optional API key at launch:**
+
+```bash
+BIOLOGIX_AI_IMAGE=ghcr.io/otunmartins/biologix-ai:0.5.27 bash docker_ghcr_run.sh -e ANTHROPIC_API_KEY=sk-ant-...
+```
+
+**What happens:** the entrypoint activates the conda env, seeds or builds retrosynthesis data on first run if needed, then starts **OpenCode** with the default **`biologics-delivery-discovery`** agent. Discovery outputs land in `./runs/` on your host. OpenMM structure figures use PyMOL ribbon + polymer sticks (`*_complex_chemviz.png`), not the matplotlib dot preview.
+
+**Launcher notes:**
+
+- Prefer **`curl … -o docker_ghcr_run.sh && bash docker_ghcr_run.sh`** over **`curl … | bash`** — piping stdin can break Docker `-it` on macOS.
+- If the terminal shows gibberish like `35;90;1M` after `docker kill`, run **`reset`** in that tab, then relaunch.
+- For **multi-hour discovery runs**, configure a paid LLM inside OpenCode (`opencode auth login`); avoid relying on the free Zen model (`big-pickle`) for long autonomous sessions.
+
+**Other ways to run:**
+
+```bash
+# Option A — clone repo and use the launcher (same GHCR image, CPU quota + TTY restore)
 git clone https://github.com/otunmartins/biologix-platform.git
 cd biologix-platform
 ./scripts/docker_run.sh
 
-# Option B (recommended, no clone) — download launcher then run it
-# Avoids `curl | bash` TTY issues and GitHub raw-cache surprises. If the terminal
-# shows gibberish from a prior hung session, run `reset` first.
-curl -fsSL https://raw.githubusercontent.com/otunmartins/biologix-platform/main/scripts/docker_ghcr_run.sh -o docker_ghcr_run.sh
-bash docker_ghcr_run.sh
-
-# Option C: raw docker run — MUST use host EXIT trap + stability env vars (Mac/Rosetta)
+# Option B — raw docker run (must set platform on ARM Macs + stability env vars)
 trap 'printf "\e[?1000l\e[?1002l\e[?1003l\e[?1006l"; stty sane 2>/dev/null || true' EXIT
 docker run --platform linux/amd64 -it --rm --init \
   -e OPENMM_CPU_THREADS=1 \
@@ -115,14 +145,14 @@ docker run --platform linux/amd64 -it --rm --init \
   -v "$(pwd)/runs:/app/runs" \
   -v "$(pwd)/papers:/app/papers" \
   -v biologix-data:/app/data \
-  ghcr.io/otunmartins/biologix-ai:0.5.19
+  ghcr.io/otunmartins/biologix-ai:0.5.27
 ```
 
 **Windows (PowerShell)** — same flow; use `${PWD}` instead of `$(pwd)`:
 
 ```powershell
 mkdir runs, papers -Force
-docker pull --platform linux/amd64 ghcr.io/otunmartins/biologix-ai:0.5.19
+docker pull --platform linux/amd64 ghcr.io/otunmartins/biologix-ai:0.5.27
 docker run --platform linux/amd64 -it --rm --init `
   -e OPENMM_CPU_THREADS=1 `
   -e BIOLOGIX_SKIP_ZINC_BRIDGE=1 `
@@ -130,14 +160,10 @@ docker run --platform linux/amd64 -it --rm --init `
   -v "${PWD}/runs:/app/runs" `
   -v "${PWD}/papers:/app/papers" `
   -v biologix-data:/app/data `
-  ghcr.io/otunmartins/biologix-ai:0.5.19
+  ghcr.io/otunmartins/biologix-ai:0.5.27
 ```
 
-**What happens:** the entrypoint activates the conda env, runs first-run data setup if needed, then starts **OpenCode** with the default **`biologics-delivery-discovery`** agent. Discovery outputs land in `./runs/` on your host.
-
-**Option B notes:** Prefer `curl … -o docker_ghcr_run.sh && bash docker_ghcr_run.sh` over `curl … | bash` — piping stdin breaks Docker `-it` on some setups. After `docker kill`, run **`reset`** in the host tab if keyboard input looks wrong.
-
-**LLM access:** sign in or attach a provider from inside OpenCode (`opencode auth login`, or your usual model/provider switch). Optional: pass a key at launch with `-e OPENAI_API_KEY=...` / `-e OPENROUTER_API_KEY=...` / `-e ANTHROPIC_API_KEY=...` if you prefer env-based auth. For **multi-hour discovery runs**, avoid relying on the free OpenCode Zen model (`big-pickle`) — it can stall mid-stream; use Anthropic, OpenAI, or OpenRouter with a configured key.
+**LLM access:** sign in or attach a provider from inside OpenCode (`opencode auth login`, or your usual model/provider switch). Optional: pass a key at launch with `-e OPENAI_API_KEY=...` / `-e OPENROUTER_API_KEY=...` / `-e ANTHROPIC_API_KEY=...` if you prefer env-based auth.
 
 ### Alternative: build locally with Compose
 
