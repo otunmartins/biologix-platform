@@ -11,6 +11,7 @@ from .dependencies import current_user
 from .models import Experiment, User
 from .schemas import ExperimentCreate, ExperimentResponse, LoginRequest, SignupRequest, UserResponse
 from .security import create_token, hash_password, verify_password
+from .queue import enqueue_experiment
 
 
 router = APIRouter(prefix="/api/platform")
@@ -73,6 +74,34 @@ def list_experiments(user: User = Depends(current_user), db: Session = Depends(g
 def create_experiment(payload: ExperimentCreate, user: User = Depends(current_user), db: Session = Depends(get_db)):
     experiment = Experiment(owner_id=user.id, **payload.model_dump())
     db.add(experiment)
+    db.commit()
+    db.refresh(experiment)
+    try:
+        experiment.job_id = enqueue_experiment(str(experiment.id))
+        db.commit()
+        db.refresh(experiment)
+    except Exception as exc:
+        experiment.status = "failed"
+        experiment.error_message = f"Unable to queue experiment: {exc}"
+        db.commit()
+        db.refresh(experiment)
+    return experiment
+
+
+@router.post("/experiments/{experiment_id}/retry", response_model=ExperimentResponse)
+def retry_experiment(experiment_id: uuid.UUID, user: User = Depends(current_user), db: Session = Depends(get_db)):
+    experiment = db.scalar(select(Experiment).where(Experiment.id == experiment_id, Experiment.owner_id == user.id))
+    if not experiment:
+        raise HTTPException(status_code=404, detail="Experiment not found")
+    if experiment.status == "running":
+        raise HTTPException(status_code=409, detail="Experiment is already running")
+    experiment.status = "queued"
+    experiment.progress = 0
+    experiment.current_stage = "queued"
+    experiment.error_message = None
+    experiment.results = None
+    experiment.progress_log = []
+    experiment.job_id = enqueue_experiment(str(experiment.id))
     db.commit()
     db.refresh(experiment)
     return experiment

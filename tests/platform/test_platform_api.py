@@ -11,6 +11,7 @@ from sqlalchemy.pool import StaticPool
 
 from biologix_ai.platform.database import Base, get_db
 from biologix_ai.platform.router import router
+import biologix_ai.platform.router as platform_router
 
 
 engine = create_engine(
@@ -30,6 +31,7 @@ def override_db():
 
 
 app.dependency_overrides[get_db] = override_db
+platform_router.enqueue_experiment = lambda experiment_id: f"job-{experiment_id}"
 
 
 def test_signup_create_and_list_experiment():
@@ -44,6 +46,8 @@ def test_signup_create_and_list_experiment():
     )
     assert response.status_code == 201
     experiment_id = response.json()["id"]
+    assert response.json()["status"] == "queued"
+    assert response.json()["job_id"] == f"job-{experiment_id}"
 
     response = client.get("/api/platform/experiments")
     assert response.status_code == 200
@@ -68,3 +72,13 @@ def test_login_and_logout():
     assert client.get("/api/platform/auth/me").status_code == 401
     assert client.post("/api/platform/auth/login", json={"email": "login@example.com", "password": "wrong"}).status_code == 401
     assert client.post("/api/platform/auth/login", json={"email": "login@example.com", "password": "secure-pass"}).status_code == 200
+
+
+def test_retry_resets_failed_experiment():
+    client = TestClient(app)
+    client.post("/api/platform/auth/signup", json={"email": "retry@example.com", "password": "secure-pass"})
+    created = client.post("/api/platform/experiments", json={"name": "Retry", "biologic_target": "insulin"}).json()
+    response = client.post(f"/api/platform/experiments/{created['id']}/retry")
+    assert response.status_code == 200
+    assert response.json()["status"] == "queued"
+    assert response.json()["progress"] == 0

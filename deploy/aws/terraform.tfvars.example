@@ -1,0 +1,13 @@
+aws_region               = "us-east-1"
+environment              = "production"
+cluster_arn              = "arn:aws:ecs:us-east-1:123456789012:cluster/biologix"
+subnet_ids               = ["subnet-private-a", "subnet-private-b"]
+security_group_ids       = ["sg-application"]
+api_target_group_arn     = "arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/biologix-api/example"
+frontend_target_group_arn = "arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/biologix-web/example"
+api_image                = "123456789012.dkr.ecr.us-east-1.amazonaws.com/biologix-api:release"
+worker_image             = "123456789012.dkr.ecr.us-east-1.amazonaws.com/biologix-api:release"
+frontend_image           = "123456789012.dkr.ecr.us-east-1.amazonaws.com/biologix-web:release"
+database_url_secret_arn  = "arn:aws:secretsmanager:us-east-1:123456789012:secret:biologix/database-url"
+redis_url_secret_arn     = "arn:aws:secretsmanager:us-east-1:123456789012:secret:biologix/redis-url"
+session_secret_arn       = "arn:aws:secretsmanager:us-east-1:123456789012:secret:biologix/session-secret"

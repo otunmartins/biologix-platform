@@ -4,6 +4,7 @@
 .venv-platform/
 frontend/node_modules/
 frontend/.next/
+**/.terraform/
 __pycache__/
 **/__pycache__/
 *.py[cod]

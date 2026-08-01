@@ -16,6 +16,17 @@ services:
       timeout: 5s
       retries: 10
 
+  redis:
+    image: redis:7-alpine
+    command: redis-server --appendonly yes
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
   api:
     build:
       context: .
@@ -24,10 +35,27 @@ services:
       DATABASE_URL: postgresql+psycopg://biologix:biologix@postgres:5432/biologix
       SECRET_KEY: ${SECRET_KEY:-local-development-secret-change-me}
       BIOLOGIX_AI_CORS_ORIGINS: http://localhost:3000
+      REDIS_URL: redis://redis:6379/0
     ports:
       - "8000:8000"
     depends_on:
       postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    command: rq worker biologix --url redis://redis:6379/0
+    environment:
+      DATABASE_URL: postgresql+psycopg://biologix:biologix@postgres:5432/biologix
+      REDIS_URL: redis://redis:6379/0
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
         condition: service_healthy
 
   frontend:
@@ -102,5 +130,6 @@ services:
 
 volumes:
   postgres-data:
+  redis-data:
   opencode-auth:
   biologix-data:

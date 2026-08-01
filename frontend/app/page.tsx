@@ -8,7 +8,13 @@ import { api, Experiment } from "@/lib/api";
 export default function Dashboard() {
   const router = useRouter();
   const [items, setItems] = useState<Experiment[] | null>(null);
-  useEffect(() => { api<Experiment[]>("/experiments").then(setItems).catch(() => router.replace("/login")); }, [router]);
+  useEffect(() => {
+    let active = true;
+    const load = () => api<Experiment[]>("/experiments").then(value => active && setItems(value)).catch(() => router.replace("/login"));
+    load();
+    const timer = window.setInterval(load, 3000);
+    return () => { active = false; window.clearInterval(timer); };
+  }, [router]);
   async function logout() { await api("/auth/logout", { method: "POST" }); router.push("/login"); }
   if (!items) return <div className="loading">Loading workspace</div>;
   return <>

@@ -8,7 +8,7 @@ Docker Desktop or Docker Engine with Compose is required. From the repository ro
 
 ```bash
 cp .env.example .env
-docker compose up --build postgres api frontend
+docker compose up --build postgres redis api worker frontend
 ```
 
 Open `http://localhost:3000`. The API documentation is available at `http://localhost:8000/docs`.

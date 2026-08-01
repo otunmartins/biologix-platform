@@ -36,5 +36,12 @@ class ExperimentResponse(ExperimentCreate):
     id: UUID
     status: ExperimentState
     results: dict | None
+    progress: int
+    current_stage: str | None
+    progress_log: list[dict]
+    error_message: str | None
+    started_at: datetime | None
+    completed_at: datetime | None
+    job_id: str | None
     created_at: datetime
     updated_at: datetime
