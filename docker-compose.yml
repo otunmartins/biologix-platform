@@ -2,6 +2,44 @@
 name: biologix-ai
 
 services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: biologix
+      POSTGRES_USER: biologix
+      POSTGRES_PASSWORD: biologix
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U biologix"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    environment:
+      DATABASE_URL: postgresql+psycopg://biologix:biologix@postgres:5432/biologix
+      SECRET_KEY: ${SECRET_KEY:-local-development-secret-change-me}
+      BIOLOGIX_AI_CORS_ORIGINS: http://localhost:3000
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: frontend
+      args:
+        API_URL: http://api:8000
+    ports:
+      - "3000:3000"
+    depends_on:
+      - api
+
   biologix:
     build:
       context: .
@@ -63,5 +101,6 @@ services:
       - biologix-data:/app/data
 
 volumes:
+  postgres-data:
   opencode-auth:
   biologix-data:

@@ -36,6 +36,7 @@ from biologix_ai.http_api.routers import (
     retrosynthesis,
 )
 from biologix_ai.http_api.sse import router as sse_router
+from biologix_ai.platform.router import router as platform_router
 
 # ---------------------------------------------------------------------------
 # App
@@ -100,6 +101,7 @@ app.include_router(reports.router)
 app.include_router(retrosynthesis.router)
 app.include_router(personas.router)
 app.include_router(sse_router)
+app.include_router(platform_router)
 
 # ---------------------------------------------------------------------------
 # Health (kept on root for backward compatibility)

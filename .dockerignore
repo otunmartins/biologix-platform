@@ -1,6 +1,9 @@
 # ---- Virtual envs and build artefacts ----
 .venv-optuna/
 .venv/
+.venv-platform/
+frontend/node_modules/
+frontend/.next/
 __pycache__/
 **/__pycache__/
 *.py[cod]

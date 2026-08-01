@@ -30,6 +30,8 @@ env/
 
 # Environment variables
 .env
+frontend/node_modules/
+frontend/.next/
 .env.local
 .env.development.local
 .env.test.local
