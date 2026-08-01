@@ -2,7 +2,7 @@ import enum
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import DateTime, Enum, ForeignKey, Integer, JSON, String, Text
+from sqlalchemy import BigInteger, DateTime, Enum, ForeignKey, Integer, JSON, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .database import Base
@@ -51,3 +51,32 @@ class Experiment(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
     owner: Mapped[User] = relationship(back_populates="experiments")
+    artifacts: Mapped[list["ExperimentArtifact"]] = relationship(cascade="all, delete-orphan")
+    events: Mapped[list["ExperimentEvent"]] = relationship(cascade="all, delete-orphan")
+
+
+class ExperimentArtifact(Base):
+    __tablename__ = "experiment_artifacts"
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    experiment_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("experiments.id", ondelete="CASCADE"), index=True)
+    kind: Mapped[str] = mapped_column(String(40))
+    filename: Mapped[str] = mapped_column(String(255))
+    object_key: Mapped[str] = mapped_column(String(700), unique=True)
+    content_type: Mapped[str] = mapped_column(String(120))
+    size_bytes: Mapped[int] = mapped_column(BigInteger)
+    sha256: Mapped[str] = mapped_column(String(64))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class ExperimentEvent(Base):
+    __tablename__ = "experiment_events"
+    __table_args__ = (UniqueConstraint("experiment_id", "sequence", name="uq_experiment_event_sequence"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    experiment_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("experiments.id", ondelete="CASCADE"), index=True)
+    sequence: Mapped[int] = mapped_column(Integer)
+    stage: Mapped[str] = mapped_column(String(120))
+    detail: Mapped[str] = mapped_column(Text)
+    progress: Mapped[int] = mapped_column(Integer)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)

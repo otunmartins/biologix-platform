@@ -24,10 +24,15 @@ def test_candidate_qualification_pipeline_records_progress_and_results():
         assert results["summary"]["psmiles"] == "[*]OCC[*]"
         assert results["validation"]["valid"] is True
         assert results["compliance"]["approved_name"] == "Polyethylene glycol (PEG)"
-        assert experiment.progress == 75
+        assert experiment.progress == 78
         assert [entry["stage"] for entry in experiment.progress_log] == [
+            "capabilities",
             "target_resolution",
             "structure_validation",
             "safety_screen",
             "compliance",
+            "retrosynthesis",
+            "openmm",
         ]
+        assert results["retrosynthesis"]["status"] in {"disabled", "unavailable", "completed", "failed"}
+        assert results["physics"]["status"] in {"disabled", "unavailable", "completed", "failed"}

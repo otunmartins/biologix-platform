@@ -2,16 +2,18 @@ import os
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi.responses import StreamingResponse
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from .database import get_db
 from .dependencies import current_user
-from .models import Experiment, User
-from .schemas import ExperimentCreate, ExperimentResponse, LoginRequest, SignupRequest, UserResponse
+from .models import Experiment, ExperimentArtifact, User
+from .schemas import ArtifactResponse, ExperimentCreate, ExperimentResponse, LoginRequest, SignupRequest, UserResponse
 from .security import create_token, hash_password, verify_password
 from .queue import enqueue_experiment
+from .storage import ArtifactStorage
 
 
 router = APIRouter(prefix="/api/platform")
@@ -105,6 +107,58 @@ def retry_experiment(experiment_id: uuid.UUID, user: User = Depends(current_user
     db.commit()
     db.refresh(experiment)
     return experiment
+
+
+@router.get("/experiments/{experiment_id}/artifacts", response_model=list[ArtifactResponse])
+def list_artifacts(experiment_id: uuid.UUID, user: User = Depends(current_user), db: Session = Depends(get_db)):
+    owned = db.scalar(select(Experiment.id).where(Experiment.id == experiment_id, Experiment.owner_id == user.id))
+    if not owned:
+        raise HTTPException(status_code=404, detail="Experiment not found")
+    return db.scalars(
+        select(ExperimentArtifact)
+        .where(ExperimentArtifact.experiment_id == experiment_id)
+        .order_by(ExperimentArtifact.created_at)
+    ).all()
+
+
+@router.get("/experiments/{experiment_id}/artifacts/{artifact_id}")
+def download_artifact(
+    experiment_id: uuid.UUID,
+    artifact_id: uuid.UUID,
+    user: User = Depends(current_user),
+    db: Session = Depends(get_db),
+):
+    artifact = db.scalar(
+        select(ExperimentArtifact)
+        .join(Experiment, Experiment.id == ExperimentArtifact.experiment_id)
+        .where(
+            ExperimentArtifact.id == artifact_id,
+            ExperimentArtifact.experiment_id == experiment_id,
+            Experiment.owner_id == user.id,
+        )
+    )
+    if not artifact:
+        raise HTTPException(status_code=404, detail="Artifact not found")
+    obj = ArtifactStorage().get(artifact.object_key)
+    return StreamingResponse(
+        obj["Body"].iter_chunks(),
+        media_type=artifact.content_type,
+        headers={"Content-Disposition": f'attachment; filename="{artifact.filename}"'},
+    )
+
+
+@router.get("/worker/status")
+def worker_status(user: User = Depends(current_user)):
+    from rq import Worker
+    from .queue import experiment_queue, redis_connection
+
+    connection = redis_connection()
+    workers = Worker.all(connection=connection, queue=experiment_queue())
+    return {
+        "available": bool(workers),
+        "workers": len(workers),
+        "queued_jobs": experiment_queue().count,
+    }
 
 
 @router.get("/experiments/{experiment_id}", response_model=ExperimentResponse)

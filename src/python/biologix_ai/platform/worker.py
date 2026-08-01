@@ -1,11 +1,17 @@
+import importlib.util
 import json
+import os
+import shutil
 import uuid
 from datetime import datetime, timezone
 
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from .database import SessionLocal
-from .models import Experiment, ExperimentState
+from .models import Experiment, ExperimentArtifact, ExperimentEvent, ExperimentState
+from .reporting import audit_bytes, json_bytes, report_pdf
+from .storage import ArtifactStorage
 
 
 POLYMER_PSMILES = {
@@ -24,9 +30,59 @@ def now():
     return datetime.now(timezone.utc)
 
 
+def enabled(name: str, default: bool = True) -> bool:
+    value = os.getenv(name)
+    if value is None:
+        return default
+    return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def module_available(name: str) -> bool:
+    try:
+        return importlib.util.find_spec(name) is not None
+    except (ImportError, ValueError):
+        return False
+
+
+def scientific_capabilities() -> dict:
+    capabilities = {
+        "rdkit": module_available("rdkit"),
+        "admet_ai": module_available("admet_ai"),
+        "retrosynthesis_agent": module_available("RetroSynAgent"),
+        "aizynthfinder": module_available("aizynthfinder"),
+        "openmm": module_available("openmm"),
+        "packmol": shutil.which("packmol") is not None,
+        "openmm_platform": None,
+    }
+    if capabilities["openmm"]:
+        try:
+            import openmm
+
+            names = [openmm.Platform.getPlatform(i).getName() for i in range(openmm.Platform.getNumPlatforms())]
+            requested = os.getenv("BIOLOGIX_AI_OPENMM_PLATFORM", "auto").upper()
+            if requested != "AUTO" and requested in names:
+                capabilities["openmm_platform"] = requested
+            else:
+                capabilities["openmm_platform"] = next((name for name in ("CUDA", "OpenCL", "CPU", "Reference") if name in names), None)
+            capabilities["openmm_platforms"] = names
+        except Exception as exc:
+            capabilities["openmm_error"] = str(exc)
+    return capabilities
+
+
 def record_progress(db: Session, experiment: Experiment, percent: int, stage: str, detail: str):
+    timestamp = now()
     entries = list(experiment.progress_log or [])
-    entries.append({"timestamp": now().isoformat(), "stage": stage, "detail": detail, "progress": percent})
+    entries.append({"timestamp": timestamp.isoformat(), "stage": stage, "detail": detail, "progress": percent})
+    sequence = db.scalar(select(func.coalesce(func.max(ExperimentEvent.sequence), 0)).where(ExperimentEvent.experiment_id == experiment.id)) + 1
+    db.add(ExperimentEvent(
+        experiment_id=experiment.id,
+        sequence=sequence,
+        stage=stage,
+        detail=detail,
+        progress=percent,
+        created_at=timestamp,
+    ))
     experiment.progress = percent
     experiment.current_stage = stage
     experiment.progress_log = entries
@@ -40,27 +96,73 @@ def resolve_psmiles(polymer_target: str | None) -> str:
     return POLYMER_PSMILES.get(value.lower(), "[*]OCC[*]")
 
 
+def run_retrosynthesis(experiment: Experiment, capabilities: dict) -> dict:
+    if not enabled("SCIENTIFIC_RETROSYNTHESIS_ENABLED"):
+        return {"status": "disabled"}
+    if not capabilities["retrosynthesis_agent"]:
+        return {"status": "unavailable", "reason": "RetroSynthesisAgent is not installed"}
+    from biologix_ai.retrosynthesis.models import RetrosynthesisConstraints, RetrosynthesisRequest
+    from biologix_ai.services.retrosynthesis_service import plan_retrosynthesis
+
+    request = RetrosynthesisRequest(
+        target=experiment.polymer_target or resolve_psmiles(experiment.polymer_target),
+        biologic_target=experiment.biologic_target,
+        constraints=RetrosynthesisConstraints(max_routes=3),
+    )
+    result = plan_retrosynthesis(request)
+    return {"status": "completed", "result": result.model_dump(mode="json")}
+
+
+def run_physics(experiment: Experiment, psmiles: str, capabilities: dict) -> dict:
+    if not enabled("SCIENTIFIC_OPENMM_ENABLED"):
+        return {"status": "disabled"}
+    if not capabilities["openmm"] or not capabilities["packmol"]:
+        return {"status": "unavailable", "reason": "OpenMM and Packmol are required"}
+    from biologix_ai.services.physics_service import run_simulation
+
+    result = run_simulation(
+        [psmiles],
+        biologic_target=experiment.biologic_target,
+        temperature_k=float(experiment.parameters.get("temperature_k", 310.0)),
+        n_steps=int(experiment.parameters.get("md_steps", os.getenv("SCIENTIFIC_OPENMM_STEPS", "100"))),
+    )
+    return {"status": "completed" if not result.get("errors") else "failed", "result": result}
+
+
 def execute_pipeline(experiment: Experiment, db: Session) -> dict:
     from biologix_ai.services.biologic_resolver import lookup_pdb_id
     from biologix_ai.services.compliance_service import check_excipient_compliance
     from biologix_ai.services.psmiles_service import validate_psmiles
     from biologix_ai.services.toxicity_service import screen_monomer
 
-    record_progress(db, experiment, 10, "target_resolution", "Resolving the biologic target")
+    capabilities = scientific_capabilities()
+    record_progress(db, experiment, 5, "capabilities", "Inspecting scientific runtime capabilities")
+    record_progress(db, experiment, 12, "target_resolution", "Resolving the biologic target")
     pdb_id = lookup_pdb_id(experiment.biologic_target)
 
     psmiles = resolve_psmiles(experiment.polymer_target)
-    record_progress(db, experiment, 30, "structure_validation", "Validating the polymer structure")
+    record_progress(db, experiment, 24, "structure_validation", "Validating the polymer structure")
     validation = validate_psmiles(psmiles=psmiles, material_name=experiment.polymer_target or "", crosscheck_web=False)
     if isinstance(validation, str):
         validation = json.loads(validation)
 
-    record_progress(db, experiment, 55, "safety_screen", "Screening the representative repeat unit for structural alerts")
-    monomer_smiles = psmiles.replace("[*]", "C")
-    toxicity = screen_monomer(monomer_smiles)
+    record_progress(db, experiment, 38, "safety_screen", "Running structural and ADMET safety screening")
+    toxicity = screen_monomer(psmiles.replace("[*]", "C"))
 
-    record_progress(db, experiment, 75, "compliance", "Checking regulatory precedent and formulation alerts")
+    record_progress(db, experiment, 50, "compliance", "Checking regulatory precedent and formulation alerts")
     compliance = check_excipient_compliance(psmiles).to_dict()
+
+    record_progress(db, experiment, 62, "retrosynthesis", "Planning available retrosynthesis routes")
+    try:
+        retrosynthesis = run_retrosynthesis(experiment, capabilities)
+    except Exception as exc:
+        retrosynthesis = {"status": "failed", "reason": str(exc)}
+
+    record_progress(db, experiment, 78, "openmm", "Running molecular physics when the runtime supports it")
+    try:
+        physics = run_physics(experiment, psmiles, capabilities)
+    except Exception as exc:
+        physics = {"status": "failed", "reason": str(exc)}
 
     safe = bool(validation.get("valid", False)) and toxicity.safe
     disposition = "recommended" if safe and compliance["overall_status"] == "approved" else "review"
@@ -72,10 +174,42 @@ def execute_pipeline(experiment: Experiment, db: Session) -> dict:
             "polymer_target": experiment.polymer_target,
             "psmiles": psmiles,
         },
+        "capabilities": capabilities,
         "validation": validation,
         "safety": toxicity.model_dump(mode="json"),
         "compliance": compliance,
+        "retrosynthesis": retrosynthesis,
+        "physics": physics,
     }
+
+
+def save_artifact(db: Session, experiment: Experiment, kind: str, filename: str, content_type: str, content: bytes):
+    key = f"experiments/{experiment.owner_id}/{experiment.id}/{uuid.uuid4().hex}/{filename}"
+    stored = ArtifactStorage().put(key, content, content_type)
+    db.add(ExperimentArtifact(
+        experiment_id=experiment.id,
+        kind=kind,
+        filename=filename,
+        object_key=stored.key,
+        content_type=content_type,
+        size_bytes=stored.size,
+        sha256=stored.sha256,
+    ))
+    db.commit()
+
+
+def create_artifacts(db: Session, experiment: Experiment, results: dict):
+    events = db.scalars(select(ExperimentEvent).where(ExperimentEvent.experiment_id == experiment.id).order_by(ExperimentEvent.sequence)).all()
+    audit = [{
+        "sequence": event.sequence,
+        "timestamp": event.created_at.isoformat(),
+        "stage": event.stage,
+        "detail": event.detail,
+        "progress": event.progress,
+    } for event in events]
+    save_artifact(db, experiment, "results", "results.json", "application/json", json_bytes(results))
+    save_artifact(db, experiment, "audit", "audit.jsonl", "application/x-ndjson", audit_bytes(audit))
+    save_artifact(db, experiment, "report", "report.pdf", "application/pdf", report_pdf(experiment.name, results))
 
 
 def run_experiment(experiment_id: str):
@@ -90,11 +224,16 @@ def run_experiment(experiment_id: str):
         try:
             results = execute_pipeline(experiment, db)
             experiment.results = results
+            record_progress(db, experiment, 92, "artifacts", "Generating report, results, and audit artifacts")
+            try:
+                create_artifacts(db, experiment, results)
+            except Exception as exc:
+                results["artifact_error"] = str(exc)
+                experiment.results = results
+                db.commit()
             experiment.status = ExperimentState.done
-            experiment.progress = 100
-            experiment.current_stage = "complete"
             experiment.completed_at = now()
-            record_progress(db, experiment, 100, "complete", "Scientific screening completed")
+            record_progress(db, experiment, 100, "complete", "Scientific workflow completed")
             return results
         except Exception as exc:
             experiment.status = ExperimentState.failed

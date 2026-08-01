@@ -47,8 +47,8 @@ pip_in_env install -e "extern/admet_ai"
 
 echo ""
 echo "=== Ensuring biologix-ai retro + admet extras ==="
-pip_in_env install -e ".[retro,admet,dev]"
-pip_in_env install -U "pydantic>=2.10" "pydantic-core>=2.27" mcp[cli]
+pip_in_env install -e ".[api,retro,admet,dev]"
+pip_in_env install -U "pydantic>=2.10" "pydantic-core>=2.27" "mcp[cli]>=1.0.0,<2.0.0"
 
 echo ""
 echo "=== Installing precursor database dependencies ==="
@@ -64,7 +64,12 @@ echo "  Tier 1: manual polymer-chemistry essentials (offline)"
 echo "  Tier 2: SMiPoly 1,083 polymer monomers (GitHub)"
 echo "  Tier 3: Molport InChIKey set — resumable HuggingFace snapshot + local parse"
 echo "  Tier 4: ZINC bridge verification (h5py + zinc_stock.hdf5)"
-conda_run python scripts/build_precursor_db.py --tiers 1,2,3,4
+if [[ "${SLIM:-0}" = "1" ]]; then
+  echo "Slim build: preparing local precursor tiers only"
+  conda_run python scripts/build_precursor_db.py --tiers 1,2
+else
+  conda_run python scripts/build_precursor_db.py --tiers 1,2,3,4
+fi
 
 echo ""
 echo "=== Submodule install done ==="

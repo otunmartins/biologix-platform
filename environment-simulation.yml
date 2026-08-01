@@ -40,7 +40,7 @@ dependencies:
     - psp>=0.0.5                   # optional PSP MoleculeBuilder (psp_polymer_build.py)
 
     # --- MCP server (FastMCP bundled in mcp>=1.0; [cli] adds typer/rich for mcp.run()) ---
-    - mcp[cli]>=1.0.0
+    - mcp[cli]>=1.0.0,<2.0.0
 
     # --- HTTP / web ---
     - requests>=2.28.0

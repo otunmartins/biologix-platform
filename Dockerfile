@@ -43,16 +43,17 @@ WORKDIR /app
 # ─────────────────────────────────────────────────────────────────────────────
 FROM base AS conda-env
 
-# Copy only the env spec first for maximum cache re-use
-COPY environment-simulation.yml ./
-
-# -e . requires pyproject.toml, which is not copied until the app stage.
-# install_submodules.sh already runs: pip install -e ".[retro,admet,dev]"
-RUN sed '/^[[:space:]]*- -e \.$/d' environment-simulation.yml > /tmp/environment-docker.yml \
-    && mamba env create -f /tmp/environment-docker.yml \
+# Resolve compiled packages in bounded waves to control solver memory.
+RUN mamba create -n biologix-ai-sim -y -c conda-forge python=3.11 pip \
+    && mamba install -n biologix-ai-sim -y -c conda-forge openmm pdbfixer packmol \
+    && mamba install -n biologix-ai-sim -y -c conda-forge rdkit \
+    && mamba install -n biologix-ai-sim -y -c conda-forge "openff-units>=0.2" "openff-toolkit-base>=0.18.0" \
+    && (mamba install -n biologix-ai-sim -y -c conda-forge "ambertools>=24.8=*nompi*" || mamba install -n biologix-ai-sim -y -c conda-forge ambertools) \
     && mamba install -n biologix-ai-sim -y -c conda-forge "git>=2.40" \
     && /opt/conda/envs/biologix-ai-sim/bin/git --version \
-    && /opt/conda/envs/biologix-ai-sim/bin/python -m pip install "mcp[cli]>=1.0.0" \
+    && /opt/conda/envs/biologix-ai-sim/bin/python -m pip install \
+       "mcp[cli]>=1.0.0,<2.0.0" "openmmforcefields>=0.14.0" \
+       "psmiles @ git+https://github.com/FermiQ/psmiles.git" "psp>=0.0.5" \
     && /opt/conda/envs/biologix-ai-sim/bin/python -c "from importlib.metadata import version; from mcp.server.fastmcp import FastMCP; print('mcp', version('mcp'))" \
     && mamba create -n pymol-viz -y -c conda-forge python=3.11 pymol-open-source \
     && PYMOL_HEADLESS=1 /opt/conda/envs/pymol-viz/bin/pymol -c -d "quit" \
@@ -123,6 +124,6 @@ RUN if [ -d /app/data ]; then cp -a /app/data /app/.data-seed; fi
 # Strip Windows CRLF line-endings that a Windows clone may have introduced,
 # then make the entrypoint executable.
 RUN sed -i 's/\r$//' /app/docker/entrypoint.sh /app/docker/restore_terminal.sh /app/docker/cpu_defaults.sh /app/scripts/*.sh 2>/dev/null || true \
-    && chmod +x /app/docker/entrypoint.sh /app/docker/restore_terminal.sh /app/scripts/docker_cpu_limit.sh /app/scripts/docker_run.sh /app/scripts/docker_compose_run.sh /app/scripts/host_docker_tty_guard.sh
+    && chmod +x /app/docker/entrypoint.sh /app/docker/restore_terminal.sh /app/scripts/*.sh
 
 ENTRYPOINT ["/app/docker/entrypoint.sh"]

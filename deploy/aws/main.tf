@@ -1,10 +1,42 @@
 locals {
   name = "biologix-${var.environment}"
+  artifact_environment = [
+    { name = "S3_BUCKET", value = aws_s3_bucket.artifacts.id },
+    { name = "AWS_REGION", value = var.aws_region }
+  ]
   common_secrets = [
     { name = "DATABASE_URL", valueFrom = var.database_url_secret_arn },
     { name = "REDIS_URL", valueFrom = var.redis_url_secret_arn },
     { name = "SECRET_KEY", valueFrom = var.session_secret_arn }
   ]
+}
+
+resource "aws_s3_bucket" "artifacts" {
+  bucket = var.artifact_bucket_name
+}
+
+resource "aws_s3_bucket_public_access_block" "artifacts" {
+  bucket                  = aws_s3_bucket.artifacts.id
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+}
+
+resource "aws_s3_bucket_server_side_encryption_configuration" "artifacts" {
+  bucket = aws_s3_bucket.artifacts.id
+  rule {
+    apply_server_side_encryption_by_default {
+      sse_algorithm = "AES256"
+    }
+  }
+}
+
+resource "aws_s3_bucket_versioning" "artifacts" {
+  bucket = aws_s3_bucket.artifacts.id
+  versioning_configuration {
+    status = "Enabled"
+  }
 }
 
 resource "aws_cloudwatch_log_group" "api" {
@@ -56,6 +88,19 @@ resource "aws_iam_role" "task" {
   })
 }
 
+resource "aws_iam_role_policy" "artifact_access" {
+  name = "artifact-storage"
+  role = aws_iam_role.task.id
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect   = "Allow"
+      Action   = ["s3:GetObject", "s3:PutObject", "s3:ListBucket"]
+      Resource = [aws_s3_bucket.artifacts.arn, "${aws_s3_bucket.artifacts.arn}/*"]
+    }]
+  })
+}
+
 resource "aws_ecs_task_definition" "api" {
   family                   = "${local.name}-api"
   requires_compatibilities = ["FARGATE"]
@@ -67,7 +112,7 @@ resource "aws_ecs_task_definition" "api" {
   container_definitions = jsonencode([{
     name             = "api", image = var.api_image, essential = true
     portMappings     = [{ containerPort = 8000, protocol = "tcp" }]
-    environment      = [{ name = "COOKIE_SECURE", value = "true" }]
+    environment      = concat([{ name = "COOKIE_SECURE", value = "true" }], local.artifact_environment)
     secrets          = local.common_secrets
     healthCheck      = { command = ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/openapi.json')\""], interval = 30, timeout = 5, retries = 3, startPeriod = 60 }
     logConfiguration = { logDriver = "awslogs", options = { awslogs-group = aws_cloudwatch_log_group.api.name, awslogs-region = var.aws_region, awslogs-stream-prefix = "api" } }
@@ -84,7 +129,8 @@ resource "aws_ecs_task_definition" "worker" {
   task_role_arn            = aws_iam_role.task.arn
   container_definitions = jsonencode([{
     name             = "worker", image = var.worker_image, essential = true
-    command          = ["rq", "worker", "biologix"]
+    command          = ["/app/scripts/start_worker.sh"]
+    environment      = local.artifact_environment
     secrets          = local.common_secrets
     logConfiguration = { logDriver = "awslogs", options = { awslogs-group = aws_cloudwatch_log_group.worker.name, awslogs-region = var.aws_region, awslogs-stream-prefix = "worker" } }
   }])

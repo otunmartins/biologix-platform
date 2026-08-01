@@ -45,3 +45,14 @@ class ExperimentResponse(ExperimentCreate):
     job_id: str | None
     created_at: datetime
     updated_at: datetime
+
+
+class ArtifactResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: UUID
+    kind: str
+    filename: str
+    content_type: str
+    size_bytes: int
+    sha256: str
+    created_at: datetime

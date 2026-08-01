@@ -17,6 +17,10 @@ variable "frontend_image" { type = string }
 variable "database_url_secret_arn" { type = string }
 variable "redis_url_secret_arn" { type = string }
 variable "session_secret_arn" { type = string }
+variable "artifact_bucket_name" {
+  type        = string
+  description = "Globally unique private S3 bucket used for experiment artifacts"
+}
 variable "api_desired_count" {
   type    = number
   default = 2

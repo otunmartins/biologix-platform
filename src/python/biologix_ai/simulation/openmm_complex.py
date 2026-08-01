@@ -14,6 +14,7 @@ import os
 import sys
 import tempfile
 import time
+from functools import lru_cache
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -48,8 +49,9 @@ def register_stage_heartbeat_hook(hook: Optional[Any]) -> None:
     _STAGE_HEARTBEAT_HOOK = hook
 
 
+@lru_cache(maxsize=1)
 def _cpu_platform():
-    """Return the OpenMM CPU platform with a fixed thread count.
+    """Select the requested OpenMM platform and fall back to CPU.
 
     Under Rosetta 2 (linux/amd64 Docker on Apple Silicon), sched_getaffinity
     returns inconsistent values across process boundaries.  OpenMM's CPU
@@ -63,10 +65,28 @@ def _cpu_platform():
     """
     import openmm  # noqa: PLC0415 — lazy to avoid import at module level before optional dep check
 
-    n_threads = os.environ.get("OPENMM_CPU_THREADS", "1")
-    platform = openmm.Platform.getPlatformByName("CPU")
-    platform.setPropertyDefaultValue("Threads", n_threads)
-    return platform
+    requested = os.environ.get("BIOLOGIX_AI_OPENMM_PLATFORM", "auto").strip().upper()
+    candidates = [requested] if requested not in {"", "AUTO"} else ["CUDA", "OpenCL", "CPU"]
+    if "CPU" not in candidates:
+        candidates.append("CPU")
+    failures = []
+    for name in candidates:
+        try:
+            platform = openmm.Platform.getPlatformByName(name)
+            if name == "CPU":
+                platform.setPropertyDefaultValue("Threads", os.environ.get("OPENMM_CPU_THREADS", "1"))
+            if name == "CUDA":
+                platform.setPropertyDefaultValue("Precision", os.environ.get("OPENMM_CUDA_PRECISION", "mixed"))
+            system = openmm.System()
+            system.addParticle(1.0)
+            integrator = openmm.VerletIntegrator(0.001)
+            context = openmm.Context(system, integrator, platform)
+            del context, integrator
+            logger.info("Selected OpenMM platform %s", name)
+            return platform
+        except Exception as exc:
+            failures.append(f"{name}: {exc}")
+    raise RuntimeError("No usable OpenMM platform: " + "; ".join(failures))
 
 
 def clear_stage_heartbeat_hook() -> None:

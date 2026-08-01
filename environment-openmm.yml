@@ -25,7 +25,7 @@ dependencies:
     - psmiles @ git+https://github.com/FermiQ/psmiles.git
     - psp>=0.0.5
     - requests>=2.28.0
-    - mcp[cli]>=1.0.0
+    - mcp[cli]>=1.0.0,<2.0.0
     - fpdf2>=2.8.0
     - markdown>=3.5
     - pytest>=7.4.0

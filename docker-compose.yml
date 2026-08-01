@@ -27,6 +27,23 @@ services:
       timeout: 5s
       retries: 10
 
+  minio:
+    image: minio/minio:RELEASE.2025-07-23T15-54-02Z
+    command: server /data --console-address :9001
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-biologix}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-biologix-local-storage}
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
   api:
     build:
       context: .
@@ -36,6 +53,10 @@ services:
       SECRET_KEY: ${SECRET_KEY:-local-development-secret-change-me}
       BIOLOGIX_AI_CORS_ORIGINS: http://localhost:3000
       REDIS_URL: redis://redis:6379/0
+      S3_ENDPOINT_URL: http://minio:9000
+      S3_BUCKET: biologix-artifacts
+      AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER:-biologix}
+      AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:-biologix-local-storage}
     ports:
       - "8000:8000"
     depends_on:
@@ -43,19 +64,34 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      minio:
+        condition: service_healthy
 
   worker:
     build:
       context: .
-      dockerfile: Dockerfile.api
-    command: rq worker biologix --url redis://redis:6379/0
+      dockerfile: Dockerfile
+      args:
+        SLIM: ${SLIM:-1}
+    command: /app/scripts/start_worker.sh
     environment:
       DATABASE_URL: postgresql+psycopg://biologix:biologix@postgres:5432/biologix
       REDIS_URL: redis://redis:6379/0
+      S3_ENDPOINT_URL: http://minio:9000
+      S3_BUCKET: biologix-artifacts
+      AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER:-biologix}
+      AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:-biologix-local-storage}
+      SCIENTIFIC_RETROSYNTHESIS_ENABLED: ${SCIENTIFIC_RETROSYNTHESIS_ENABLED:-true}
+      SCIENTIFIC_OPENMM_ENABLED: ${SCIENTIFIC_OPENMM_ENABLED:-true}
+      SCIENTIFIC_OPENMM_STEPS: ${SCIENTIFIC_OPENMM_STEPS:-100}
+      BIOLOGIX_AI_OPENMM_PLATFORM: ${BIOLOGIX_AI_OPENMM_PLATFORM:-auto}
+      STALE_JOB_MINUTES: ${STALE_JOB_MINUTES:-45}
     depends_on:
       postgres:
         condition: service_healthy
       redis:
+        condition: service_healthy
+      minio:
         condition: service_healthy
 
   frontend:
@@ -131,5 +167,6 @@ services:
 volumes:
   postgres-data:
   redis-data:
+  minio-data:
   opencode-auth:
   biologix-data:

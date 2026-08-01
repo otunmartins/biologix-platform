@@ -11,3 +11,4 @@ frontend_image           = "123456789012.dkr.ecr.us-east-1.amazonaws.com/biologi
 database_url_secret_arn  = "arn:aws:secretsmanager:us-east-1:123456789012:secret:biologix/database-url"
 redis_url_secret_arn     = "arn:aws:secretsmanager:us-east-1:123456789012:secret:biologix/redis-url"
 session_secret_arn       = "arn:aws:secretsmanager:us-east-1:123456789012:secret:biologix/session-secret"
+artifact_bucket_name     = "biologix-production-artifacts-example"
