@@ -35,7 +35,7 @@ from fastapi.responses import StreamingResponse
 
 router = APIRouter(tags=["Streaming"])
 
-_ROOT = Path(os.environ.get("BIOLOGIX_AI_ROOT", Path(__file__).parents[6]))
+_ROOT = Path(os.environ.get("BIOLOGIX_AI_ROOT") or Path(__file__).resolve().parents[4])
 _RUNS = _ROOT / "runs"
 
 _POLL_INTERVAL = 0.5   # seconds between file-tail polls

@@ -14,6 +14,8 @@ from fastapi import APIRouter, HTTPException
 from biologix_ai.http_api.schemas import PersonaPreset
 from biologix_ai.persona_presets import PERSONA_MAP, PERSONAS
 
+_PERSONAS = PERSONAS
+
 router = APIRouter(prefix="/api/personas", tags=["Personas"])
 
 
