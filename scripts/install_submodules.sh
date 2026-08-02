@@ -41,8 +41,9 @@ pip_in_env install -e "extern/aizynthfinder"
 
 echo ""
 echo "=== Installing ADMET-AI from submodule ==="
-# Pin torch below 2.12 — 2.12+ can hit circular-import failures in torch.utils._pytree on import.
-pip_in_env install "torch>=2.8.0,<2.12"
+# Keep the worker portable. GPU deployments can replace this wheel with the
+# matching CUDA build without changing the application image contract.
+pip_in_env install --index-url https://download.pytorch.org/whl/cpu "torch>=2.8.0,<2.12"
 pip_in_env install -e "extern/admet_ai"
 
 echo ""

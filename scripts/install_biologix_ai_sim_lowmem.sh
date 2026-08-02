@@ -78,10 +78,8 @@ if ! check_conda_pkg openff-toolkit-base && ! check_conda_pkg openff-toolkit; th
 fi
 
 echo "Wave 4/5: AmberTools (antechamber + parmchk2 for GAFF templates)..."
-echo "      Large conda solve — install fast solver first: bash scripts/install_micromamba.sh"
-if ! wave_install "ambertools>=24.8=*nompi*" 2>/dev/null; then
-  wave_install ambertools
-fi
+echo "      AmberTools 23.3 preserves Python 3.11 and Packmol compatibility."
+wave_install "ambertools=23.3"
 if ! check_conda_pkg ambertools; then
   echo "ERROR: Wave 4 failed — ambertools not installed in ${ENV_NAME}" >&2
   repair_hint

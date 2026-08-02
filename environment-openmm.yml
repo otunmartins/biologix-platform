@@ -12,7 +12,7 @@ dependencies:
   - packmol
   - openff-toolkit>=0.18.0       # conda-forge only
   - openff-units>=0.2            # conda-forge only
-  - ambertools
+  - ambertools=23.3
   - pip
 
   - pip:

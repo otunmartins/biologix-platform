@@ -433,10 +433,10 @@ def lookup_material(material_name: str, max_results: int = 5) -> str:
 
 @mcp.tool()
 def validate_psmiles(
-    ctx: Context,
     psmiles: Union[str, List[Any]],
     material_name: str = "",
     crosscheck_web: bool = False,
+    ctx: Optional[Context] = None,
 ) -> str:
     """
     Validate, annotate functional groups, and check name-structure consistency of a PSMILES.
@@ -2874,12 +2874,12 @@ def get_funnel_context(
 
 @mcp.tool()
 def save_pipeline_stage(
-    ctx: Context,
     candidate_psmiles: str,
     stage: str,
     disposition: str,
     detail: str = "",
     run_dir: str = "",
+    ctx: Optional[Context] = None,
 ) -> str:
     """Append an audit record for one pipeline stage applied to one candidate.
 

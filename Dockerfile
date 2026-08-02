@@ -45,10 +45,10 @@ FROM base AS conda-env
 
 # Resolve compiled packages in bounded waves to control solver memory.
 RUN mamba create -n biologix-ai-sim -y -c conda-forge python=3.11 pip \
-    && mamba install -n biologix-ai-sim -y -c conda-forge openmm pdbfixer packmol \
+    && mamba install -n biologix-ai-sim -y -c conda-forge "ambertools=23.3" \
+    && mamba install -n biologix-ai-sim -y -c conda-forge openmm pdbfixer \
     && mamba install -n biologix-ai-sim -y -c conda-forge rdkit \
     && mamba install -n biologix-ai-sim -y -c conda-forge "openff-units>=0.2" "openff-toolkit-base>=0.18.0" \
-    && (mamba install -n biologix-ai-sim -y -c conda-forge "ambertools>=24.8=*nompi*" || mamba install -n biologix-ai-sim -y -c conda-forge ambertools) \
     && mamba install -n biologix-ai-sim -y -c conda-forge "git>=2.40" \
     && /opt/conda/envs/biologix-ai-sim/bin/git --version \
     && /opt/conda/envs/biologix-ai-sim/bin/python -m pip install \
@@ -78,22 +78,19 @@ COPY . .
 RUN git submodule update --init --recursive 2>/dev/null || true
 
 # Environment wiring
-ENV CONDA_ENV=biologix-ai-sim
-ENV PYTHONPATH=/app/src/python
-ENV RETRO_LLM_BACKEND=skip
-ENV BIOLOGIX_AI_AIZYNTH_CONFIG=/app/data/aizynthfinder/config.yml
-ENV PATH="/opt/conda/envs/biologix-ai-sim/bin:/root/.opencode/bin:${PATH}"
-ENV CONDA_DEFAULT_ENV=biologix-ai-sim
-# Conda-forge C++ libs (libLerc, graphviz) require newer libstdc++ than the base image.
-ENV LD_LIBRARY_PATH=/opt/conda/envs/biologix-ai-sim/lib
-ENV BIOLOGIX_AI_IMAGE_VERSION=${IMAGE_VERSION}
-ENV OPENCODE_DISABLE_AUTOUPDATE=true
-# Resumable Molport tier-3 downloads during Docker build (avoid HF CDN 408 on streaming).
-ENV HF_HUB_DOWNLOAD_TIMEOUT=600
-ENV HF_HUB_ETAG_TIMEOUT=60
-ENV HF_HUB_ENABLE_HF_TRANSFER=1
-# Make conda activate work inside RUN steps
-ENV BASH_ENV=/opt/conda/etc/profile.d/conda.sh
+ENV CONDA_ENV=biologix-ai-sim \
+    PYTHONPATH=/app/src/python \
+    RETRO_LLM_BACKEND=skip \
+    BIOLOGIX_AI_AIZYNTH_CONFIG=/app/data/aizynthfinder/config.yml \
+    PATH="/opt/conda/envs/biologix-ai-sim/bin:/root/.opencode/bin:${PATH}" \
+    CONDA_DEFAULT_ENV=biologix-ai-sim \
+    LD_LIBRARY_PATH=/opt/conda/envs/biologix-ai-sim/lib \
+    BIOLOGIX_AI_IMAGE_VERSION=${IMAGE_VERSION} \
+    OPENCODE_DISABLE_AUTOUPDATE=true \
+    HF_HUB_DOWNLOAD_TIMEOUT=600 \
+    HF_HUB_ETAG_TIMEOUT=60 \
+    HF_HUB_ENABLE_HF_TRANSFER=1 \
+    BASH_ENV=/opt/conda/etc/profile.d/conda.sh
 
 # Install submodules, torch, precursor DB, and the project package into the env
 RUN source /opt/conda/etc/profile.d/conda.sh && conda activate biologix-ai-sim \
