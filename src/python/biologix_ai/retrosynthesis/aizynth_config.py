@@ -24,4 +24,47 @@ def get_configfile() -> Optional[str]:
 
 
 def models_ready() -> bool:
-    return get_configfile() is not None
+    configfile = get_configfile()
+    if configfile is None:
+        return False
+
+    try:
+        lines = Path(configfile).read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return False
+
+    paths: list[str] = []
+    counts = {"expansion": 0, "filter": 0, "stock": 0}
+    section = ""
+    for raw_line in lines:
+        stripped = raw_line.strip()
+        if not stripped or stripped.startswith("#"):
+            continue
+        if not raw_line[0].isspace() and stripped.endswith(":"):
+            section = stripped[:-1]
+            continue
+        if section == "expansion" and stripped.startswith("- "):
+            paths.append(stripped[2:].strip().strip("'\""))
+            counts[section] += 1
+        elif section in {"filter", "stock"} and ":" in stripped:
+            value = stripped.split(":", 1)[1].strip().strip("'\"")
+            if value:
+                paths.append(value)
+                counts[section] += 1
+
+    if counts["expansion"] < 2 or counts["filter"] < 1 or counts["stock"] < 1:
+        return False
+
+    config_dir = Path(configfile).parent
+    for configured_path in paths:
+        if not isinstance(configured_path, str) or not configured_path.strip():
+            return False
+        path = Path(configured_path).expanduser()
+        if not path.is_absolute():
+            path = config_dir / path
+        try:
+            if not path.is_file() or path.stat().st_size == 0:
+                return False
+        except OSError:
+            return False
+    return True

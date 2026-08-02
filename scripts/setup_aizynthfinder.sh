@@ -10,11 +10,6 @@ source "$SCRIPT_DIR/install_lib.sh"
 DEST="$REPO_ROOT/data/aizynthfinder"
 mkdir -p "$DEST"
 
-if [[ -f "$DEST/config.yml" ]]; then
-  echo "AiZynthFinder config already present at $DEST/config.yml"
-  exit 0
-fi
-
 if ! conda_run python -c "import aizynthfinder" 2>/dev/null; then
   echo "Installing AiZynthFinder package into ${ENV_NAME}..."
   pip_in_env install paretoset
@@ -43,12 +38,11 @@ download_file() {
   while (( attempt <= max_attempts )); do
     echo "Downloading ${name} (attempt ${attempt}/${max_attempts}) ..."
     # Do not use --retry-all-errors: curl in condaforge/miniforge3 base is too old for it.
-    if curl -fL --retry 5 --retry-delay 5 \
+    if curl -fL --retry 5 --retry-delay 5 --continue-at - \
       --connect-timeout 30 --max-time 7200 \
       -o "$dest" "$url"; then
       return 0
     fi
-    rm -f "$dest"
     echo "  Download failed; retrying in $((attempt * 20))s ..."
     sleep $((attempt * 20))
     ((attempt++))
@@ -62,7 +56,11 @@ echo "Downloading public data to $DEST ..."
 for entry in "${AIZYNTH_FILES[@]}"; do
   name="${entry%%|*}"
   url="${entry#*|}"
-  download_file "$url" "$DEST/$name" "$name"
+  if [[ -s "$DEST/$name" ]]; then
+    echo "Using existing ${name}"
+  else
+    download_file "$url" "$DEST/$name" "$name"
+  fi
 done
 
 abs_dest="$(cd "$DEST" && pwd)"
@@ -81,4 +79,6 @@ stock:
 EOF
 
 echo "Configuration file written to $DEST/config.yml"
+conda_run env BIOLOGIX_AI_AIZYNTH_CONFIG="$DEST/config.yml" python -c \
+  "from biologix_ai.retrosynthesis.aizynth_config import models_ready; raise SystemExit(0 if models_ready() else 1)"
 echo "Done. Set BIOLOGIX_AI_AIZYNTH_CONFIG=$DEST/config.yml"

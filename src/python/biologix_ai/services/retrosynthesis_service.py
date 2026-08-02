@@ -45,7 +45,7 @@ _SMILES_TOKENS = re.compile(r"\[\*\]|\[C|=O|=S|#N|\(C\)|\(=")
 
 _PDF_DOWNLOAD_TIMEOUT = int(os.environ.get("BIOLOGIX_PDF_TIMEOUT", "60"))
 _TREE_CONSTRUCT_TIMEOUT = int(os.environ.get("BIOLOGIX_TREE_TIMEOUT", "120"))
-_AIZYNTH_TIMEOUT = int(os.environ.get("BIOLOGIX_AIZYNTH_TIMEOUT", "180"))
+_AIZYNTH_TIMEOUT = int(os.environ.get("BIOLOGIX_AIZYNTH_TIMEOUT", "360"))
 
 
 def _is_smiles_like(name: str) -> bool:

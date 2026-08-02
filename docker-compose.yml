@@ -85,7 +85,12 @@ services:
       SCIENTIFIC_OPENMM_ENABLED: ${SCIENTIFIC_OPENMM_ENABLED:-true}
       SCIENTIFIC_OPENMM_STEPS: ${SCIENTIFIC_OPENMM_STEPS:-100}
       BIOLOGIX_AI_OPENMM_PLATFORM: ${BIOLOGIX_AI_OPENMM_PLATFORM:-auto}
+      BIOLOGIX_AIZYNTH_TIMEOUT: ${BIOLOGIX_AIZYNTH_TIMEOUT:-360}
+      BIOLOGIX_PLATFORM_RUNS_DIR: /app/runs/platform
       STALE_JOB_MINUTES: ${STALE_JOB_MINUTES:-45}
+    volumes:
+      - ./runs:/app/runs
+      - ./data:/app/data
     depends_on:
       postgres:
         condition: service_healthy
@@ -148,7 +153,7 @@ services:
       # Retrosynthesis subprocess wall clocks (PDF download, KG tree, AiZynthFinder)
       - BIOLOGIX_PDF_TIMEOUT=${BIOLOGIX_PDF_TIMEOUT:-60}
       - BIOLOGIX_TREE_TIMEOUT=${BIOLOGIX_TREE_TIMEOUT:-300}
-      - BIOLOGIX_AIZYNTH_TIMEOUT=${BIOLOGIX_AIZYNTH_TIMEOUT:-180}
+      - BIOLOGIX_AIZYNTH_TIMEOUT=${BIOLOGIX_AIZYNTH_TIMEOUT:-360}
       # Pass through provider keys from host env if not already in .env
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}

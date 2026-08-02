@@ -4,6 +4,7 @@ import os
 import shutil
 import uuid
 from datetime import datetime, timezone
+from pathlib import Path
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -102,15 +103,46 @@ def run_retrosynthesis(experiment: Experiment, capabilities: dict) -> dict:
     if not capabilities["retrosynthesis_agent"]:
         return {"status": "unavailable", "reason": "RetroSynthesisAgent is not installed"}
     from biologix_ai.retrosynthesis.models import RetrosynthesisConstraints, RetrosynthesisRequest
+    from biologix_ai.retrosynthesis.retro_adapter import normalize_extractions, write_llm_res
     from biologix_ai.services.retrosynthesis_service import plan_retrosynthesis
 
+    parameters = experiment.parameters or {}
+    material_name = str(
+        parameters.get("retrosynthesis_material_name")
+        or experiment.polymer_target
+        or ""
+    ).strip()
+    session_root = os.getenv("BIOLOGIX_PLATFORM_RUNS_DIR", "/app/runs/platform")
+    session_dir = os.path.join(session_root, str(experiment.id))
+    os.makedirs(session_dir, exist_ok=True)
+
+    extractions = parameters.get("retrosynthesis_extractions")
+    if extractions:
+        normalized = normalize_extractions(extractions)
+        write_llm_res(
+            Path(session_dir),
+            material_name,
+            normalized,
+            target_psmiles=resolve_psmiles(experiment.polymer_target),
+        )
+
     request = RetrosynthesisRequest(
-        target=experiment.polymer_target or resolve_psmiles(experiment.polymer_target),
+        target=material_name or resolve_psmiles(experiment.polymer_target),
         biologic_target=experiment.biologic_target,
         constraints=RetrosynthesisConstraints(max_routes=3),
+        session_dir=session_dir,
     )
     result = plan_retrosynthesis(request)
-    return {"status": "completed", "result": result.model_dump(mode="json")}
+    payload = result.model_dump(mode="json")
+    if result.errors:
+        status = "failed"
+    elif result.metadata.get("requires_agent_extractions"):
+        status = "requires_input"
+    elif not result.polymer_routes:
+        status = "no_routes"
+    else:
+        status = "completed"
+    return {"status": status, "result": payload}
 
 
 def run_physics(experiment: Experiment, psmiles: str, capabilities: dict) -> dict:

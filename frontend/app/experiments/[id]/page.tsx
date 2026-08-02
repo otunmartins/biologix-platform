@@ -10,7 +10,7 @@ type Results = {
   validation?: Record<string, unknown>;
   safety?: { safe?: boolean; warnings?: string[] };
   compliance?: { overall_status?: string; approved_name?: string; jurisdictions_matched?: string[] };
-  retrosynthesis?: { status?: string; reason?: string; result?: { routes?: unknown[] } };
+  retrosynthesis?: { status?: string; reason?: string; result?: { polymer_routes?: unknown[]; warnings?: string[] } };
   physics?: { status?: string; reason?: string; result?: Record<string, unknown> };
   capabilities?: Record<string, unknown>;
 };
@@ -36,7 +36,8 @@ export default function Detail() {
   if (!item) return <div className="loading">Loading experiment</div>;
 
   const results = item.results as Results | undefined;
-  const routeCount = results?.retrosynthesis?.result?.routes?.length;
+  const routeCount = results?.retrosynthesis?.result?.polymer_routes?.length;
+  const retrosynthesisNote = results?.retrosynthesis?.reason || results?.retrosynthesis?.result?.warnings?.[0];
   const capabilities = results?.capabilities
     ? Object.entries(results.capabilities).filter(([, value]) => value === true).map(([name]) => name.replaceAll("_", " "))
     : [];
@@ -60,7 +61,7 @@ export default function Detail() {
       <div className="result-grid"><article><span>Disposition</span><strong>{String(results.summary?.disposition || "Review")}</strong></article><article><span>Structure</span><strong>{results.validation?.valid ? "Valid" : "Review"}</strong></article><article><span>Safety screen</span><strong>{results.safety?.safe ? "Passed" : "Alerts found"}</strong></article><article><span>Compliance</span><strong>{results.compliance?.overall_status || "Unknown"}</strong></article></div>
       <div className="science-grid">
         <div className="panel result-detail"><h2>Regulatory context</h2><p>{results.compliance?.approved_name || "No approved excipient match found."}</p><p>{results.compliance?.jurisdictions_matched?.join(", ") || "No jurisdiction match"}</p>{results.safety?.warnings?.map(note => <p className="warning" key={note}>{note}</p>)}</div>
-        <div className="panel result-detail"><h2>Retrosynthesis</h2><p className="result-status">{results.retrosynthesis?.status || "Not run"}</p><p>{routeCount !== undefined ? `${routeCount} candidate routes returned` : results.retrosynthesis?.reason || "No route summary available"}</p></div>
+        <div className="panel result-detail"><h2>Retrosynthesis</h2><p className="result-status">{results.retrosynthesis?.status?.replaceAll("_", " ") || "Not run"}</p><p>{routeCount ? `${routeCount} candidate routes returned` : retrosynthesisNote || "No route summary available"}</p></div>
         <div className="panel result-detail"><h2>Molecular physics</h2><p className="result-status">{results.physics?.status || "Not run"}</p><p>{results.physics?.reason || (results.physics?.result ? "Simulation results are included in the report" : "No simulation summary available")}</p></div>
         <div className="panel result-detail"><h2>Scientific runtime</h2><p>{capabilities.length ? capabilities.join(", ") : "Core validation runtime"}</p></div>
       </div>

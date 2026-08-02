@@ -47,8 +47,8 @@ pip_in_env install --index-url https://download.pytorch.org/whl/cpu "torch>=2.8.
 pip_in_env install -e "extern/admet_ai"
 
 echo ""
-echo "=== Ensuring biologix-ai retro + admet extras ==="
-pip_in_env install -e ".[api,retro,admet,dev]"
+echo "=== Ensuring biologix-ai scientific extras ==="
+pip_in_env install -e ".[api,retro,admet,llm,rl,benchmark,dev]"
 pip_in_env install -U "pydantic>=2.10" "pydantic-core>=2.27" "mcp[cli]>=1.0.0,<2.0.0"
 
 echo ""

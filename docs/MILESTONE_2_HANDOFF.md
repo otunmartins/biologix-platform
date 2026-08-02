@@ -8,7 +8,7 @@ Creating an experiment places a job on the Redis `biologix` queue. An RQ worker 
 2. Resolve and validate the polymer PSMILES repeat unit with RDKit.
 3. Screen the representative repeat unit against the toxicity SMARTS library.
 4. Check excipient precedent, jurisdictions, immunogenicity, and aggregation alerts.
-5. Plan retrosynthesis routes when RetroSynthesisAgent is available.
+5. Plan extraction backed polymer routes with RetroSynthesisAgent and enrich eligible monomers with AiZynthFinder.
 6. Run molecular physics when OpenMM and Packmol are available.
 7. Generate a PDF report, structured results, and an immutable audit trail.
 
@@ -21,7 +21,13 @@ cp .env.example .env
 docker compose up --build postgres redis minio api worker frontend
 ```
 
-Open `http://localhost:3000`, create an account, and submit an experiment. `Human insulin` with `PEG` exercises the complete supported path.
+Open `http://localhost:3000`, create an account, and submit an experiment. `Human insulin` with `PEG` exercises target resolution, structure validation, ADMET, compliance, OpenMM, progress, reports, and artifact storage.
+
+Retrosynthesis has two distinct inputs. RetroSynthesisAgent builds the polymer route from reaction extractions tied to a session. AiZynthFinder then plans small molecule routes for eligible leaf monomers. A polymer name alone is not reaction evidence, so an experiment without extractions reports `requires_input` rather than presenting an empty route as completed.
+
+AiZynthFinder loads a large public stock and can use several gigabytes of memory while starting. The worker allows six minutes per monomer by default. Set `BIOLOGIX_AIZYNTH_TIMEOUT` higher on slower emulated environments or lower after measuring startup on the production worker image.
+
+API clients can provide verified reaction extractions in `parameters.retrosynthesis_extractions` and the matching polymer name in `parameters.retrosynthesis_material_name`. The worker validates the payload, stores it in the experiment session, builds the polymer route, and invokes AiZynthFinder for eligible monomers. The setup script downloads the public AiZynthFinder models and validates every configured asset before the worker starts.
 
 When running the worker directly on macOS, use the nonforking worker class because RDKit can conflict with the Objective C runtime after a process fork:
 
@@ -82,7 +88,7 @@ The check creates an isolated account, submits an insulin and PEG experiment, wa
 
 RQ retains successful job metadata for one day and failed metadata for seven days. PostgreSQL remains the authoritative experiment record. Scale workers independently from the API. Worker startup requeues experiments that remained in the running state beyond `STALE_JOB_MINUTES`. The default is 45 minutes.
 
-The worker selects CUDA, OpenCL, CPU, or Reference in that order when automatic platform selection is enabled. CPU is the normal fallback. The API image stays small and does not contain the scientific environment.
+The worker selects CUDA, OpenCL, CPU, or Reference in that order when automatic platform selection is enabled. CPU is the normal fallback. The API image stays small and does not contain the scientific environment. The worker mounts `runs` for retrosynthesis sessions and `data` for model persistence.
 
 ## Verification
 
@@ -99,4 +105,10 @@ Run the complete scientific suite in the conda environment:
 mamba run -n biologix-ai-sim pytest
 ```
 
-The structured result payload records capability availability and the status of every optional stage. An unavailable optional dependency is reported as unavailable and is never presented as a completed scientific calculation.
+Verify both retrosynthesis layers against the installed public model assets:
+
+```bash
+python scripts/verify_retrosynthesis.py --require-models
+```
+
+The structured result payload records capability availability and the status of every optional stage. An unavailable dependency is reported as unavailable. Retrosynthesis without required extraction evidence is reported as `requires_input`. Neither condition is presented as a completed scientific calculation.
