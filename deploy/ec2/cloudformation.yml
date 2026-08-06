@@ -10,8 +10,8 @@ Parameters:
     Default: milestone-2
   InstanceType:
     Type: String
-    Default: t3a.large
-    AllowedValues: [t3a.medium, t3a.large]
+    Default: m7i-flex.large
+    AllowedValues: [m7i-flex.large, c7i-flex.large, t3a.medium, t3a.large]
   VpcId:
     Type: AWS::EC2::VPC::Id
     Default: vpc-0e31e1e28793c0d96
@@ -114,6 +114,7 @@ Resources:
           set -euxo pipefail
           dnf install -y docker git awscli cronie
           systemctl enable --now docker crond
+          mkdir -p /usr/local/lib/docker/cli-plugins
           curl -fsSL https://github.com/docker/compose/releases/download/v2.39.1/docker-compose-linux-x86_64 -o /usr/local/lib/docker/cli-plugins/docker-compose
           chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
           mkdir -p /opt/biologix
