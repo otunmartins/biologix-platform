@@ -112,7 +112,7 @@ resource "aws_ecs_task_definition" "api" {
   container_definitions = jsonencode([{
     name             = "api", image = var.api_image, essential = true
     portMappings     = [{ containerPort = 8000, protocol = "tcp" }]
-    environment      = concat([{ name = "COOKIE_SECURE", value = "true" }], local.artifact_environment)
+    environment      = concat([{ name = "COOKIE_SECURE", value = "true" }, { name = "ADMIN_EMAILS", value = var.admin_emails }], local.artifact_environment)
     secrets          = local.common_secrets
     healthCheck      = { command = ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/openapi.json')\""], interval = 30, timeout = 5, retries = 3, startPeriod = 60 }
     logConfiguration = { logDriver = "awslogs", options = { awslogs-group = aws_cloudwatch_log_group.api.name, awslogs-region = var.aws_region, awslogs-stream-prefix = "api" } }

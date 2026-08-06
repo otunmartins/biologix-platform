@@ -82,3 +82,25 @@ def test_retry_resets_failed_experiment():
     assert response.status_code == 200
     assert response.json()["status"] == "queued"
     assert response.json()["progress"] == 0
+
+
+def test_admin_dashboard_is_allowlisted_and_can_inspect_experiments(monkeypatch):
+    monkeypatch.setenv("ADMIN_EMAILS", "admin@example.com")
+    owner = TestClient(app)
+    admin = TestClient(app)
+    outsider = TestClient(app)
+    owner.post("/api/platform/auth/signup", json={"email": "dashboard-owner@example.com", "password": "secure-pass"})
+    created = owner.post(
+        "/api/platform/experiments",
+        json={"name": "Admin visible", "biologic_target": "insulin"},
+    ).json()
+    admin.post("/api/platform/auth/signup", json={"email": "admin@example.com", "password": "secure-pass"})
+    outsider.post("/api/platform/auth/signup", json={"email": "outsider@example.com", "password": "secure-pass"})
+
+    assert outsider.get("/api/platform/admin/users").status_code == 403
+    assert admin.get("/api/platform/auth/me").json()["is_admin"] is True
+    assert admin.get("/api/platform/admin/users").status_code == 200
+    experiments = admin.get("/api/platform/admin/experiments")
+    assert experiments.status_code == 200
+    assert created["id"] in {item["id"] for item in experiments.json()}
+    assert admin.get(f"/api/platform/experiments/{created['id']}").status_code == 200

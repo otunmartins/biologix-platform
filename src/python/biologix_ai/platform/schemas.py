@@ -21,6 +21,39 @@ class UserResponse(BaseModel):
     id: UUID
     email: EmailStr
     created_at: datetime
+    is_admin: bool = False
+
+
+class AdminOverview(BaseModel):
+    users: int
+    experiments: int
+    queued: int
+    running: int
+    done: int
+    failed: int
+    workers: int
+    queued_jobs: int
+    worker_available: bool
+    queue_error: str | None = None
+
+
+class AdminUserResponse(UserResponse):
+    experiment_count: int
+
+
+class AdminExperimentResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: UUID
+    owner_email: EmailStr
+    name: str
+    biologic_target: str
+    polymer_target: str | None
+    status: ExperimentState
+    progress: int
+    current_stage: str | None
+    error_message: str | None
+    created_at: datetime
+    updated_at: datetime
 
 
 class ExperimentCreate(BaseModel):

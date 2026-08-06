@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
-import { api, Experiment } from "@/lib/api";
+import { api, Experiment, User } from "@/lib/api";
 
 type StatusFilter = "all" | Experiment["status"];
 
@@ -12,6 +12,7 @@ export default function Dashboard() {
   const [items, setItems] = useState<Experiment[] | null>(null);
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState<StatusFilter>("all");
+  const [me, setMe] = useState<User | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -19,6 +20,7 @@ export default function Dashboard() {
       .then(value => active && setItems(value))
       .catch(() => router.replace("/login"));
     load();
+    api<User>("/auth/me").then(value => active && setMe(value)).catch(() => undefined);
     const timer = window.setInterval(load, 3000);
     return () => { active = false; window.clearInterval(timer); };
   }, [router]);
@@ -42,7 +44,7 @@ export default function Dashboard() {
   return <>
     <div className="page-head">
       <div><p className="eyebrow">Experiment history</p><h1>Your discovery work</h1><p className="muted">Create, review and revisit every scientific experiment.</p></div>
-      <div className="actions"><button className="quiet" onClick={logout}>Sign out</button><Link className="button" href="/experiments/new">New experiment</Link></div>
+      <div className="actions">{me?.is_admin && <Link className="quiet button-link" href="/admin">Admin</Link>}<button className="quiet" onClick={logout}>Sign out</button><Link className="button" href="/experiments/new">New experiment</Link></div>
     </div>
     {items.length === 0 ? <section className="empty"><div className="flask" aria-hidden="true">⌬</div><h2>No experiments yet</h2><p>Set up your first discovery campaign and it will appear here.</p><Link className="button" href="/experiments/new">Create experiment</Link></section> : <>
       <section className="workspace-tools" aria-label="Experiment filters">

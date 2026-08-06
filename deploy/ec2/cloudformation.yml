@@ -1,0 +1,169 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Low-cost single-host Biologix Milestone 2 deployment
+
+Parameters:
+  AdminEmails:
+    Type: String
+    Description: Comma-separated account emails allowed to use /admin
+  RepositoryBranch:
+    Type: String
+    Default: milestone-2
+  InstanceType:
+    Type: String
+    Default: t3a.large
+    AllowedValues: [t3a.medium, t3a.large]
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+    Default: vpc-0e31e1e28793c0d96
+  SubnetId:
+    Type: AWS::EC2::Subnet::Id
+    Default: subnet-03429932011994c99
+  LatestAmiId:
+    Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
+    Default: /aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64
+
+Resources:
+  ArtifactBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault: { SSEAlgorithm: AES256 }
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      VersioningConfiguration: { Status: Enabled }
+      LifecycleConfiguration:
+        Rules:
+          - Id: ExpireDatabaseBackups
+            Status: Enabled
+            Prefix: database-backups/
+            ExpirationInDays: 30
+          - Id: ExpireOldBackupVersions
+            Status: Enabled
+            NoncurrentVersionExpiration: { NoncurrentDays: 30 }
+
+  SecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: HTTPS access to Biologix
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - { IpProtocol: tcp, FromPort: 80, ToPort: 80, CidrIp: 0.0.0.0/0 }
+        - { IpProtocol: tcp, FromPort: 443, ToPort: 443, CidrIp: 0.0.0.0/0 }
+      SecurityGroupEgress:
+        - { IpProtocol: "-1", CidrIp: 0.0.0.0/0 }
+      Tags:
+        - { Key: Name, Value: biologix-production }
+
+  InstanceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal: { Service: ec2.amazonaws.com }
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+      Policies:
+        - PolicyName: BiologixArtifacts
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: [s3:GetObject, s3:PutObject, s3:ListBucket]
+                Resource: [!GetAtt ArtifactBucket.Arn, !Sub "${ArtifactBucket.Arn}/*"]
+
+  InstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles: [!Ref InstanceRole]
+
+  Instance:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: !Ref LatestAmiId
+      InstanceType: !Ref InstanceType
+      IamInstanceProfile: !Ref InstanceProfile
+      SubnetId: !Ref SubnetId
+      SecurityGroupIds: [!Ref SecurityGroup]
+      DisableApiTermination: true
+      MetadataOptions:
+        HttpEndpoint: enabled
+        HttpTokens: required
+        HttpPutResponseHopLimit: 2
+      BlockDeviceMappings:
+        - DeviceName: /dev/xvda
+          Ebs:
+            VolumeType: gp3
+            VolumeSize: 60
+            Encrypted: true
+            DeleteOnTermination: false
+      Tags:
+        - { Key: Name, Value: biologix-production }
+        - { Key: Project, Value: biologix }
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          set -euxo pipefail
+          dnf install -y docker git awscli cronie
+          systemctl enable --now docker crond
+          curl -fsSL https://github.com/docker/compose/releases/download/v2.39.1/docker-compose-linux-x86_64 -o /usr/local/lib/docker/cli-plugins/docker-compose
+          chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
+          mkdir -p /opt/biologix
+          git clone --depth 1 --branch '${RepositoryBranch}' https://github.com/otunmartins/biologix-platform.git /opt/biologix/app
+          cd /opt/biologix/app
+          POSTGRES_PASSWORD=$(openssl rand -hex 24)
+          SECRET_KEY=$(openssl rand -hex 48)
+          TOKEN=$(curl -fsS -X PUT -H 'X-aws-ec2-metadata-token-ttl-seconds: 21600' http://169.254.169.254/latest/api/token)
+          for attempt in $(seq 1 30); do
+            PUBLIC_IP=$(curl -fsS -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/meta-data/public-ipv4 || true)
+            test -n "$PUBLIC_IP" && break
+            sleep 2
+          done
+          cat > deploy/ec2/.env <<ENV
+          POSTGRES_PASSWORD=$POSTGRES_PASSWORD
+          SECRET_KEY=$SECRET_KEY
+          ADMIN_EMAILS=${AdminEmails}
+          S3_BUCKET=${ArtifactBucket}
+          AWS_REGION=${AWS::Region}
+          DOMAIN=$PUBLIC_IP.sslip.io
+          ENV
+          chmod 600 deploy/ec2/.env
+          cd deploy/ec2
+          docker compose --env-file .env up -d --build
+          cat > /opt/biologix/backup.sh <<'BACKUP'
+          #!/bin/bash
+          set -euo pipefail
+          cd /opt/biologix/app/deploy/ec2
+          stamp=$(date -u +%Y%m%dT%H%M%SZ)
+          docker compose --env-file .env exec -T postgres pg_dump -U biologix -d biologix | gzip | aws s3 cp - "s3://${ArtifactBucket}/database-backups/biologix-$stamp.sql.gz"
+          BACKUP
+          chmod 700 /opt/biologix/backup.sh
+          echo '17 2 * * * root /opt/biologix/backup.sh >> /var/log/biologix-backup.log 2>&1' > /etc/cron.d/biologix-backup
+
+  ElasticIp:
+    Type: AWS::EC2::EIP
+    Properties:
+      Domain: vpc
+      InstanceId: !Ref Instance
+      Tags:
+        - { Key: Name, Value: biologix-production }
+
+Outputs:
+  ApplicationUrl:
+    Value: !Sub "https://${ElasticIp}.sslip.io"
+  AdminUrl:
+    Value: !Sub "https://${ElasticIp}.sslip.io/admin"
+  InstanceId:
+    Value: !Ref Instance
+  ArtifactBucketName:
+    Value: !Ref ArtifactBucket
+  MonthlyBaseline:
+    Value: Approximately USD 64/month at current us-east-1 on-demand rates before data transfer and taxes

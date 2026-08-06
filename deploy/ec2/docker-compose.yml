@@ -1,0 +1,115 @@
+name: biologix-production
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: biologix
+      POSTGRES_USER: biologix
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U biologix"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy noeviction
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  api:
+    build:
+      context: ../..
+      dockerfile: Dockerfile.api
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql+psycopg://biologix:${POSTGRES_PASSWORD}@postgres:5432/biologix
+      REDIS_URL: redis://redis:6379/0
+      SECRET_KEY: ${SECRET_KEY}
+      COOKIE_SECURE: "true"
+      ADMIN_EMAILS: ${ADMIN_EMAILS}
+      S3_BUCKET: ${S3_BUCKET}
+      AWS_REGION: ${AWS_REGION}
+      BIOLOGIX_AI_CORS_ORIGINS: https://${DOMAIN}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+
+  worker:
+    platform: linux/amd64
+    build:
+      context: ../..
+      dockerfile: Dockerfile.worker
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql+psycopg://biologix:${POSTGRES_PASSWORD}@postgres:5432/biologix
+      REDIS_URL: redis://redis:6379/0
+      S3_BUCKET: ${S3_BUCKET}
+      AWS_REGION: ${AWS_REGION}
+      SCIENTIFIC_RETROSYNTHESIS_ENABLED: "true"
+      SCIENTIFIC_OPENMM_ENABLED: "true"
+      SCIENTIFIC_OPENMM_STEPS: "100"
+      BIOLOGIX_AI_OPENMM_PLATFORM: CPU
+      OPENMM_CPU_THREADS: "1"
+      BIOLOGIX_AIZYNTH_TIMEOUT: "360"
+      BIOLOGIX_PLATFORM_RUNS_DIR: /app/runs/platform
+      STALE_JOB_MINUTES: "45"
+    volumes:
+      - worker-runs:/app/runs
+      - worker-data:/app/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ../../frontend
+      args:
+        API_URL: http://api:8000
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    environment:
+      DOMAIN: ${DOMAIN}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - frontend
+
+volumes:
+  postgres-data:
+  redis-data:
+  worker-runs:
+  worker-data:
+  caddy-data:
+  caddy-config:

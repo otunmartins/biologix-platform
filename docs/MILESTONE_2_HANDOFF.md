@@ -53,6 +53,8 @@ The Application Load Balancer should route `/api/*` to the API target group and 
 
 Store each production value as a plain secret value in Secrets Manager. Grant human access narrowly. The Terraform execution role grants the ECS agent access only to the three secret ARNs supplied to the module.
 
+Set `admin_emails` to a comma-separated allowlist of client operator email addresses. After signing in with one of those accounts, the **Admin** link opens `/admin`, which shows PostgreSQL-backed user and experiment records plus queue and worker health. The dashboard is read-only; it never exposes password hashes, session secrets, database credentials, or arbitrary SQL access.
+
 Build and publish both images to ECR:
 
 ```bash

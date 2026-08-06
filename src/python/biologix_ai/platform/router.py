@@ -3,14 +3,24 @@ import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 from fastapi.responses import StreamingResponse
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from .database import get_db
-from .dependencies import current_user
+from .dependencies import admin_user, current_user, is_admin
 from .models import Experiment, ExperimentArtifact, User
-from .schemas import ArtifactResponse, ExperimentCreate, ExperimentResponse, LoginRequest, SignupRequest, UserResponse
+from .schemas import (
+    AdminExperimentResponse,
+    AdminOverview,
+    AdminUserResponse,
+    ArtifactResponse,
+    ExperimentCreate,
+    ExperimentResponse,
+    LoginRequest,
+    SignupRequest,
+    UserResponse,
+)
 from .security import create_token, hash_password, verify_password
 from .queue import enqueue_experiment
 from .storage import ArtifactStorage
@@ -62,7 +72,65 @@ def logout(response: Response):
 
 @router.get("/auth/me", response_model=UserResponse)
 def me(user: User = Depends(current_user)):
-    return user
+    response = UserResponse.model_validate(user).model_dump()
+    response["is_admin"] = is_admin(user)
+    return response
+
+
+@router.get("/admin/overview", response_model=AdminOverview)
+def admin_overview(_: User = Depends(admin_user), db: Session = Depends(get_db)):
+    counts = dict(db.execute(select(Experiment.status, func.count()).group_by(Experiment.status)).all())
+    queue = {"workers": 0, "queued_jobs": 0, "worker_available": False, "queue_error": None}
+    try:
+        from rq import Worker
+        from .queue import experiment_queue, redis_connection
+
+        experiment_queue_instance = experiment_queue()
+        workers = Worker.all(connection=redis_connection(), queue=experiment_queue_instance)
+        queue.update(workers=len(workers), queued_jobs=experiment_queue_instance.count, worker_available=bool(workers))
+    except Exception as exc:
+        queue["queue_error"] = str(exc)
+    return {
+        "users": db.scalar(select(func.count()).select_from(User)) or 0,
+        "experiments": db.scalar(select(func.count()).select_from(Experiment)) or 0,
+        **{state: counts.get(state, 0) for state in ("queued", "running", "done", "failed")},
+        **queue,
+    }
+
+
+@router.get("/admin/users", response_model=list[AdminUserResponse])
+def admin_users(_: User = Depends(admin_user), db: Session = Depends(get_db)):
+    rows = db.execute(
+        select(User, func.count(Experiment.id))
+        .outerjoin(Experiment, Experiment.owner_id == User.id)
+        .group_by(User.id)
+        .order_by(User.created_at.desc())
+        .limit(100)
+    ).all()
+    return [{**UserResponse.model_validate(user).model_dump(), "experiment_count": count} for user, count in rows]
+
+
+@router.get("/admin/experiments", response_model=list[AdminExperimentResponse])
+def admin_experiments(_: User = Depends(admin_user), db: Session = Depends(get_db)):
+    rows = db.execute(
+        select(Experiment, User.email)
+        .join(User, User.id == Experiment.owner_id)
+        .order_by(Experiment.created_at.desc())
+        .limit(200)
+    ).all()
+    return [{
+        "id": experiment.id,
+        "owner_email": email,
+        "name": experiment.name,
+        "biologic_target": experiment.biologic_target,
+        "polymer_target": experiment.polymer_target,
+        "status": experiment.status,
+        "progress": experiment.progress,
+        "current_stage": experiment.current_stage,
+        "error_message": experiment.error_message,
+        "created_at": experiment.created_at,
+        "updated_at": experiment.updated_at,
+    } for experiment, email in rows]
 
 
 @router.get("/experiments", response_model=list[ExperimentResponse])
@@ -111,7 +179,10 @@ def retry_experiment(experiment_id: uuid.UUID, user: User = Depends(current_user
 
 @router.get("/experiments/{experiment_id}/artifacts", response_model=list[ArtifactResponse])
 def list_artifacts(experiment_id: uuid.UUID, user: User = Depends(current_user), db: Session = Depends(get_db)):
-    owned = db.scalar(select(Experiment.id).where(Experiment.id == experiment_id, Experiment.owner_id == user.id))
+    ownership_query = select(Experiment.id).where(Experiment.id == experiment_id)
+    if not is_admin(user):
+        ownership_query = ownership_query.where(Experiment.owner_id == user.id)
+    owned = db.scalar(ownership_query)
     if not owned:
         raise HTTPException(status_code=404, detail="Experiment not found")
     return db.scalars(
@@ -128,15 +199,14 @@ def download_artifact(
     user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
-    artifact = db.scalar(
+    query = (
         select(ExperimentArtifact)
         .join(Experiment, Experiment.id == ExperimentArtifact.experiment_id)
-        .where(
-            ExperimentArtifact.id == artifact_id,
-            ExperimentArtifact.experiment_id == experiment_id,
-            Experiment.owner_id == user.id,
-        )
+        .where(ExperimentArtifact.id == artifact_id, ExperimentArtifact.experiment_id == experiment_id)
     )
+    if not is_admin(user):
+        query = query.where(Experiment.owner_id == user.id)
+    artifact = db.scalar(query)
     if not artifact:
         raise HTTPException(status_code=404, detail="Artifact not found")
     obj = ArtifactStorage().get(artifact.object_key)
@@ -163,9 +233,10 @@ def worker_status(user: User = Depends(current_user)):
 
 @router.get("/experiments/{experiment_id}", response_model=ExperimentResponse)
 def get_experiment(experiment_id: uuid.UUID, user: User = Depends(current_user), db: Session = Depends(get_db)):
-    experiment = db.scalar(
-        select(Experiment).where(Experiment.id == experiment_id, Experiment.owner_id == user.id)
-    )
+    query = select(Experiment).where(Experiment.id == experiment_id)
+    if not is_admin(user):
+        query = query.where(Experiment.owner_id == user.id)
+    experiment = db.scalar(query)
     if not experiment:
         raise HTTPException(status_code=404, detail="Experiment not found")
     return experiment

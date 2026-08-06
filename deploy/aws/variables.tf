@@ -21,6 +21,10 @@ variable "artifact_bucket_name" {
   type        = string
   description = "Globally unique private S3 bucket used for experiment artifacts"
 }
+variable "admin_emails" {
+  type        = string
+  description = "Comma-separated email addresses allowed to access the operations dashboard"
+}
 variable "api_desired_count" {
   type    = number
   default = 2

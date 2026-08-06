@@ -12,3 +12,4 @@ database_url_secret_arn  = "arn:aws:secretsmanager:us-east-1:123456789012:secret
 redis_url_secret_arn     = "arn:aws:secretsmanager:us-east-1:123456789012:secret:biologix/redis-url"
 session_secret_arn       = "arn:aws:secretsmanager:us-east-1:123456789012:secret:biologix/session-secret"
 artifact_bucket_name     = "biologix-production-artifacts-example"
+admin_emails             = "client@example.com"
