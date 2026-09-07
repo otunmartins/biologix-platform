@@ -184,7 +184,13 @@ def _pubchem_smiles(name: str) -> Optional[str]:
             body = json.loads(resp.read())
         props = body.get("PropertyTable", {}).get("Properties", [])
         if props:
-            return props[0].get("IsomericSMILES")
+            # PubChem renamed the response key: an IsomericSMILES request now comes
+            # back as "SMILES". Reading only the requested name silently returned
+            # None for every compound.
+            for key in ("SMILES", "IsomericSMILES", "ConnectivitySMILES", "CanonicalSMILES"):
+                value = props[0].get(key)
+                if value:
+                    return str(value)
     except Exception:
         pass
     return None

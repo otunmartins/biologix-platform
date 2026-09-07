@@ -35,6 +35,7 @@ requests>=2.28.0
 duckduckgo-search>=8.0.0
 
 # --- LLM clients ---
+anthropic>=1.0
 ollama>=0.2
 langchain>=0.2
 langchain-core>=0.2

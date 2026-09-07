@@ -306,19 +306,97 @@ def _strip_poly_prefix(name: str) -> str:
     return s.strip()
 
 
+def _atom_counts(smiles: str) -> Optional[Dict[str, int]]:
+    """Element counts including implicit hydrogens."""
+    try:
+        from collections import Counter
+
+        from rdkit import Chem
+    except ImportError:
+        return None
+    mol = Chem.MolFromSmiles(smiles)
+    if mol is None:
+        return None
+    counts: Dict[str, int] = Counter()
+    for atom in mol.GetAtoms():
+        if atom.GetAtomicNum() == 0:
+            continue
+        counts[atom.GetSymbol()] += 1
+        counts["H"] += atom.GetTotalNumHs()
+    return dict(counts)
+
+
+def _repeat_unit_counts(psmiles: str) -> Optional[Dict[str, int]]:
+    """Element counts of the bare repeat unit, without the capping hydrogens."""
+    counts = _atom_counts(_cap_psmiles(psmiles, cap="[H]"))
+    if counts is None:
+        return None
+    counts = dict(counts)
+    counts["H"] = counts.get("H", 0) - psmiles.count("[*]")
+    if counts["H"] < 0:
+        return None
+    return {element: n for element, n in counts.items() if n > 0}
+
+
+def _difference(minuend: Dict[str, int], subtrahend: Dict[str, int]) -> Dict[str, int]:
+    out = dict(minuend)
+    for element, n in subtrahend.items():
+        out[element] = out.get(element, 0) - n
+    return {element: n for element, n in out.items() if n != 0}
+
+
+def _compare_repeat_to_monomer(psmiles: str, ref_smiles: str) -> Dict[str, Any]:
+    """Composition check between a repeat unit and its monomer reference.
+
+    A capped repeat unit is a different molecule from its monomer, so fingerprint
+    similarity between them is low even when the PSMILES is exactly right - the
+    canonical structures for PEG, PLGA and PVA all scored below the old 0.4
+    warning threshold. Composition is the meaningful comparison: addition and
+    ring-opening polymerisation conserve the monomer formula, and condensation
+    loses one water per bond formed.
+    """
+    repeat = _repeat_unit_counts(psmiles)
+    monomer = _atom_counts(ref_smiles)
+    result: Dict[str, Any] = {"repeat_unit": repeat, "monomer": monomer}
+    if not repeat or not monomer:
+        result["relation"] = "unknown"
+        return result
+    if repeat == monomer:
+        result["relation"] = "conserved"
+    elif _difference(monomer, repeat) == {"H": 2, "O": 1}:
+        result["relation"] = "condensation_water_loss"
+    else:
+        result["relation"] = "mismatch"
+        result["difference"] = _difference(monomer, repeat)
+    return result
+
+
 def _apply_pubchem_similarity(out: Dict[str, Any], psmiles: Optional[str]) -> None:
-    """Add Tanimoto similarity and optional warning to a PubChem result dict."""
+    """Compare the PSMILES repeat unit against the PubChem monomer reference."""
     if not psmiles or not out.get("ok"):
         return
     ref_smiles = out.get("pubchem_smiles") or ""
     if not ref_smiles:
         return
-    sim = _tanimoto_similarity(ref_smiles, _cap_psmiles(psmiles, cap="[H]"))
-    out["similarity"] = sim
-    if sim is not None and sim < 0.4:
+    # Reported for information; see _compare_repeat_to_monomer for why it is not
+    # used as a pass/fail signal.
+    out["similarity"] = _tanimoto_similarity(ref_smiles, _cap_psmiles(psmiles, cap="[H]"))
+    if "." in ref_smiles:
+        # Copolymer references come back as multi-component mixtures, which no
+        # single repeat unit can match.
+        out["composition_check"] = {
+            "relation": "reference_is_a_mixture",
+            "reference": ref_smiles,
+        }
+        return
+    comparison = _compare_repeat_to_monomer(psmiles, ref_smiles)
+    out["composition_check"] = comparison
+    if comparison["relation"] == "mismatch":
         out["warning"] = (
-            f"Low Tanimoto similarity ({sim:.2f}) between PubChem reference "
-            f"and capped PSMILES; the PSMILES may not represent this material."
+            f"Repeat unit composition {comparison['repeat_unit']} does not match the "
+            f"PubChem reference {comparison['monomer']} for this name, and the difference "
+            f"{comparison.get('difference')} is not a condensation water loss; "
+            "the PSMILES may not represent this material."
         )
 
 

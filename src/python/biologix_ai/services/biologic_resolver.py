@@ -32,7 +32,36 @@ _NAME_TO_PDB: Dict[str, str] = {
     "nivolumab": "5WT9",
     "ustekinumab": "3HMW",
     "omalizumab": "4HKI",
+    "cas9": "4CMP",
+    "crispr cas9": "4CMP",
+    "crispr-cas9": "4CMP",
+    "streptococcus pyogenes cas9": "4CMP",
+    # Common non-antibody biologics. "Lysozyme" ships as an example in the
+    # experiment form, so it must resolve without a network round trip.
+    "lysozyme": "1LYZ",
+    "hen egg white lysozyme": "1LYZ",
+    "human lysozyme": "1REX",
+    "albumin": "1AO6",
+    "human serum albumin": "1AO6",
+    "hsa": "1AO6",
+    "somatropin": "1HGU",
+    "human growth hormone": "1HGU",
+    "hgh": "1HGU",
+    "erythropoietin": "1BUY",
+    "epo": "1BUY",
+    "interferon alpha": "1ITF",
+    "interferon beta": "1AU1",
+    "filgrastim": "1RHG",
+    "g-csf": "1RHG",
+    "glucagon": "1GCN",
+    "factor viii": "2R7E",
+    "asparaginase": "3ECA",
+    "urate oxidase": "1R4U",
+    "rasburicase": "1R4U",
 }
+
+_SEARCH_URL = "https://search.rcsb.org/rcsbsearch/v2/query"
+_search_cache: Dict[str, str] = {}
 
 _PDB_CODE_RE = re.compile(r"^([0-9]{1}[A-Za-z0-9]{3})$", re.IGNORECASE)
 
@@ -58,15 +87,97 @@ def _normalize_name_key(name: str) -> str:
     return " ".join(name.strip().lower().split())
 
 
-def lookup_pdb_id(name_or_pdb: str) -> str:
-    """Map a common name to a PDB ID, or pass through a valid PDB code."""
-    raw = name_or_pdb.strip()
+def _search_rcsb(name: str) -> str:
+    """Best-match PDB entry from the RCSB full-text index.
+
+    Without this the resolver only knew a fixed handful of names and returned an
+    empty id for everything else, leaving the physics stage with no structure.
+    """
+    if name in _search_cache:
+        return _search_cache[name]
+    payload = {
+        "query": {
+            "type": "terminal",
+            "service": "full_text",
+            "parameters": {"value": name},
+        },
+        "return_type": "entry",
+        "request_options": {
+            "paginate": {"start": 0, "rows": 1},
+            "sort": [{"sort_by": "score", "direction": "desc"}],
+        },
+    }
+    found = ""
+    try:
+        response = requests.post(_SEARCH_URL, json=payload, timeout=10)
+        if response.ok:
+            results = response.json().get("result_set") or []
+            if results:
+                found = str(results[0].get("identifier", "")).upper()
+    except Exception as exc:
+        logger.warning("RCSB search failed for %r: %s", name, exc)
+    _search_cache[name] = found
+    return found
+
+
+def resolve_pdb_entry(name_or_pdb: str, allow_search: bool = True) -> Dict[str, Any]:
+    """Resolve a biologic to a PDB entry and report how the answer was reached.
+
+    Claude picks the structure the field uses and the entry is read back from RCSB to
+    confirm it exists and holds a protein. The name table and the full-text search are
+    fallbacks for when the model cannot be reached, and each is labelled.
+    """
+    raw = (name_or_pdb or "").strip()
     if not raw:
-        return ""
+        return {"pdb_id": "", "provenance": "none", "canonical_name": ""}
     if _PDB_CODE_RE.match(raw):
-        return raw.upper()
+        return {"pdb_id": raw.upper(), "provenance": "user_supplied", "canonical_name": raw.upper()}
+
+    try:
+        from biologix_ai.llm.client import LLMUnavailable
+        from biologix_ai.llm.structures import resolve_biologic
+
+        resolved = resolve_biologic(raw)
+        return {
+            "pdb_id": resolved["pdb_id"],
+            "canonical_name": resolved["canonical_name"],
+            "provenance": "llm_verified",
+            "confidence": resolved["confidence"],
+            "rationale": resolved["rationale"],
+            "entry": resolved["entry"],
+            "model": resolved["model"],
+        }
+    except LLMUnavailable as exc:
+        fallback_reason = str(exc)
+    except ValueError as exc:
+        fallback_reason = str(exc)
+    except ImportError as exc:
+        fallback_reason = f"structure resolution unavailable: {exc}"
+    logger.warning("Falling back from Claude structure resolution for %r: %s", raw, fallback_reason)
+
     key = _normalize_name_key(raw)
-    return _NAME_TO_PDB.get(key, "")
+    curated = _NAME_TO_PDB.get(key, "")
+    if curated:
+        return {
+            "pdb_id": curated.upper(),
+            "canonical_name": raw,
+            "provenance": "offline_cache",
+            "fallback_reason": fallback_reason,
+        }
+    if not allow_search:
+        return {"pdb_id": "", "provenance": "none", "canonical_name": raw, "fallback_reason": fallback_reason}
+    found = _search_rcsb(raw)
+    return {
+        "pdb_id": found.upper() if found else "",
+        "canonical_name": raw,
+        "provenance": "rcsb_text_search" if found else "none",
+        "fallback_reason": fallback_reason,
+    }
+
+
+def lookup_pdb_id(name_or_pdb: str, allow_search: bool = True) -> str:
+    """Map a common name to a PDB ID, or pass through a valid PDB code."""
+    return resolve_pdb_entry(name_or_pdb, allow_search=allow_search)["pdb_id"]
 
 
 def _default_bundled_pdb(repo_root: Path, pdb_id: str) -> Optional[Path]:

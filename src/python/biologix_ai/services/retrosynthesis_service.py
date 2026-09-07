@@ -31,6 +31,7 @@ from biologix_ai.retrosynthesis.models import (
     SmallMolStep,
 )
 from biologix_ai.retrosynthesis.psmiles_bridge import resolve_retro_target
+from biologix_ai.retrosynthesis.polymer_templates import lookup_template
 from biologix_ai.retrosynthesis.retro_adapter import (
     infer_polymer_name_from_extractions,
     normalize_for_tree_root,
@@ -137,6 +138,7 @@ def _tree_worker(
         tree_root = material_name.strip().lower()
         tree = Tree(tree_root, result_dict=results_dict)
         _inject_product_aliases(tree, tree_root)
+        _guard_root_expansion(tree, tree_root)
         tree.construct_tree()
 
         routes = _routes_from_tree(tree, material_name)
@@ -270,8 +272,25 @@ def _is_runnable_smiles_for_aizynth(smiles: str) -> bool:
         return bool(smiles) and len(smiles) < 200
 
 
-def _check_purchasability(smiles: str) -> MonomerSource:
-    """Check if a monomer SMILES is in known purchasable stocks."""
+def _check_purchasability(smiles: str, name: str = "") -> MonomerSource:
+    """Check if a monomer is in known purchasable stocks.
+
+    The bundled precursor registry is keyed by name, the other stocks by SMILES,
+    so both are consulted. Checking only SMILES reported common reagents such as
+    ethylene oxide as unknown even though the registry lists them.
+    """
+    candidate = (name or "").strip().lower()
+    if candidate:
+        try:
+            from biologix_ai.retrosynthesis.precursor_registry import (
+                get_bundled_precursors,
+                get_workspace_precursors,
+            )
+
+            if candidate in get_bundled_precursors() or candidate in get_workspace_precursors():
+                return MonomerSource.PURCHASABLE
+        except Exception:
+            pass
     try:
         from biologix_ai.material_mappings import prescreen_psmiles_for_md
 
@@ -427,6 +446,30 @@ def _run_aizynthfinder(target_smiles: str) -> Optional[SmallMolRoute]:
         return None
 
 
+def _guard_root_expansion(tree: object, tree_root: str) -> None:
+    """Stop the target itself from terminating the search.
+
+    Node.expand() treats any substance PubChem can resolve as a purchasable leaf.
+    The target polymer resolves (PEG is a PubChem entry), so the root was marked a
+    leaf immediately and find_all_paths() returned a single empty path — a route
+    object with no steps and a perfect score. The question is how to synthesise the
+    target, so being able to buy it is not an answer.
+    """
+    root_name = (tree_root or "").strip().lower()
+    if not root_name:
+        return
+    original = tree.db.is_common_chemical_cached  # type: ignore[attr-defined]
+
+    def purchasable_except_target(compound_name: str) -> bool:
+        if str(compound_name).strip().lower() == root_name:
+            return False
+        return original(compound_name)
+
+    tree.db.is_common_chemical_cached = purchasable_except_target  # type: ignore[attr-defined]
+    # Children inherit cache_func from their parent, so the root covers the tree.
+    tree.root.cache_func = purchasable_except_target  # type: ignore[attr-defined]
+
+
 def _inject_product_aliases(tree: object, tree_root: str) -> None:
     """Register tree_root in product_dict if any existing key contains it.
 
@@ -536,6 +579,45 @@ def _lookup_manifest_name(session_dir: Path, target_psmiles: str) -> Optional[st
     return None
 
 
+def _valid_smiles(value: Optional[str]) -> bool:
+    if not value:
+        return False
+    try:
+        from rdkit import Chem
+
+        return Chem.MolFromSmiles(value) is not None
+    except ImportError:
+        return False
+
+
+def _monomer_smiles(tree: object, name: str) -> str:
+    """Resolve a monomer name to a parseable SMILES.
+
+    CommonSubstanceDB.get_smiles_from_name treats any punctuation-free token as if
+    it were already SMILES, so single-word names come back unchanged - 'water'
+    was being stored as the SMILES for water. Anything RDKit cannot parse is sent
+    through a proper name lookup instead.
+    """
+    cached = None
+    try:
+        cached = tree.db.get_smiles_cached(name)  # type: ignore[attr-defined]
+    except Exception:
+        cached = None
+    if _valid_smiles(cached):
+        return str(cached)
+    try:
+        from biologix_ai.retrosynthesis.precursor_registry import _pubchem_smiles
+
+        resolved = _pubchem_smiles(name)
+        if _valid_smiles(resolved):
+            return str(resolved)
+    except Exception:
+        pass
+    # Returning the name here would put a non-structure into MonomerInfo.smiles,
+    # where every downstream RDKit call silently no-ops. Report it as unresolved.
+    return ""
+
+
 def _routes_from_tree(
     tree: object,
     material_name: str,
@@ -573,16 +655,12 @@ def _routes_from_tree(
         leaf_names = all_reactants - all_products
         monomers: List[MonomerInfo] = []
         for name in sorted(leaf_names):
-            smiles = name
-            try:
-                smiles = tree.db.get_smiles_cached(name) or name  # type: ignore[attr-defined]
-            except Exception:
-                pass
+            smiles = _monomer_smiles(tree, name)
             monomers.append(
                 MonomerInfo(
                     smiles=smiles,
                     name=name,
-                    source=_check_purchasability(smiles),
+                    source=_check_purchasability(smiles, name),
                 )
             )
 
@@ -839,6 +917,20 @@ def plan_retrosynthesis(request: RetrosynthesisRequest) -> RetrosynthesisResult:
         target_psmiles=target_psmiles,
     )
 
+    # Last resort only. Evidence-backed routes and the caller's own planning both
+    # take precedence; a curated route is a cached answer, not a computed one, and it
+    # is labelled as such so the completeness audit can hold it to a lower standard.
+    if not polymer_routes and target_psmiles and constraints.allow_curated_template:
+        template_route = lookup_template(target_psmiles)
+        if template_route is not None:
+            polymer_routes = [template_route]
+            route_provenance = "curated_template"
+            retro_agent_error = None
+            warnings.append(
+                "No session literature extraction was supplied; used the reviewed "
+                "curated polymer route. Supply extractions to build a literature KG route."
+            )
+
     extractions_reaction_count: Optional[int] = None
     if session_dir is not None:
         manifest_path = session_dir / "retrosynthesis" / "extractions_manifest.json"
@@ -869,6 +961,8 @@ def plan_retrosynthesis(request: RetrosynthesisRequest) -> RetrosynthesisResult:
     if route_provenance == "session_agent_llm":
         retro_stages.append("session_extractions")
         retro_stages.append("kg_tree")
+    elif route_provenance == "curated_template":
+        retro_stages.append("curated_polymer_route")
     kg_empty_after_extractions = False
     if (
         not polymer_routes
@@ -947,17 +1041,19 @@ def plan_retrosynthesis(request: RetrosynthesisRequest) -> RetrosynthesisResult:
     for route in polymer_routes:
         for monomer in route.monomers:
             if monomer.source == MonomerSource.UNKNOWN:
-                monomer.source = _check_purchasability(monomer.smiles)
+                monomer.source = _check_purchasability(monomer.smiles, monomer.name or "")
 
+            # Enrichment exists to resolve leaves that cannot be bought. A
+            # purchasable monomer is already a valid termination point, so
+            # searching USPTO for a route to it and then reporting "no route"
+            # penalised routes that were in fact complete.
             run_aizynth = (
                 aizynth_models
+                and constraints.enrich_monomers_with_aizynth
                 and not constraints.require_purchasable_monomers
+                and monomer.source != MonomerSource.PURCHASABLE
                 and _is_runnable_smiles_for_aizynth(monomer.smiles)
                 and monomer.synthesis_route is None
-                and (
-                    constraints.enrich_monomers_with_aizynth
-                    or monomer.source != MonomerSource.PURCHASABLE
-                )
             )
             if run_aizynth:
                 aizynth_attempted += 1
@@ -1012,10 +1108,23 @@ def plan_retrosynthesis(request: RetrosynthesisRequest) -> RetrosynthesisResult:
     if not aizynth_models and aizynth_pkg:
         meta["aizynth_setup_hint"] = "Run: bash scripts/setup_aizynthfinder.sh"
     elif aizynth_models and aizynth_attempted == 0 and polymer_routes:
-        meta["aizynth_skip_reason"] = (
-            "No eligible monomer SMILES, enrich_monomers_with_aizynth=false, "
-            "or all monomers marked non-runnable"
-        )
+        needs_enrichment = [
+            monomer
+            for route in polymer_routes
+            for monomer in route.monomers
+            if monomer.source != MonomerSource.PURCHASABLE and monomer.synthesis_route is None
+        ]
+        if not needs_enrichment:
+            # A route whose every leaf can be bought is already terminated. This
+            # is the goal state, not a stage that was skipped.
+            meta["aizynth_not_needed"] = (
+                "Every monomer is purchasable, so no route enrichment was required"
+            )
+        else:
+            meta["aizynth_skip_reason"] = (
+                "No eligible monomer SMILES, enrich_monomers_with_aizynth=false, "
+                "or all monomers marked non-runnable"
+            )
     if request.biologic_pdb_path:
         meta["biologic_pdb_path"] = request.biologic_pdb_path
 
@@ -1023,6 +1132,11 @@ def plan_retrosynthesis(request: RetrosynthesisRequest) -> RetrosynthesisResult:
     if prov == "session_agent_llm":
         meta["reporting_honesty"] = (
             "Provenance: session_agent_llm (literature-derived RetroSyn KG routes)."
+        )
+    elif prov == "curated_template":
+        meta["reporting_honesty"] = (
+            "Provenance: curated_template (reviewed built-in route; not a "
+            "literature-extracted KG route)."
         )
     else:
         meta["reporting_honesty"] = f"Provenance: {prov}; no polymer routes."

@@ -1,0 +1,29 @@
+# Runs the real stack using the already-built images, with live source mounted.
+services:
+  api:
+    image: biologix-ai-api:latest
+    build: !reset null
+    volumes:
+      - ./src:/app/src:ro
+    environment:
+      PYTHONPATH: /app/src/python
+  worker:
+    image: biologix-ai-worker:latest
+    build: !reset null
+    volumes:
+      - ./src:/app/src:ro
+      - ./.verify/runs:/app/runs
+    environment:
+      PYTHONPATH: /app/src/python
+      OPENMM_CPU_THREADS: "1"
+      BIOLOGIX_AI_OPENMM_PLATFORM: CPU
+      BIOLOGIX_AI_OPENMM_MATRIX_N_POLYMERS: "8"
+      BIOLOGIX_AI_OPENMM_CANDIDATE_TIMEOUT_S: "100000"
+      SCIENTIFIC_OPENMM_STEPS: "5000"
+      SCIENTIFIC_OPENMM_ENABLED: "${SCIENTIFIC_OPENMM_ENABLED:-true}"
+      BIOLOGIX_AUTOMATIC_RETRO_EXTRACTION: "false"
+    deploy:
+      replicas: ${WORKER_REPLICAS:-1}
+
+  frontend:
+    profiles: ["ui"]

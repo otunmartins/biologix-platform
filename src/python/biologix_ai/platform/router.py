@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from .database import get_db
 from .dependencies import admin_user, current_user, is_admin
+from .extractions import apply_to_parameters, preflight
 from .models import Experiment, ExperimentArtifact, User
 from .schemas import (
     AdminExperimentResponse,
@@ -17,6 +18,9 @@ from .schemas import (
     ArtifactResponse,
     ExperimentCreate,
     ExperimentResponse,
+    ExperimentRetry,
+    ExtractionPreflightRequest,
+    ExtractionPreflightResponse,
     LoginRequest,
     SignupRequest,
     UserResponse,
@@ -140,9 +144,23 @@ def list_experiments(user: User = Depends(current_user), db: Session = Depends(g
     ).all()
 
 
+@router.post("/retrosynthesis/preflight", response_model=ExtractionPreflightResponse)
+def preflight_extractions(payload: ExtractionPreflightRequest, _: User = Depends(current_user)):
+    """Check synthesis evidence against the engine's own rules before an experiment is queued."""
+    try:
+        return preflight(payload.material_name.strip(), payload.sources)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+
+
 @router.post("/experiments", response_model=ExperimentResponse, status_code=status.HTTP_201_CREATED)
 def create_experiment(payload: ExperimentCreate, user: User = Depends(current_user), db: Session = Depends(get_db)):
-    experiment = Experiment(owner_id=user.id, **payload.model_dump())
+    fields = payload.model_dump()
+    try:
+        fields["parameters"] = apply_to_parameters(fields.get("parameters"), fields.get("polymer_target"))
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    experiment = Experiment(owner_id=user.id, **fields)
     db.add(experiment)
     db.commit()
     db.refresh(experiment)
@@ -159,12 +177,23 @@ def create_experiment(payload: ExperimentCreate, user: User = Depends(current_us
 
 
 @router.post("/experiments/{experiment_id}/retry", response_model=ExperimentResponse)
-def retry_experiment(experiment_id: uuid.UUID, user: User = Depends(current_user), db: Session = Depends(get_db)):
+def retry_experiment(
+    experiment_id: uuid.UUID,
+    payload: ExperimentRetry | None = None,
+    user: User = Depends(current_user),
+    db: Session = Depends(get_db),
+):
     experiment = db.scalar(select(Experiment).where(Experiment.id == experiment_id, Experiment.owner_id == user.id))
     if not experiment:
         raise HTTPException(status_code=404, detail="Experiment not found")
     if experiment.status == "running":
         raise HTTPException(status_code=409, detail="Experiment is already running")
+    if payload and payload.parameters is not None:
+        merged = {**(experiment.parameters or {}), **payload.parameters}
+        try:
+            experiment.parameters = apply_to_parameters(merged, experiment.polymer_target)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc))
     experiment.status = "queued"
     experiment.progress = 0
     experiment.current_stage = "queued"

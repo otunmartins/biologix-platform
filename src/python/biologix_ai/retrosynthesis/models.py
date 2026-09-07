@@ -15,6 +15,11 @@ class PolymerizationType(str, Enum):
     RING_OPENING = "ring_opening"
     FREE_RADICAL = "free_radical"
     STEP_GROWTH = "step_growth"
+    ANIONIC = "anionic"
+    CATIONIC = "cationic"
+    COORDINATION = "coordination"
+    ENZYMATIC = "enzymatic"
+    NATURAL_MODIFICATION = "modification_of_natural_polymer"
     OTHER = "other"
     UNKNOWN = "unknown"
 
@@ -103,6 +108,13 @@ class RetrosynthesisConstraints(BaseModel):
     banned_reagents: List[str] = Field(default_factory=list)
     require_purchasable_monomers: bool = False
     max_routes: int = 5
+    allow_curated_template: bool = Field(
+        default=True,
+        description=(
+            "Fall back to the offline curated route table when no evidence-backed route "
+            "could be built. Set False to make the caller responsible for the fallback."
+        ),
+    )
     enrich_monomers_with_aizynth: bool = Field(
         default=True,
         description=(

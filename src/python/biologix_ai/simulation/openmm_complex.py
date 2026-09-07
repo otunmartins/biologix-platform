@@ -198,6 +198,25 @@ def run_protein_minimization(
     return float(energy), pos
 
 
+def _gaff_generator(mol_off):
+    """GAFF template generator with the force field named explicitly.
+
+    openmmforcefields dropped the implicit default: constructing the generator without
+    a forcefield now raises "A GAFF force field name must be provided as a string", which
+    kills the physics stage on any rebuilt image. gaff-2.11 was that old default, so
+    pinning it keeps existing results comparable.
+    """
+    from openmmforcefields.generators import GAFFTemplateGenerator
+
+    import os
+
+    requested = os.getenv("BIOLOGIX_AI_GAFF_VERSION", "gaff-2.11").strip()
+    installed = list(GAFFTemplateGenerator.INSTALLED_FORCEFIELDS)
+    if requested not in installed:
+        requested = installed[-1] if installed else requested
+    return GAFFTemplateGenerator(molecules=mol_off, forcefield=requested)
+
+
 def _merge_topologies_with_maps(
     protein_top: app.Topology, lig_top: app.Topology
 ) -> Tuple[app.Topology, Dict, Dict]:
@@ -236,10 +255,8 @@ def create_ligand_system(
     box_vectors: Optional[openmm.Vec3] = None,
 ) -> Tuple[app.Topology, openmm.System]:
     """Create OpenMM system for ligand with GAFF + RDKit Gasteiger charges."""
-    from openmmforcefields.generators import GAFFTemplateGenerator
-
     mol_off = rdkit_mol_to_openff_with_gasteiger(rdkit_mol)
-    gaff = GAFFTemplateGenerator(molecules=mol_off)
+    gaff = _gaff_generator(mol_off)
     ff = app.ForceField()
     ff.registerTemplateGenerator(gaff.generator)
     top = mol_off.to_topology()
@@ -368,9 +385,7 @@ def run_openmm_relax_and_energy(
 
     combined_top, _, _ = _merge_topologies_with_maps(protein_top, lig_top)
     mol_off = rdkit_mol_to_openff_with_gasteiger(lig_mol)
-    from openmmforcefields.generators import GAFFTemplateGenerator
-
-    gaff = GAFFTemplateGenerator(molecules=mol_off)
+    gaff = _gaff_generator(mol_off)
     protein_ff.registerTemplateGenerator(gaff.generator)
     combined_sys = protein_ff.createSystem(
         combined_top,
@@ -542,6 +557,7 @@ def run_openmm_matrix_relax_and_energy(
     run_npt: bool = True,
     barostat_interval_fs: float = 10.0,
     npt_duration_ps: float = 1.0,
+    equilibration_fraction: float = 0.5,
     wall_clock_limit_s: float = 900.0,
     report_interval_steps: int = 250,
     temperature_k: float = 300.0,
@@ -740,9 +756,7 @@ def run_openmm_matrix_relax_and_energy(
         combined_top = _merge_topology_protein_n_ligands(protein_top, lig_top, n_polymers)
         combined_top.setPeriodicBoxVectors(box_vec_omm)
         mol_off = rdkit_mol_to_openff_with_gasteiger(lig_mol)
-        from openmmforcefields.generators import GAFFTemplateGenerator
-
-        gaff = GAFFTemplateGenerator(molecules=mol_off)
+        gaff = _gaff_generator(mol_off)
         protein_ff.registerTemplateGenerator(gaff.generator)
         combined_sys = protein_ff.createSystem(
             combined_top,
@@ -782,7 +796,7 @@ def run_openmm_matrix_relax_and_energy(
         )
         ligands_only_top.setPeriodicBoxVectors(box_vec_omm)
         ligands_ff = app.ForceField()
-        gaff2 = GAFFTemplateGenerator(molecules=mol_off)
+        gaff2 = _gaff_generator(mol_off)
         ligands_ff.registerTemplateGenerator(gaff2.generator)
         ligands_sys = ligands_ff.createSystem(
             ligands_only_top,
@@ -839,6 +853,9 @@ def run_openmm_matrix_relax_and_energy(
         e_int: float
         e_int_std: Optional[float] = None
         n_frames_averaged: Optional[int] = None
+        n_frames_discarded: Optional[int] = None
+        e_int_drift: Optional[float] = None
+        energy_series: Optional[List[float]] = None
 
         _stage_heartbeat("energy_eval", "computing interaction energy")
         if run_npt:
@@ -892,10 +909,33 @@ def run_openmm_matrix_relax_and_energy(
                 )
                 e_int_list.append(float(e_int_frame))
             if e_int_list:
-                e_int = float(np.mean(e_int_list))
-                e_int_std = float(np.std(e_int_list)) if len(e_int_list) > 1 else None
-                n_frames_averaged = len(e_int_list)
-                _log(f"[matrix] NPT complete: {total_steps} steps, {n_frames_averaged} frames, E_int mean={e_int:.3f} kJ/mol")
+                # The start of the trajectory is the system still relaxing into the
+                # packed box: over the first picoseconds the interaction energy walks
+                # steadily downwards as contacts form. Averaging those frames in reports
+                # the approach to equilibrium rather than equilibrium, and inflates the
+                # spread with drift. Discard a leading fraction, then average.
+                equil_fraction = min(max(equilibration_fraction, 0.0), 0.9)
+                n_discard = int(len(e_int_list) * equil_fraction)
+                if len(e_int_list) - n_discard < 2:
+                    n_discard = max(0, len(e_int_list) - 2)
+                production = e_int_list[n_discard:] or e_int_list
+                e_int = float(np.mean(production))
+                e_int_std = float(np.std(production)) if len(production) > 1 else None
+                n_frames_averaged = len(production)
+                n_frames_discarded = n_discard
+                energy_series = [round(value, 4) for value in e_int_list]
+                # Drift across the production half is what says whether this converged:
+                # a settled trajectory has the two halves agreeing inside their spread.
+                if len(production) >= 4:
+                    midpoint = len(production) // 2
+                    first_half = float(np.mean(production[:midpoint]))
+                    second_half = float(np.mean(production[midpoint:]))
+                    e_int_drift = float(second_half - first_half)
+                _log(
+                    f"[matrix] NPT complete: {total_steps} steps, {len(e_int_list)} frames "
+                    f"({n_discard} discarded as equilibration), E_int mean={e_int:.3f} "
+                    f"+/- {e_int_std if e_int_std is None else round(e_int_std, 3)} kJ/mol"
+                )
             else:
                 e_prot = _e(protein_sys, pos_prot)
                 e_ligs = _e(ligands_sys, pos_ligs)
@@ -905,6 +945,35 @@ def run_openmm_matrix_relax_and_energy(
             e_prot = _e(protein_sys, pos_prot)
             e_ligs = _e(ligands_sys, pos_ligs)
             e_int = float(e_complex) - float(e_prot) - float(e_ligs)
+
+        # Component energies, RMSD and contacts feed the composite screening score.
+        # They were never emitted, so that score was always None and candidates
+        # could not be ranked against each other.
+        try:
+            e_prot_out = float(_e(protein_sys, pos_prot))
+            e_ligs_out = float(_e(ligands_sys, pos_ligs))
+        except Exception as exc:
+            _log(f"[matrix] component energies unavailable: {exc}")
+            e_prot_out = e_ligs_out = None
+
+        try:
+            from biologix_ai.simulation.complex_metrics import contact_count, kabsch_rmsd_nm
+
+            initial_nm = np.asarray(
+                combined_pos.value_in_unit(unit.nanometers), dtype=float
+            )
+            final_nm = np.asarray(pos_min.value_in_unit(unit.nanometers), dtype=float)
+            insulin_rmsd = kabsch_rmsd_nm(initial_nm[:n_protein], final_nm[:n_protein])
+            contacts = contact_count(
+                final_nm[:n_protein],
+                final_nm[n_protein:],
+                cutoff_nm=float(os.getenv("BIOLOGIX_AI_CONTACT_CUTOFF_NM", "0.4")),
+                box_nm=float(effective_box_nm),
+            )
+        except Exception as exc:
+            _log(f"[matrix] structural metrics unavailable: {exc}")
+            insulin_rmsd = None
+            contacts = None
 
         method_name = (
             "OpenMM_matrix_bulk_AMBER14SB_GAFF_Gasteiger"
@@ -923,6 +992,10 @@ def run_openmm_matrix_relax_and_energy(
             "shell_angstrom": shell_only_angstrom,
             "box_nm": effective_box_nm,
             "gromacs_only": False,
+            "potential_energy_insulin_kj_mol": e_prot_out,
+            "potential_energy_polymer_kj_mol": e_ligs_out,
+            "insulin_rmsd_to_initial_nm": insulin_rmsd,
+            "insulin_polymer_contacts": contacts,
         }
         if progressive_pack:
             out["packmol_progressive"] = {
@@ -941,4 +1014,10 @@ def run_openmm_matrix_relax_and_energy(
             out["interaction_energy_kj_mol_std"] = e_int_std
         if n_frames_averaged is not None:
             out["n_frames_averaged"] = n_frames_averaged
+        if n_frames_discarded is not None:
+            out["n_frames_discarded_as_equilibration"] = n_frames_discarded
+        if e_int_drift is not None:
+            out["interaction_energy_drift_kj_mol"] = e_int_drift
+        if energy_series is not None:
+            out["interaction_energy_series_kj_mol"] = energy_series
         return out

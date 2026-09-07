@@ -33,14 +33,14 @@ _APPROVED_EXCIPIENTS: Dict[str, Dict[str, Any]] = {
         "precedent_count": 12,
         "notes": "FDA IIG listed for oral and parenteral use.",
     },
-    "[*]OC(=O)C(C)OC(=O)C[*]": {
+    "[*]OC(=O)COC(=O)C(C)[*]": {
         "name": "PLGA (poly(lactic-co-glycolic acid))",
         "gras": False,
         "jurisdictions": ["FDA", "EMA"],
         "precedent_count": 40,
         "notes": "Approved in multiple parenteral formulations. Biodegradable.",
     },
-    "[*]OC(=O)CC[*]": {
+    "[*]OC(=O)C[*]": {
         "name": "Poly(glycolic acid) / PGA",
         "gras": False,
         "jurisdictions": ["FDA", "EMA"],
@@ -61,14 +61,14 @@ _APPROVED_EXCIPIENTS: Dict[str, Dict[str, Any]] = {
         "precedent_count": 55,
         "notes": "FDA IIG listed. Widely used binder and stabiliser.",
     },
-    "[*]CC(O)[*]": {
+    "[*]CC([*])O": {
         "name": "Polyvinyl alcohol (PVA)",
         "gras": False,
         "jurisdictions": ["FDA", "EMA"],
         "precedent_count": 20,
         "notes": "EMA excipient monograph. Ophthalmic and parenteral use.",
     },
-    "[*]OC(=O)CCCCC(=O)O[*]": {
+    "[*]OC(=O)CCCCC[*]": {
         "name": "Polycaprolactone (PCL)",
         "gras": False,
         "jurisdictions": ["FDA"],
@@ -76,6 +76,17 @@ _APPROVED_EXCIPIENTS: Dict[str, Dict[str, Any]] = {
         "notes": "FDA approved in biodegradable implants.",
     },
 }
+
+# Accept structures emitted by older clients and stored experiments while all
+# new target resolution uses the corrected repeat-unit representations above.
+_APPROVED_EXCIPIENTS["[*]OC(=O)C(C)OC(=O)C[*]"] = _APPROVED_EXCIPIENTS[
+    "[*]OC(=O)COC(=O)C(C)[*]"
+]
+_APPROVED_EXCIPIENTS["[*]OC(=O)CC[*]"] = _APPROVED_EXCIPIENTS["[*]OC(=O)C[*]"]
+_APPROVED_EXCIPIENTS["[*]CC(O)[*]"] = _APPROVED_EXCIPIENTS["[*]CC([*])O"]
+_APPROVED_EXCIPIENTS["[*]OC(=O)CCCCC(=O)O[*]"] = _APPROVED_EXCIPIENTS[
+    "[*]OC(=O)CCCCC[*]"
+]
 
 # Name-based lookup (lower-case fragment match)
 _NAME_FRAGMENT_MAP: Dict[str, str] = {

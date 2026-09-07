@@ -5,13 +5,29 @@ Parameters:
   AdminEmails:
     Type: String
     Description: Comma-separated account emails allowed to use /admin
+  AnthropicApiKey:
+    Type: String
+    NoEcho: true
+    Default: ""
+    Description: >-
+      Anthropic API key. The scientific pipeline asks Claude to resolve the polymer
+      repeat unit, pick the target structure and plan synthesis evidence; without it
+      the worker falls back to its offline tables and marks every run incomplete.
   RepositoryBranch:
     Type: String
     Default: milestone-2
+  WorkerReplicas:
+    Type: Number
+    Default: 1
+    MinValue: 1
+    MaxValue: 8
+    Description: >-
+      Scientific worker containers to run. Each handles one experiment at a time.
+      OpenMM is pinned to one CPU thread, so keep this at or below the instance vCPU count.
   InstanceType:
     Type: String
     Default: m7i-flex.large
-    AllowedValues: [m7i-flex.large, c7i-flex.large, t3a.medium, t3a.large]
+    AllowedValues: [m7i-flex.large, c7i-flex.large, t3a.medium, t3a.large, g4dn.xlarge, g5.xlarge]
   VpcId:
     Type: AWS::EC2::VPC::Id
     Default: vpc-0e31e1e28793c0d96
@@ -112,7 +128,7 @@ Resources:
         Fn::Base64: !Sub |
           #!/bin/bash
           set -euxo pipefail
-          dnf install -y docker git awscli cronie
+          dnf install -y docker git awscli cronie pciutils
           systemctl enable --now docker crond
           mkdir -p /usr/local/lib/docker/cli-plugins
           curl -fsSL https://github.com/docker/compose/releases/download/v2.39.1/docker-compose-linux-x86_64 -o /usr/local/lib/docker/cli-plugins/docker-compose
@@ -132,13 +148,31 @@ Resources:
           POSTGRES_PASSWORD=$POSTGRES_PASSWORD
           SECRET_KEY=$SECRET_KEY
           ADMIN_EMAILS=${AdminEmails}
+          ANTHROPIC_API_KEY=${AnthropicApiKey}
           S3_BUCKET=${ArtifactBucket}
           AWS_REGION=${AWS::Region}
           DOMAIN=$PUBLIC_IP.sslip.io
+          WORKER_REPLICAS=${WorkerReplicas}
           ENV
           chmod 600 deploy/ec2/.env
           cd deploy/ec2
-          docker compose --env-file .env up -d --build
+          GPU_COMPOSE=""
+          if lspci 2>/dev/null | grep -qi nvidia; then
+            (
+              set -e
+              if ! command -v nvidia-smi >/dev/null 2>&1; then
+                dnf install -y "kernel-devel-$(uname -r)" kernel-modules-extra dkms
+                dnf config-manager --add-repo https://developer.download.nvidia.com/compute/cuda/repos/amzn2023/x86_64/cuda-amzn2023.repo
+                dnf install -y nvidia-driver nvidia-driver-cuda
+                modprobe nvidia || true
+              fi
+              curl -fsSL https://nvidia.github.io/libnvidia-container/stable/rpm/nvidia-container-toolkit.repo -o /etc/yum.repos.d/nvidia-container-toolkit.repo
+              dnf install -y nvidia-container-toolkit
+              nvidia-ctk runtime configure --runtime=docker
+              systemctl restart docker
+            ) && nvidia-smi >/dev/null 2>&1 && GPU_COMPOSE="-f docker-compose.gpu.yml"
+          fi
+          docker compose --env-file .env -f docker-compose.yml $GPU_COMPOSE up -d --build
           cat > /opt/biologix/backup.sh <<'BACKUP'
           #!/bin/bash
           set -euo pipefail

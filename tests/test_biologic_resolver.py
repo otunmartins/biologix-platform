@@ -24,6 +24,7 @@ def test_lookup_pdb_id_common_names():
     assert br.lookup_pdb_id("insulin") == "4F1C"
     assert br.lookup_pdb_id("  Adalimumab ") == "3WD5"
     assert br.lookup_pdb_id("1n8z") == "1N8Z"
+    assert br.lookup_pdb_id("CRISPR-Cas9") == "4CMP"
 
 
 def test_lookup_pdb_id_unknown():

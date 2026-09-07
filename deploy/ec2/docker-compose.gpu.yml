@@ -1,0 +1,16 @@
+# GPU override for the scientific worker.
+# Use on a GPU host (NVIDIA driver + nvidia-container-toolkit installed) with:
+#   docker compose --env-file .env -f docker-compose.yml -f docker-compose.gpu.yml up -d --build
+# The worker image already ships the OpenMM CUDA plugin; this only grants the
+# container GPU access and switches OpenMM off the CPU platform.
+services:
+  worker:
+    environment:
+      BIOLOGIX_AI_OPENMM_PLATFORM: CUDA
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]

@@ -131,6 +131,87 @@ _TEMPLATES: dict[str, PolymerRoute] = {
         pathway_score=0.5,
         recommended=True,
     ),
+    "[*]OC(=O)COC(=O)C(C)[*]": PolymerRoute(
+        target_polymer="poly(lactic-co-glycolic acid)",
+        polymerization_type=PolymerizationType.RING_OPENING,
+        steps=[
+            PolymerRetroStep(
+                reactant_names=["lactide", "glycolide"],
+                product_name="poly(lactic-co-glycolic acid)",
+                reaction_type="ring-opening copolymerization",
+                conditions=(
+                    "Sn(Oct)2 catalyst with an alcohol initiator; inert atmosphere; "
+                    "typically 130-180°C; feed ratio controls lactide:glycolide composition"
+                ),
+                literature_source="curated template",
+            ),
+        ],
+        monomers=[
+            MonomerInfo(
+                smiles="CC1OC(=O)C(C)OC1=O",
+                name="lactide",
+                source=MonomerSource.UNKNOWN,
+            ),
+            MonomerInfo(
+                smiles="O=C1OCOC(=O)CO1",
+                name="glycolide",
+                source=MonomerSource.UNKNOWN,
+            ),
+        ],
+        pathway_score=0.5,
+        recommended=True,
+    ),
+    "[*]OC(=O)CCCCC[*]": PolymerRoute(
+        target_polymer="poly(caprolactone)",
+        polymerization_type=PolymerizationType.RING_OPENING,
+        steps=[
+            PolymerRetroStep(
+                reactant_names=["epsilon-caprolactone"],
+                product_name="poly(caprolactone)",
+                reaction_type="ring-opening polymerization",
+                conditions=(
+                    "Sn(Oct)2 with an alcohol initiator; inert atmosphere; "
+                    "typically 100-160°C"
+                ),
+                literature_source="curated template",
+            ),
+        ],
+        monomers=[
+            MonomerInfo(
+                smiles="O=C1OCCCCC1",
+                name="epsilon-caprolactone",
+                source=MonomerSource.UNKNOWN,
+            ),
+        ],
+        pathway_score=0.5,
+        recommended=True,
+    ),
+    "[*]OC1C(N)C(O)C(CO)OC1[*]": PolymerRoute(
+        target_polymer="chitosan",
+        polymerization_type=PolymerizationType.OTHER,
+        steps=[
+            PolymerRetroStep(
+                reactant_names=["chitin"],
+                product_name="chitosan",
+                reaction_type="alkaline deacetylation",
+                conditions=(
+                    "40-50 wt% aqueous NaOH; typically 80-120°C under an inert "
+                    "atmosphere; wash to neutral pH and dry; time and temperature "
+                    "control the degree of deacetylation"
+                ),
+                literature_source="curated template",
+            ),
+        ],
+        monomers=[
+            MonomerInfo(
+                smiles="CC(=O)NC1C(O)OC(CO)C(O)C1O",
+                name="chitin (N-acetyl-D-glucosamine repeat-unit precursor)",
+                source=MonomerSource.UNKNOWN,
+            ),
+        ],
+        pathway_score=0.5,
+        recommended=True,
+    ),
 }
 
 

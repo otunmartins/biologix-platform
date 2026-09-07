@@ -59,6 +59,11 @@ def prepare_insulin_ab_pdb(
     Keeps SSBOND lines that reference only those chains.
     Drops HETATM, ANISOU, other records. Resolves altloc by taking first.
     """
+    pdb_id = Path(pdb_in).stem.upper().replace("BIOLOGIC_", "")
+    # Representative antibody entries do not use a uniform chain convention.
+    # 1BJ1 contains two Fab copies plus VEGF; retain one heavy/light Fab pair.
+    if pdb_id in {"1BJ1", "5WT9"}:
+        chains = ("H", "L")
     keep = set(chains)
     ssbonds = filter_ssbond_for_chains(
         parse_ssbond_from_pdb(pdb_in),
@@ -75,6 +80,11 @@ def prepare_insulin_ab_pdb(
             if line.startswith("SSBOND"):
                 continue  # Already written from ssbonds
             if line.startswith("ATOM") or line.startswith("HETATM"):
+                # The matrix path models the protein cargo itself.  Crystal
+                # waters, ions, buffers and bound ligands require separate
+                # force-field parameters and must not leak into AMBER14SB.
+                if line.startswith("HETATM"):
+                    continue
                 chain = line[21:22].strip()
                 if chain not in keep:
                     continue
@@ -91,10 +101,6 @@ def prepare_insulin_ab_pdb(
                         continue
                 seen_atoms.add(key)
                 atom_line = line[:16] + " " + line[17:66] + "\n"
-                if line.startswith("HETATM"):
-                    resname = line[17:20].strip()
-                    if resname in ("HOH", "WAT", "ZN", "CL", "NA", "CA"):
-                        continue
                 lines_out.append(atom_line)
             elif line.startswith("TER"):
                 chain_before = ""

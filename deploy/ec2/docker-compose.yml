@@ -66,12 +66,29 @@ services:
       AWS_REGION: ${AWS_REGION}
       SCIENTIFIC_RETROSYNTHESIS_ENABLED: "true"
       SCIENTIFIC_OPENMM_ENABLED: "true"
-      SCIENTIFIC_OPENMM_STEPS: "100"
+      # Constant-pressure sampling, so the interaction energy is a mean over frames
+      # with a spread rather than one minimised pose. SCIENTIFIC_OPENMM_STEPS used to
+      # sit here and never controlled a trajectory - it set minimiser iterations.
+      SCIENTIFIC_OPENMM_NPT: "true"
+      SCIENTIFIC_OPENMM_NPT_PS: "${SCIENTIFIC_OPENMM_NPT_PS:-200}"
+      SCIENTIFIC_OPENMM_WALL_CLOCK_S: "${SCIENTIFIC_OPENMM_WALL_CLOCK_S:-3600}"
+      SCIENTIFIC_OPENMM_MINIMIZE_ITERATIONS: "${SCIENTIFIC_OPENMM_MINIMIZE_ITERATIONS:-2000}"
+      SCIENTIFIC_OPENMM_MIN_FRAMES: "${SCIENTIFIC_OPENMM_MIN_FRAMES:-10}"
       BIOLOGIX_AI_OPENMM_PLATFORM: CPU
       OPENMM_CPU_THREADS: "1"
       BIOLOGIX_AIZYNTH_TIMEOUT: "360"
       BIOLOGIX_PLATFORM_RUNS_DIR: /app/runs/platform
-      STALE_JOB_MINUTES: "45"
+      STALE_JOB_MINUTES: "${STALE_JOB_MINUTES:-105}"
+      # Claude resolves the repeat unit, picks the structure and plans the synthesis
+      # evidence; without this key the worker falls back to the offline tables and
+      # every run is marked incomplete.
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      BIOLOGIX_LLM_MODEL: ${BIOLOGIX_LLM_MODEL:-claude-opus-5}
+      BIOLOGIX_LLM_EFFORT: ${BIOLOGIX_LLM_EFFORT:-high}
+      BIOLOGIX_RETRO_PLAN_ATTEMPTS: ${BIOLOGIX_RETRO_PLAN_ATTEMPTS:-2}
+      EXPERIMENT_JOB_TIMEOUT_S: ${EXPERIMENT_JOB_TIMEOUT_S:-5400}
+    deploy:
+      replicas: ${WORKER_REPLICAS:-1}
     volumes:
       - worker-runs:/app/runs
       - worker-data:/app/data

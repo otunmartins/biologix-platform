@@ -56,6 +56,24 @@ class AdminExperimentResponse(BaseModel):
     updated_at: datetime
 
 
+class ExtractionPreflightRequest(BaseModel):
+    material_name: str = Field(min_length=1, max_length=500)
+    sources: list[dict] = Field(default_factory=list)
+
+
+class ExtractionPreflightResponse(BaseModel):
+    root_product_found: bool
+    tree_root: str
+    paper_count: int
+    warnings: list[str] = Field(default_factory=list)
+    blocking_reactants: list[str] = Field(default_factory=list)
+    leaf_reachability: dict = Field(default_factory=dict)
+
+
+class ExperimentRetry(BaseModel):
+    parameters: dict | None = None
+
+
 class ExperimentCreate(BaseModel):
     name: str = Field(min_length=1, max_length=160)
     biologic_target: str = Field(min_length=1, max_length=200)

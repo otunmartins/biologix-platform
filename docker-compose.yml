@@ -51,6 +51,8 @@ services:
     environment:
       DATABASE_URL: postgresql+psycopg://biologix:biologix@postgres:5432/biologix
       SECRET_KEY: ${SECRET_KEY:-local-development-secret-change-me}
+      # An account whose login email is listed here can reach /admin.
+      ADMIN_EMAILS: ${ADMIN_EMAILS:-}
       BIOLOGIX_AI_CORS_ORIGINS: http://localhost:3000
       REDIS_URL: redis://redis:6379/0
       S3_ENDPOINT_URL: http://minio:9000
@@ -74,6 +76,9 @@ services:
       args:
         SLIM: ${SLIM:-1}
     command: /app/scripts/start_worker.sh
+    env_file:
+      - path: .env
+        required: false
     environment:
       DATABASE_URL: postgresql+psycopg://biologix:biologix@postgres:5432/biologix
       REDIS_URL: redis://redis:6379/0
@@ -83,14 +88,30 @@ services:
       AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:-biologix-local-storage}
       SCIENTIFIC_RETROSYNTHESIS_ENABLED: ${SCIENTIFIC_RETROSYNTHESIS_ENABLED:-true}
       SCIENTIFIC_OPENMM_ENABLED: ${SCIENTIFIC_OPENMM_ENABLED:-true}
-      SCIENTIFIC_OPENMM_STEPS: ${SCIENTIFIC_OPENMM_STEPS:-100}
+      SCIENTIFIC_OPENMM_NPT: ${SCIENTIFIC_OPENMM_NPT:-true}
+      SCIENTIFIC_OPENMM_NPT_PS: ${SCIENTIFIC_OPENMM_NPT_PS:-200}
+      SCIENTIFIC_OPENMM_WALL_CLOCK_S: ${SCIENTIFIC_OPENMM_WALL_CLOCK_S:-3600}
+      SCIENTIFIC_OPENMM_MINIMIZE_ITERATIONS: ${SCIENTIFIC_OPENMM_MINIMIZE_ITERATIONS:-2000}
+      SCIENTIFIC_OPENMM_MIN_FRAMES: ${SCIENTIFIC_OPENMM_MIN_FRAMES:-10}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      BIOLOGIX_LLM_MODEL: ${BIOLOGIX_LLM_MODEL:-claude-opus-5}
+      BIOLOGIX_LLM_EFFORT: ${BIOLOGIX_LLM_EFFORT:-high}
+      BIOLOGIX_RETRO_PLAN_ATTEMPTS: ${BIOLOGIX_RETRO_PLAN_ATTEMPTS:-2}
+      EXPERIMENT_JOB_TIMEOUT_S: ${EXPERIMENT_JOB_TIMEOUT_S:-5400}
       BIOLOGIX_AI_OPENMM_PLATFORM: ${BIOLOGIX_AI_OPENMM_PLATFORM:-auto}
+      BIOLOGIX_AI_OPENMM_MATRIX_FIXED_MODE: ${BIOLOGIX_AI_OPENMM_MATRIX_FIXED_MODE:-true}
+      BIOLOGIX_AI_OPENMM_MATRIX_N_POLYMERS: ${BIOLOGIX_AI_OPENMM_MATRIX_N_POLYMERS:-8}
+      BIOLOGIX_AI_OPENMM_MATRIX_BOX_NM: ${BIOLOGIX_AI_OPENMM_MATRIX_BOX_NM:-0}
+      BIOLOGIX_AI_OPENMM_CANDIDATE_TIMEOUT_S: ${BIOLOGIX_AI_OPENMM_CANDIDATE_TIMEOUT_S:-240}
       BIOLOGIX_AIZYNTH_TIMEOUT: ${BIOLOGIX_AIZYNTH_TIMEOUT:-360}
       BIOLOGIX_PLATFORM_RUNS_DIR: /app/runs/platform
       STALE_JOB_MINUTES: ${STALE_JOB_MINUTES:-45}
+    deploy:
+      replicas: ${WORKER_REPLICAS:-1}
     volumes:
       - ./runs:/app/runs
       - ./data:/app/data
+      - opencode-auth:/root/.local/share/opencode
     depends_on:
       postgres:
         condition: service_healthy

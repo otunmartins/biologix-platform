@@ -18,6 +18,30 @@ export type Experiment = {
   updated_at: string;
 };
 
+export type EvidenceReaction = { reactants: string; products: string; conditions: string };
+export type EvidenceSource = { name: string; reactions: EvidenceReaction[] };
+
+export type Preflight = {
+  root_product_found: boolean;
+  tree_root: string;
+  paper_count: number;
+  warnings: string[];
+  blocking_reactants: string[];
+  leaf_reachability: Record<string, { purchasable: boolean; resolution_source: string; blocking: boolean }>;
+};
+
+export const emptyReaction = (): EvidenceReaction => ({ reactants: "", products: "", conditions: "" });
+export const emptySource = (): EvidenceSource => ({ name: "", reactions: [emptyReaction()] });
+
+export function usableSources(sources: EvidenceSource[]): EvidenceSource[] {
+  return sources
+    .map(source => ({
+      name: source.name.trim(),
+      reactions: source.reactions.filter(reaction => reaction.reactants.trim() && reaction.products.trim()),
+    }))
+    .filter(source => source.name && source.reactions.length > 0);
+}
+
 export type Artifact = {
   id: string;
   kind: string;

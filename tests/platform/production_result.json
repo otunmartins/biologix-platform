@@ -1,0 +1,416 @@
+{
+  "name": "Pipeline audit - PEG insulin",
+  "biologic_target": "Human insulin",
+  "polymer_target": "PEG",
+  "description": "End to end audit of the real scientific pipeline",
+  "parameters": {
+    "retrosynthesis_extractions": {
+      "Herzberger et al. 2016, Chem. Rev.": "Reaction 1:\nReactants: ethylene oxide, water\nProducts: poly(ethylene glycol)\nConditions: KOH, 120 C, 6 h"
+    },
+    "retrosynthesis_material_name": "poly(ethylene glycol)"
+  },
+  "id": "74c35ab7-dea0-43d5-9721-353aa11de776",
+  "status": "done",
+  "results": {
+    "safety": {
+      "safe": false,
+      "admet": {
+        "flags": [
+          "LD50_Zhu=1.564 (threshold 500)"
+        ],
+        "smiles": "COCCC",
+        "available": true,
+        "predictions": {
+          "QED": 0.4752681489358652,
+          "AMES": 0.11900272220373154,
+          "DILI": 0.19232818484306335,
+          "hERG": 0.015664275735616684,
+          "logP": 1.0428000000000002,
+          "tpsa": 9.23,
+          "NR-AR": 0.005245588254183531,
+          "NR-ER": 0.022674862295389175,
+          "NR-AhR": 0.0021308406721800566,
+          "SR-ARE": 0.0052457875572144985,
+          "SR-HSE": 0.0021987571381032467,
+          "SR-MMP": 0.0007983731338754296,
+          "SR-p53": 0.0003904002660419792,
+          "ClinTox": 0.009772403165698051,
+          "HIA_Hou": 0.999995231628418,
+          "PPBR_AZ": 22.248266220092773,
+          "LD50_Zhu": 1.5637619495391846,
+          "Lipinski": 4.0,
+          "SR-ATAD5": 0.0005974267842248082,
+          "NIH_alert": 0.0,
+          "NR-AR-LBD": 0.0007543271058239043,
+          "NR-ER-LBD": 0.000985663733445108,
+          "Caco2_Wang": -3.8025145530700684,
+          "BBB_Martins": 0.9919587969779968,
+          "BRENK_alert": 0.0,
+          "PAINS_alert": 0.0,
+          "PAMPA_NCATS": 0.9916403889656067,
+          "CYP1A2_Veith": 0.19552749395370483,
+          "CYP2C9_Veith": 0.0016611249884590507,
+          "CYP2D6_Veith": 0.0011677920119836926,
+          "CYP3A4_Veith": 0.00018854734662454575,
+          "NR-Aromatase": 0.0007755520055070519,
+          "CYP2C19_Veith": 0.027915094047784805,
+          "NR-PPAR-gamma": 0.0006273638573475182,
+          "Skin_Reaction": 0.599281907081604,
+          "VDss_Lombardo": 3.6007297039031982,
+          "stereo_centers": 0.0,
+          "Half_Life_Obach": 20.638904571533203,
+          "Pgp_Broccatelli": 0.0006533337873406708,
+          "molecular_weight": 74.123,
+          "Bioavailability_Ma": 0.9705082178115845,
+          "Solubility_AqSolDB": -0.3561919331550598,
+          "Carcinogens_Lagunin": 0.12897659838199615,
+          "hydrogen_bond_donors": 0.0,
+          "Clearance_Microsome_AZ": 23.355817794799805,
+          "Clearance_Hepatocyte_AZ": 94.28524780273438,
+          "hydrogen_bond_acceptors": 1.0,
+          "Lipophilicity_AstraZeneca": 0.5732514262199402,
+          "HydrationFreeEnergy_FreeSolv": -1.7267329692840576,
+          "CYP2C9_Substrate_CarbonMangels": 0.164890319108963,
+          "CYP2D6_Substrate_CarbonMangels": 0.2827898859977722,
+          "CYP3A4_Substrate_CarbonMangels": 0.30254942178726196,
+          "QED_drugbank_approved_percentile": 43.16344463971881,
+          "AMES_drugbank_approved_percentile": 31.880492091388405,
+          "DILI_drugbank_approved_percentile": 33.286467486818985,
+          "hERG_drugbank_approved_percentile": 9.876977152899824,
+          "logP_drugbank_approved_percentile": 32.16168717047452,
+          "tpsa_drugbank_approved_percentile": 5.62390158172232,
+          "NR-AR_drugbank_approved_percentile": 6.502636203866433,
+          "NR-ER_drugbank_approved_percentile": 2.249560632688928,
+          "NR-AhR_drugbank_approved_percentile": 14.973637961335678,
+          "SR-ARE_drugbank_approved_percentile": 1.40597539543058,
+          "SR-HSE_drugbank_approved_percentile": 15.53602811950791,
+          "SR-MMP_drugbank_approved_percentile": 11.458699472759228,
+          "SR-p53_drugbank_approved_percentile": 2.776801405975396,
+          "ClinTox_drugbank_approved_percentile": 6.748681898066785,
+          "HIA_Hou_drugbank_approved_percentile": 93.77855887521969,
+          "PPBR_AZ_drugbank_approved_percentile": 10.263620386643234,
+          "LD50_Zhu_drugbank_approved_percentile": 6.748681898066785,
+          "Lipinski_drugbank_approved_percentile": 63.44463971880493,
+          "SR-ATAD5_drugbank_approved_percentile": 10.123022847100177,
+          "NIH_alert_drugbank_approved_percentile": 37.188049209138846,
+          "NR-AR-LBD_drugbank_approved_percentile": 3.725834797891037,
+          "NR-ER-LBD_drugbank_approved_percentile": 2.249560632688928,
+          "Caco2_Wang_drugbank_approved_percentile": 99.7188049209139,
+          "BBB_Martins_drugbank_approved_percentile": 97.4340949033392,
+          "BRENK_alert_drugbank_approved_percentile": 25.869947275922673,
+          "PAINS_alert_drugbank_approved_percentile": 47.59226713532514,
+          "PAMPA_NCATS_drugbank_approved_percentile": 98.17223198594026,
+          "CYP1A2_Veith_drugbank_approved_percentile": 65.13181019332163,
+          "CYP2C9_Veith_drugbank_approved_percentile": 11.985940246045695,
+          "CYP2D6_Veith_drugbank_approved_percentile": 3.19859402460457,
+          "CYP3A4_Veith_drugbank_approved_percentile": 7.346221441124781,
+          "NR-Aromatase_drugbank_approved_percentile": 8.646748681898067,
+          "CYP2C19_Veith_drugbank_approved_percentile": 30.755711775043938,
+          "NR-PPAR-gamma_drugbank_approved_percentile": 14.481546572934976,
+          "Skin_Reaction_drugbank_approved_percentile": 60.597539543058005,
+          "VDss_Lombardo_drugbank_approved_percentile": 66.67838312829527,
+          "stereo_centers_drugbank_approved_percentile": 22.601054481546576,
+          "Half_Life_Obach_drugbank_approved_percentile": 58.875219683655544,
+          "Pgp_Broccatelli_drugbank_approved_percentile": 11.107205623901583,
+          "molecular_weight_drugbank_approved_percentile": 2.319859402460457,
+          "Bioavailability_Ma_drugbank_approved_percentile": 99.26186291739896,
+          "Solubility_AqSolDB_drugbank_approved_percentile": 91.45869947275924,
+          "Carcinogens_Lagunin_drugbank_approved_percentile": 39.96485061511424,
+          "hydrogen_bond_donors_drugbank_approved_percentile": 11.63444639718805,
+          "Clearance_Microsome_AZ_drugbank_approved_percentile": 47.76801405975396,
+          "Clearance_Hepatocyte_AZ_drugbank_approved_percentile": 85.97539543057998,
+          "hydrogen_bond_acceptors_drugbank_approved_percentile": 6.854130052724078,
+          "Lipophilicity_AstraZeneca_drugbank_approved_percentile": 39.789103690685415,
+          "HydrationFreeEnergy_FreeSolv_drugbank_approved_percentile": 97.15289982425308,
+          "CYP2C9_Substrate_CarbonMangels_drugbank_approved_percentile": 61.230228471001766,
+          "CYP2D6_Substrate_CarbonMangels_drugbank_approved_percentile": 75.7469244288225,
+          "CYP3A4_Substrate_CarbonMangels_drugbank_approved_percentile": 37.926186291739896
+        }
+      },
+      "smiles": "COCCC",
+      "warnings": [
+        "LD50_Zhu=1.564 (threshold 500)"
+      ],
+      "smarts_hits": []
+    },
+    "physics": {
+      "result": {
+        "errors": [],
+        "results": {
+          "md_results_raw": [
+            {
+              "box_nm": 7.5,
+              "method": "OpenMM_matrix_bulk_AMBER14SB_GAFF_Gasteiger",
+              "psmiles": "[*]OCC[*]",
+              "gromacs_only": false,
+              "packing_mode": "bulk",
+              "shell_angstrom": null,
+              "n_insulin_atoms": 786,
+              "n_polymer_chains": 100,
+              "interaction_energy_kj_mol": -305.861364140992,
+              "n_polymer_atoms_per_chain": 58,
+              "potential_energy_complex_kj_mol": -10922.544405939283
+            }
+          ],
+          "high_performers": [
+            "[*]OCC[*]"
+          ],
+          "property_analysis": {
+            "[*]OCC[*]": {
+              "method": "OpenMM_matrix_bulk_AMBER14SB_GAFF_Gasteiger",
+              "psmiles": "[*]OCC[*]",
+              "insulin_polymer_contacts": null,
+              "composite_screening_score": null,
+              "interaction_energy_kj_mol": -305.861364140992,
+              "insulin_rmsd_to_initial_nm": null,
+              "potential_energy_complex_kj_mol": -10922.544405939283,
+              "potential_energy_insulin_kj_mol": null,
+              "potential_energy_polymer_kj_mol": null
+            }
+          },
+          "evaluation_progress": [
+            {
+              "index": 0,
+              "total": 1,
+              "method": "OpenMM_matrix_bulk_AMBER14SB_GAFF_Gasteiger",
+              "status": "completed",
+              "seconds": 10.766,
+              "material_name": "[*]OCC[*]",
+              "n_insulin_atoms": 786,
+              "n_polymer_atoms": null,
+              "psmiles_preview": "[*]OCC[*]",
+              "complex_pdb_path": null,
+              "monomer_png_path": null,
+              "n_polymer_chains": 100,
+              "complex_chemviz_backend": null,
+              "complex_chemviz_png_path": null,
+              "complex_preview_png_path": null,
+              "interaction_energy_kj_mol": -305.861364140992,
+              "potential_energy_complex_kj_mol": -10922.544405939283
+            }
+          ],
+          "effective_mechanisms": [
+            "favorable_interaction_energy"
+          ],
+          "problematic_features": [],
+          "successful_materials": [
+            "[*]OCC[*]"
+          ]
+        },
+        "psmiles_list": [
+          "[*]OCC[*]"
+        ],
+        "temperature_k": 310.0,
+        "biologic_target": "Human insulin"
+      },
+      "status": "completed"
+    },
+    "summary": {
+      "pdb_id": "4F1C",
+      "psmiles": "[*]OCC[*]",
+      "disposition": "review",
+      "polymer_target": "PEG",
+      "biologic_target": "Human insulin"
+    },
+    "compliance": {
+      "gras": true,
+      "notes": [
+        "FDA IIG listed. EMA excipient monograph. Widely used for protein PEGylation.",
+        "Immunogenicity structural alert(s) detected."
+      ],
+      "errors": [],
+      "psmiles": "[*]OCC[*]",
+      "approved_name": "Polyethylene glycol (PEG)",
+      "approved_match": "[*]OCC[*]",
+      "overall_status": "flagged",
+      "precedent_count": 95,
+      "aggregation_flags": [],
+      "jurisdiction_clear": true,
+      "immunogenicity_flags": [
+        {
+          "name": "anti_PEG_ether_repeat",
+          "note": "PEG-like ether repeat; anti-PEG antibodies documented in patients with prior PEG exposure.",
+          "severity": "warning"
+        }
+      ],
+      "jurisdictions_matched": [
+        "FDA",
+        "EMA"
+      ]
+    },
+    "validation": {
+      "valid": true,
+      "canonical": "[*]COC[*]",
+      "pubchem_lookup": {
+        "ok": true,
+        "warning": "Low Tanimoto similarity (0.38) between PubChem reference and capped PSMILES; the PSMILES may not represent this material.",
+        "similarity": 0.375,
+        "pubchem_cid": 174,
+        "monomer_name": "PEG",
+        "pubchem_iupac": "ethane-1,2-diol",
+        "pubchem_smiles": "C(CO)O"
+      },
+      "name_consistency": {
+        "found": {
+          "ether": 1
+        },
+        "missing": [],
+        "expected": {
+          "ether": ">=1"
+        },
+        "warnings": [],
+        "consistent": true
+      },
+      "functional_groups": {
+        "urea": 0,
+        "amide": 0,
+        "amine": 0,
+        "ester": 0,
+        "ether": 1,
+        "imide": 0,
+        "ketone": 0,
+        "aldehyde": 0,
+        "aromatic": 0,
+        "hydroxyl": 0,
+        "carbonate": 0,
+        "sulfonate": 0,
+        "thioether": 0,
+        "fluorinated": 0,
+        "carboxylic_acid": 0
+      }
+    },
+    "capabilities": {
+      "rdkit": true,
+      "openmm": true,
+      "packmol": true,
+      "admet_ai": true,
+      "aizynthfinder": true,
+      "openmm_platform": "CPU",
+      "openmm_platforms": [
+        "Reference",
+        "CPU"
+      ],
+      "retrosynthesis_agent": true
+    },
+    "retrosynthesis": {
+      "result": {
+        "errors": [],
+        "request": {
+          "target": "poly(ethylene glycol)",
+          "constraints": {
+            "max_steps": 10,
+            "max_routes": 3,
+            "banned_reagents": [],
+            "allowed_mechanisms": null,
+            "enrich_monomers_with_aizynth": true,
+            "require_purchasable_monomers": false
+          },
+          "session_dir": "/app/runs/platform/74c35ab7-dea0-43d5-9721-353aa11de776",
+          "biologic_target": "Human insulin",
+          "biologic_pdb_path": null
+        },
+        "metadata": {
+          "target_smiles": "CCO",
+          "target_psmiles": "[*]OCC[*]",
+          "biologic_target": "Human insulin",
+          "route_provenance": "session_agent_llm",
+          "reporting_honesty": "Provenance: session_agent_llm (literature-derived RetroSyn KG routes).",
+          "retro_agent_error": null,
+          "aizynth_skip_reason": "No eligible monomer SMILES, enrich_monomers_with_aizynth=false, or all monomers marked non-runnable",
+          "retro_workspace_ready": true,
+          "material_name_resolved": "poly(ethylene glycol)",
+          "retro_stages_completed": [
+            "session_extractions",
+            "kg_tree"
+          ],
+          "aizynth_monomers_solved": 0,
+          "aizynthfinder_available": true,
+          "aizynth_monomers_attempted": 0,
+          "aizynthfinder_models_ready": true,
+          "extractions_reaction_count": 1,
+          "requires_agent_extractions": false,
+          "session_extractions_present": true,
+          "retrosynthesis_agent_available": true,
+          "kg_empty_after_session_extractions": false
+        },
+        "warnings": [],
+        "polymer_routes": [
+          {
+            "steps": [],
+            "monomers": [],
+            "recommended": true,
+            "pathway_score": 1.0,
+            "target_polymer": "poly(ethylene glycol)",
+            "literature_refs": [],
+            "polymerization_type": "unknown"
+          }
+        ]
+      },
+      "status": "completed"
+    }
+  },
+  "progress": 100,
+  "current_stage": "complete",
+  "progress_log": [
+    {
+      "stage": "capabilities",
+      "detail": "Inspecting scientific runtime capabilities",
+      "progress": 5,
+      "timestamp": "2026-08-30T09:24:26.329360+00:00"
+    },
+    {
+      "stage": "target_resolution",
+      "detail": "Resolving the biologic target",
+      "progress": 12,
+      "timestamp": "2026-08-30T09:24:26.339445+00:00"
+    },
+    {
+      "stage": "structure_validation",
+      "detail": "Validating the polymer structure",
+      "progress": 24,
+      "timestamp": "2026-08-30T09:24:26.347613+00:00"
+    },
+    {
+      "stage": "safety_screen",
+      "detail": "Running structural and ADMET safety screening",
+      "progress": 38,
+      "timestamp": "2026-08-30T09:24:27.526433+00:00"
+    },
+    {
+      "stage": "compliance",
+      "detail": "Checking regulatory precedent and formulation alerts",
+      "progress": 50,
+      "timestamp": "2026-08-30T09:24:30.986364+00:00"
+    },
+    {
+      "stage": "retrosynthesis",
+      "detail": "Planning available retrosynthesis routes",
+      "progress": 62,
+      "timestamp": "2026-08-30T09:24:30.992048+00:00"
+    },
+    {
+      "stage": "openmm",
+      "detail": "Running molecular physics when the runtime supports it",
+      "progress": 78,
+      "timestamp": "2026-08-30T09:24:32.541581+00:00"
+    },
+    {
+      "stage": "artifacts",
+      "detail": "Generating report, results, and audit artifacts",
+      "progress": 92,
+      "timestamp": "2026-08-30T09:24:43.332589+00:00"
+    },
+    {
+      "stage": "complete",
+      "detail": "Scientific workflow completed",
+      "progress": 100,
+      "timestamp": "2026-08-30T09:24:43.948754+00:00"
+    }
+  ],
+  "error_message": null,
+  "started_at": "2026-08-30T09:24:26.147739Z",
+  "completed_at": "2026-08-30T09:24:43.948744Z",
+  "job_id": "2daef022-fc4d-4b1b-b841-fb36f29efbbd",
+  "created_at": "2026-08-30T09:24:25.615574Z",
+  "updated_at": "2026-08-30T09:24:43.950728Z"
+}

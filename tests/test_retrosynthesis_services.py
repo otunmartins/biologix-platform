@@ -63,15 +63,42 @@ class TestRetrosynthesisService:
         assert len(result.polymer_routes) == 0
         assert result.metadata.get("requires_agent_extractions") is True
 
-    def test_plan_without_extractions_returns_none_provenance(self):
+    def test_plan_without_extractions_uses_curated_route_for_known_polymer(self):
         from biologix_ai.services.retrosynthesis_service import plan_retrosynthesis
 
         request = RetrosynthesisRequest(target="PEG", constraints=RetrosynthesisConstraints(max_routes=1))
         result = plan_retrosynthesis(request)
-        assert result.metadata.get("route_provenance") in ("none", "session_agent_llm")
-        if result.metadata.get("route_provenance") == "none":
-            assert len(result.polymer_routes) == 0
-            assert result.metadata.get("requires_agent_extractions") is True
+        assert result.metadata.get("route_provenance") == "curated_template"
+        assert len(result.polymer_routes) == 1
+        assert result.metadata.get("requires_agent_extractions") is False
+
+    def test_plga_curated_route_contains_both_cyclic_monomers(self):
+        from biologix_ai.services.retrosynthesis_service import plan_retrosynthesis
+
+        request = RetrosynthesisRequest(
+            target="PLGA",
+            constraints=RetrosynthesisConstraints(enrich_monomers_with_aizynth=False),
+        )
+        result = plan_retrosynthesis(request)
+        assert result.metadata.get("route_provenance") == "curated_template"
+        assert {m.name for m in result.polymer_routes[0].monomers} == {
+            "lactide", "glycolide"
+        }
+
+    def test_chitosan_curated_route_uses_chitin_precursor(self):
+        from biologix_ai.services.retrosynthesis_service import plan_retrosynthesis
+
+        request = RetrosynthesisRequest(
+            target="chitosan",
+            constraints=RetrosynthesisConstraints(enrich_monomers_with_aizynth=False),
+        )
+        result = plan_retrosynthesis(request)
+        assert result.metadata.get("route_provenance") == "curated_template"
+        assert len(result.polymer_routes) == 1
+        route = result.polymer_routes[0]
+        assert route.target_polymer == "chitosan"
+        assert route.steps[0].reactant_names == ["chitin"]
+        assert route.steps[0].reaction_type == "alkaline deacetylation"
 
     def test_plan_with_session_extractions_builds_routes_or_none(self, tmp_path):
         import json
@@ -100,7 +127,9 @@ class TestRetrosynthesisService:
         )
         result = plan_retrosynthesis(request)
         assert result.metadata.get("session_extractions_present") is True
-        assert result.metadata.get("route_provenance") in ("session_agent_llm", "none")
+        assert result.metadata.get("route_provenance") in (
+            "session_agent_llm", "curated_template"
+        )
         if result.metadata.get("route_provenance") == "session_agent_llm":
             assert len(result.polymer_routes) >= 1
 
@@ -184,6 +213,17 @@ class TestRetrosynthesisService:
         assert result.smiles == "CCO"
         assert isinstance(result.safe, bool)
         assert isinstance(result.warnings, list)
+
+    def test_ld50_zhu_unit_conversion_is_not_raw_mg_kg_comparison(self):
+        from biologix_ai.services.toxicity_service import (
+            _ld50_log_inverse_molar_to_mg_kg,
+        )
+
+        # Ethanol MW 46.07 and a model output of 1.0 means 0.1 mol/kg,
+        # hence approximately 4607 mg/kg—not "1 mg/kg".
+        converted = _ld50_log_inverse_molar_to_mg_kg("CCO", 1.0)
+        assert converted is not None
+        assert converted == pytest.approx(4606.9, rel=0.01)
 
     def test_smarts_detects_acrylamide(self):
         from biologix_ai.services.toxicity_service import _run_smarts_screen

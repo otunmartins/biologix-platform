@@ -88,6 +88,9 @@ admet = [
     # ADMET-AI: install from submodule with pip install -e extern/admet_ai
 ]
 api = [
+    # The scientific pipeline asks Claude for the chemistry judgement calls, so the
+    # worker cannot run without the SDK.
+    "anthropic>=1.0",
     "fastapi>=0.115",
     "uvicorn>=0.30",
     "sqlalchemy>=2.0",

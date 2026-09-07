@@ -80,7 +80,7 @@ def _effective_matrix_target_density_g_cm3() -> Optional[float]:
     explicit = _matrix_target_density_g_cm3()
     if explicit is not None:
         return explicit
-    if _env_bool("BIOLOGIX_AI_OPENMM_MATRIX_FIXED_MODE", False):
+    if _env_bool("BIOLOGIX_AI_OPENMM_MATRIX_FIXED_MODE", True):
         return None
     return _env_float("BIOLOGIX_AI_OPENMM_MATRIX_DEFAULT_DENSITY_G_CM3", "", "0.52")
 
@@ -558,7 +558,8 @@ class MDSimulator:
         progress: List[Dict[str, Any]] = []
         n_repeats = _env_int("BIOLOGIX_AI_OPENMM_N_REPEATS", "BIOLOGIX_AI_GMX_N_REPEATS", "4")
         n_polymers = _env_int("BIOLOGIX_AI_OPENMM_MATRIX_N_POLYMERS", "", "8")
-        box_nm = _env_float("BIOLOGIX_AI_OPENMM_MATRIX_BOX_NM", "", "7.5")
+        box_nm_raw = _env_float("BIOLOGIX_AI_OPENMM_MATRIX_BOX_NM", "", "0")
+        box_nm: Optional[float] = box_nm_raw if box_nm_raw > 0 else None
         density_n_min = _env_int("BIOLOGIX_AI_OPENMM_MATRIX_DENSITY_N_MIN", "", "4")
         density_n_max = _env_int("BIOLOGIX_AI_OPENMM_MATRIX_DENSITY_N_MAX", "", "100")
         shell_a = _env_float("BIOLOGIX_AI_OPENMM_MATRIX_SHELL_A", "", "14.0")
@@ -568,6 +569,7 @@ class MDSimulator:
         run_npt = _env_bool("BIOLOGIX_AI_OPENMM_MATRIX_NPT", False)
         npt_ps = _env_float("BIOLOGIX_AI_OPENMM_MATRIX_NPT_PS", "", "0.5")
         wall_s = _env_float("BIOLOGIX_AI_OPENMM_MATRIX_WALL_CLOCK_S", "", "180.0")
+        equil_fraction = _env_float("BIOLOGIX_AI_OPENMM_MATRIX_EQUIL_FRACTION", "", "0.5")
         progressive_pack = _matrix_progressive_pack()
         _rs = os.environ.get("BIOLOGIX_AI_OPENMM_MATRIX_RESTRAIN_SHELL")
         if _rs is None or not str(_rs).strip():
@@ -611,6 +613,7 @@ class MDSimulator:
             run_npt=run_npt,
             barostat_interval_fs=barostat_fs,
             npt_duration_ps=npt_ps,
+            equilibration_fraction=equil_fraction,
             wall_clock_limit_s=wall_s,
             packing_mode=packing_mode,
         )
