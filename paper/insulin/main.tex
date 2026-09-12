@@ -3,13 +3,13 @@
 \documentclass[twocolumn]{fairmeta}
 \input{../shared/main_imports}
 
-\title{Towards Discovery of Polymeric Materials for Insulin Delivery via Physics-Grounded Agentic Workflows}
+\title{Towards Discovery of Polymers for Insulin Delivery via Physics-Grounded Agentic Workflows}
 
-\author[1]{Otun Martins}
+\author[1]{Martins Otun}
 % Affiliation: numbered address line only (cf.\ Meta FAIR preprint style).
-\affiliation[1]{Algonix Ltd., United Kingdom}
+\affiliation[1]{Algonix AI Ltd., Scotland, United Kingdom}
 % Resource / contact block appears after the abstract in the title box (bold labels).
-\metadata[Domain]{\href{https://algonix.co.uk}{algonix.co.uk}}
+%\metadata[Website]{\href{https://algonix.co.uk}{algonix.co.uk}}
 \metadata[Code]{\url{https://github.com/otunmartins/FRIDGEFREENET}}
 \correspondence{O.M. (\email{martins@algonix.co.uk})}
 
@@ -17,10 +17,11 @@
 Cold-chain storage limits access to insulin for hundreds of millions of people; a thermally protective patch polymer could help, but the design space is too large for exhaustive experiment.
 Starting from that problem, we narrow to an agentic workflow: a large language model (LLM) calls physics-based tools through the Model Context Protocol (MCP), searching the discrete PSMILES space under a budget of OpenMM Packmol-matrix evaluations.
 The LLM acts as an implicit acquisition function conditioned on a persistent ``discovery world'': hypotheses, literature claims, and simulation outcomes updated each iteration.
-Under matched oracle budgets, the best autonomous campaign reaches an insulin--polymer interaction energy of $-2263$~kJ/mol, outperforming reinforcement-learning baselines by 68\% and Bayesian optimization by 19\%.
+Under matched oracle budgets, the best autonomous campaign reaches a single-draw insulin--polymer interaction energy of $-2263$~kJ/mol; because packing energies carry ${\sim}12\%$ stochastic noise, we additionally replicate every method's champion candidate ($n{=}20$ each) and report the noise-corrected comparison: a mean of $-1533$~kJ/mol (95\% CI $-1648$ to $-1419$), 26\% below the replicated reinforcement-learning champion and 29\% below the replicated Bayesian-optimization champion (Welch $p<0.001$ for both).
 Three independent campaigns converge on one structural motif (dense hydrogen-bond donors and acceptors per repeat unit) while physics checks reject infeasible packings and name--structure mismatches before they steer the next step.
+These are computational screening results from a single-point energy-minimization oracle, not experimentally validated materials.
 The science stage is CPU-bound and runs on commodity hardware.
-Zooming back out, the same architecture applies to other protein-stabilization tasks whenever a tractable screening oracle is available.}
+The same architecture is not specific to insulin, but transfer to other protein-stabilization tasks remains untested.}
 
 \begin{document}
 
@@ -32,7 +33,7 @@ Zooming back out, the same architecture applies to other protein-stabilization t
 
 Diabetes affects over 500 million people worldwide, and its management depends critically on insulin that must be stored between 2 and 8$^{\circ}$C~\cite{hsu2022glycosylated}.
 In resource-limited settings, where refrigeration is unreliable or absent, this cold-chain requirement leads to degraded medication and preventable complications.
-A transdermal patch whose polymer matrix stabilizes insulin at ambient temperature would fundamentally change access to treatment, but the combinatorial space of candidate polymers is vast, and no single experimental campaign can screen more than a tiny fraction of it.
+A transdermal patch whose polymer matrix stabilizes insulin at ambient temperature could substantially widen access to treatment, but the combinatorial space of candidate polymers is vast, and no single experimental campaign can screen more than a tiny fraction of it.
 
 Polymer informatics has begun to narrow this space computationally.
 Machine-readable repeat-unit notations such as PSMILES~\cite{lin2019bigsmiles,kuenneth2023polybert} and graph-neural-network property predictors trained on curated databases~\cite{huan2020polymer,kern2022solvent,gurnani2024ai} enable rapid surrogate evaluation.
@@ -42,18 +43,18 @@ What is missing is a closed loop in which candidate generation, explicit molecul
 Meanwhile, large language model (LLM) agents have demonstrated the ability to orchestrate multi-step scientific workflows.
 Boiko et al.\ showed autonomous chemical synthesis planning~\cite{boiko2023autonomous}, Zheng et al.\ applied ChatGPT to metal--organic framework prediction~\cite{zheng2023chatgpt}, and the Kosmos system combined parallel agents through a shared world model for multi-domain discovery~\cite{kosmos2025}.
 Stephens and Salawu formalized such agentic processes as probability chains over tool calls, providing a mathematical vocabulary for analyzing how state updates, inference functionals, and action-space partitioning affect the likelihood of reaching a goal~\cite{stephens2025mathframing}.
-Those exemplars emphasize synthesis planning, porous-crystal prediction, or cross-domain literature agents rather than budgeted search over polymer repeat units with explicit energy evaluation against a specified protein structure between hypothesis updates.
+Those examples emphasize synthesis planning, porous-crystal prediction, or cross-domain literature agents rather than budgeted search over polymer repeat units with explicit energy evaluation against a specified protein structure between hypothesis updates.
 Complementary work increasingly connects LLMs to molecular dynamics and simulation stacks, including simulation-informed training of MD assistants~\cite{mdagent2_2026}, natural-language control of MD engines~\cite{simulon2026}, and autonomous simulation agents for polymer benchmark workflows~\cite{liu2024asa}.
-We focus on a different closed loop: MCP-mediated tools for literature mining, PSMILES validation, and Packmol--OpenMM screening of a protein--polymer matrix, with a persistent discovery world that records falsifying energies and packing failures before the next iteration, benchmarked against reinforcement learning and tree-structured Parzen optimization under a matched oracle budget.
 
-We instantiate this design as an agentic discovery platform built on the Model Context Protocol (MCP)~\cite{mcp2024}.
+
+In this work, we focus on a different closed loop that combines literature mining, cheminformatics, and molecular simulations to screen a range of polymeric materials. We instantiate this design as an agentic discovery platform built on the Model Context Protocol (MCP)~\cite{mcp2024}.
 The platform exposes literature mining, PSMILES validation, cheminformatics mutation, and OpenMM Packmol-matrix screening as callable tools; a persistent ``discovery world'' accumulates hypotheses, simulation outcomes, and literature claims across iterations.
 Formally, we cast the search as budget-constrained optimization over the discrete PSMILES space, where the LLM serves as an implicit acquisition function~\cite{yang2024opro} conditioned on a structured state that classical optimizers lack~\cite{shahriari2016bayesopt}.
 The simulation stage is CPU-bound, so the entire workflow runs on commodity hardware, compatible with the local and edge LLM deployments gaining traction in resource-constrained laboratories~\cite{xu2024ondevice}.
 
-This paper makes three contributions.
+The paper is organized as follows.
 First, we formalize the agentic discovery loop using the probabilistic-chain framework of Stephens and Salawu and budget-constrained regret theory, and we compare the degrees of freedom available to RL, Bayesian optimization, and LLM-agent strategies (\S\ref{sec:methods}).
-Second, we benchmark DQN, PPO, and Optuna TPE against three independent 25-iteration autonomous LLM campaigns on the same physics objective, showing that the agentic workflow reduces simple regret by up to 68\% over RL (\S\ref{sec:results}).
+Second, we benchmark DQN, PPO, and Optuna TPE against three independent 25-iteration autonomous LLM campaigns on the same physics objective; after correcting for oracle noise via replicate evaluation, the agentic workflow reduces simple regret by 26\% over RL and 29\% over Bayesian optimization (\S\ref{sec:results}).
 Third, we analyze the chemical reasoning recorded in the discovery world, demonstrating cross-campaign convergence on hydrogen-bond-dense motifs and quantifying how physics-based falsification prunes hallucinated or sterically untenable proposals (\S\ref{sec:analysis}).
 
 %% =====================================================================
@@ -64,8 +65,14 @@ Third, we analyze the chemical reasoning recorded in the discovery world, demons
 \subsection{Platform architecture}
 
 We implement the platform as a single Python MCP server~\cite{mcp2024} (FastMCP) that registers tools for literature mining, polymer validation, molecular screening, cheminformatics mutation, and session management.
-It runs inside the \texttt{biologix-ai-sim} conda environment, which bundles OpenMM~\cite{eastman2017openmm}, RDKit~\cite{landrum2013rdkit}, Packmol~\cite{packmol2009}, the Open Force Field toolkit~\cite{qiu2021development}, and Stable-Baselines3~\cite{sb3_2021}.
+It runs inside the \texttt{insulin-ai-sim} conda environment, which bundles OpenMM~\cite{eastman2017openmm}, RDKit~\cite{landrum2013rdkit}, Packmol~\cite{packmol2009}, the Open Force Field toolkit~\cite{qiu2021development}, and Stable-Baselines3~\cite{sb3_2021}.
 An LLM hosted by OpenCode (or Cursor) connects to this server and calls tools in response to user prompts; model weights, tool schema, and session artifacts are version-controlled alongside the scientific code.
+
+\paragraph{LLM provenance and reproducibility.}
+Campaigns A, B, and C were driven by OpenCode CLI~1.3.3, provider \texttt{opencode} (OpenCode Zen), model alias \texttt{big-pickle}, agent profile \texttt{materials-discovery}, run between 25~March and 4~April 2026.
+RL and Optuna use no LLM at all: both call \texttt{MDSimulator.evaluate\_candidates()} directly and never invoke the MCP server.
+We record this alias rather than a specific model checkpoint because OpenCode Zen routes \texttt{big-pickle} to a backing model that is not publicly disclosed and may change over time without a corresponding alias-version bump; this is a genuine reproducibility limitation of provider-hosted LLM routing, not specific to our platform, and we flag it as such in \S\ref{sec:epistemic}.
+What we can and do pin exactly are the artifacts that determine what the agent could do and observe at each step: the versioned agent instruction file (\texttt{.opencode/agent/materials-discovery.md}), the MCP tool schema, the verbatim per-iteration prompts and directives, and the full \texttt{agent\_iteration\_N.json} state trail for every campaign, all of which are included in the code release.
 
 Figure~\ref{fig:architecture} summarizes the data flow.
 Each discovery session creates a folder under \texttt{runs/<session\_id>/} containing per-iteration state files (\texttt{agent\_iteration\_N.json}), a structured world-model rollup (\texttt{discovery\_world.json}), cumulative best-candidate records (\texttt{ALL\_ITERATIONS\_BEST\_CANDIDATES.tsv}), structure artifacts (PDB, PNG), and a compiled summary report (Markdown and PDF).
@@ -137,11 +144,13 @@ P(\mathbf{a} \mid c) = \prod_{i=1}^{n} P(a_i \mid s_{i-1},\, c),
 \label{eq:chain}
 \end{equation}
 where $s_0 = s_0(c)$ is the initial prompt state and $s_i = u(a_i, s_{i-1})$ is the state update~\cite{puterman1994mdp}.
+In plain terms, Eq.~\ref{eq:chain} just says that each tool call the agent makes depends on everything that happened before it, not on the initial prompt alone.
 Under the ReAct formalism the LLM generates a reasoning trace (``thought'') $t_i$ before each tool call, so
 \begin{equation}
 P^t(a_i \mid s_{i-1}) = P(a_i \mid t_i, s_{i-1})\; P(t_i \mid s_{i-1}).
 \label{eq:react}
 \end{equation}
+That is, the agent first ``thinks'' in natural language, then chooses its next tool call conditioned on that thought as well as on the state.
 Each action decomposes as $a_i \to (\alpha_i, x_i, o_i)$, where $\alpha_i \in \{\texttt{mine},\, \texttt{generate},\, \texttt{mutate},\, \texttt{screen},\, \texttt{patch\_world}\}$ is the MCP tool class, $x_i$ is its argument, and $o_i$ is the returned observation.
 
 Different search strategies occupy different positions in this framework depending on the optimization levers (the \emph{degrees of freedom}) available to each (Table~\ref{tab:dof}).
@@ -172,12 +181,14 @@ Let $\mathcal{X}$ denote the discrete space of valid PSMILES and let $f\!:\!\mat
 f(x) = E_\text{int}(x) + \epsilon, \quad \epsilon \sim \mathcal{N}(0,\,\sigma^2),
 \label{eq:oracle}
 \end{equation}
-where $\sigma$ captures stochastic packing variability (${\sim}$15\% in our protocol).
+where $\sigma$ captures stochastic Packmol packing variability, later estimated at ${\sim}$12\% of $|E_\text{int}|$ from replicate measurements (\S\ref{sec:stats}).
+In words: re-evaluating the same PSMILES twice gives two different energies, and Eq.~\ref{eq:oracle} treats that difference as measurement noise on top of a true value $E_\text{int}(x)$, not as a real chemical distinction.
 The agent selects candidates $x_1,\ldots,x_B$ under oracle budget $B$; the goal is to minimize the \emph{simple regret}~\cite{shahriari2016bayesopt,srinivas2010gpucb}
 \begin{equation}
 r_B = f(x^\star) - \min_{t \le B} f(x_t).
 \label{eq:regret}
 \end{equation}
+Regret is just the gap between the best energy found so far and the true (unknown) optimum $f(x^\star)$; a method with lower regret has found a better candidate for the same number of oracle queries $B$.
 Classical Bayesian optimization chooses the next query by maximizing an explicit acquisition function $\alpha(x \mid \mathcal{D}_t)$ such as expected improvement or GP-UCB~\cite{srinivas2010gpucb}.
 The LLM agent instead implements an \emph{implicit acquisition}~\cite{yang2024opro,liu2025igpo},
 \begin{equation}
@@ -185,12 +196,14 @@ x_{t+1} = \pi_\text{LLM}(s_t) \;\approx\; \arg\max_{x\in\mathcal{X}}\; \alpha_\t
 \label{eq:implicit_acq}
 \end{equation}
 conditioned on the full state $s_t = (\mathcal{D}_t, \mathcal{W}_t, \mathcal{H}_t)$, which includes the evaluation history $\mathcal{D}_t$, the discovery-world hypotheses $\mathcal{W}_t$, and the LLM's implicit belief $\mathcal{H}_t$.
+Concretely, Eq.~\ref{eq:implicit_acq} says the LLM's next proposal behaves \emph{as if} it were optimizing an acquisition function, even though no such function is ever written down or computed explicitly; the language model's own judgment stands in for it.
 Iterations that \emph{falsify} a hypothesis (packing failures, name--structure mismatches) contribute high information gain
 \begin{equation}
 I_t = H(\mathcal{H}_t) - H(\mathcal{H}_t \mid o_t,\, \mathcal{W}_{t+1})
 \label{eq:infogain}
 \end{equation}
 even when $f(x_t)$ is poor.
+Plainly, $I_t$ measures how much a single observation narrows down the agent's belief about which chemical families are worth pursuing; a failed experiment that rules out an entire family of structures can be as informative as a successful one.
 Such observations are wasted budget under RL or Optuna (which have no hypothesis state $\mathcal{W}_t$) but valuable in the agentic loop because they prune unpromising chemical families from future exploration.
 
 \subsection{Discovery world model}
@@ -296,33 +309,44 @@ Table~\ref{tab:benchmarks} summarizes performance across all methods.
 
 \begin{table*}[t]
 \centering
-\caption{Benchmark and agentic results. RL rows: mean $\pm$ std over seeds 42, 123, 456. Optuna: seed~42. Campaign session identifiers appear in Table footnotes; $N_\text{eval}$ for Campaign~C estimated from session transcript (${\sim}$50+ screened, ${\sim}$10 Packmol failures).}
+\caption{Benchmark and agentic results, corrected against the surviving raw evaluation logs (this revision).
+$E_\text{int}^\text{best}$ is the single best draw, as originally reported.
+$E_\text{int}^\text{repl.}$ is the noise-corrected champion mean (95\% CI, $n$) from a dedicated $n{=}20$ replicate re-evaluation of that same PSMILES at independent Packmol seeds (\S\ref{sec:stats}); DQN, PPO, and Optuna seed~456 converge on the identical champion, so they share one replicate estimate.
+RL rows: mean $\pm$ std of $E_\text{int}^\text{best}$ over seeds 42, 123, 456; per-seed values and corrected champion PSMILES are in the text (\S\ref{sec:baselines}).
+Optuna row: mean $\pm$ std over the same three seeds (previously seed~42 only).
+$N_\text{eval}$ and unique-PSMILES counts for Campaigns~B and~C are lower bounds: 3 and 15 of 25 iteration files, respectively, are missing from the surviving session logs.
+Session identifiers: Campaign~A~=~\texttt{autonomous-25iter} (macOS); Campaign~B~=~\texttt{insulin\_patch\_autonomous\_25iter}; Campaign~C~=~\texttt{insulin\_patch\_autonomous\_25iter\_1} (both Linux).}
 \label{tab:benchmarks}
-\small
-\begin{tabular}{lccccc}
+\footnotesize
+\begin{tabular}{lccccl}
 \toprule
-\textbf{Method} & \textbf{$N_\text{eval}$} & \textbf{$E_\text{int}^\text{best}$ (kJ/mol)} & \textbf{Unique PSMILES} & \textbf{Wall time} & \textbf{Best candidate} \\
+\textbf{Method} & \textbf{$N_\text{eval}$} & \textbf{$E_\text{int}^\text{best}$} & \textbf{$E_\text{int}^\text{repl.}$ (95\% CI, $n$)} & \textbf{Unique} & \textbf{Best candidate} \\
 \midrule
-DQN (3 seeds)   & $99 \pm 1$  & $-1345 \pm 67$   & 14 & ${\sim}$8 min  & \texttt{[*]CCOC([*])=O} \\
-PPO (3 seeds)   & $100$       & $-1314 \pm 185$  & 14 & ${\sim}$8 min  & \texttt{[*]CCOC([*])=O} \\
-Optuna TPE      & 143         & $-1902$          & 26 & ${\sim}$1.9 h  & \texttt{[*]NC(=O)NC([*])=O} \\
-Campaign~A (LLM)   & 115+        & $\mathbf{-2263}$ & 25+ & ${\sim}$6 h  & \texttt{[*]CNC(=O)NC([*])=O} \\
-Campaign~B (LLM)   & 30          & $-1545$          & 30 & ${\sim}$4 h  & polyhistidine \\
-Campaign~C (LLM)   & 50+         & $-1765$          & 50+ & ${\sim}$5 h  & polygalacturonic acid \\
+DQN (3 seeds)   & $99 \pm 1$  & $-1345 \pm 67$   & $-1214$ $[-1321,-1108]$, $n{=}20$ & 14 & \texttt{[*]CCC(=O)C([*])=O} \\
+PPO (3 seeds)   & $100$       & $-1314 \pm 185$  & $-1214$ $[-1321,-1108]$, $n{=}20$ & 14 & \texttt{[*]CCC(=O)C([*])=O} \\
+Optuna TPE (3 seeds) & $144 \pm 1$ & $-1815 \pm 86$ & $-1190$ $[-1259,-1122]$, $n{=}20$ & 26 & \texttt{[*]NNC(=O)C([*])=O} \\
+Campaign~A (LLM)   & 122        & $\mathbf{-2263}$ & $\mathbf{-1533}$ $[-1648,-1419]$, $n{=}20$ & 105 & \texttt{[*]CNC(=O)NC([*])=O} \\
+Campaign~B (LLM)   & 28+        & $-1545$          & $-1054$ $[-1134,-974]$, $n{=}19$\footnotemark[1] & 28+ & \texttt{[*]NC(Cc1cnc[nH]1)C([*])=O} \\
+Campaign~C (LLM)   & 27+        & $-1765$          & $-1635$ $[-2108,-1162]$, $n{=}5$\footnotemark[2] & 24+ & \texttt{[*]OC(=O)C(O)C(O)C(O)C([*])C=O} \\
 \bottomrule
 \end{tabular}
+\footnotetext[1]{1 of 20 replicate evaluations failed (Packmol timeout).}
+\footnotetext[2]{15 of 20 replicate evaluations failed (Packmol timeout); the wide interval reflects both this and the small surviving $n$, not unusually variable packing.}
 \end{table*}
 
 \subsection{Baseline performance (RL and Optuna)}
+\label{sec:baselines}
 
 Both RL algorithms converge rapidly (the first mutation from PEG already produces a favorable candidate) but plateau early.
 DQN achieves a cross-seed mean of $-1345 \pm 67$~kJ/mol; PPO reaches $-1314 \pm 185$~kJ/mol with wider variance, reflecting greater sensitivity to the random seed under on-policy updates.
+All six DQN and PPO runs (seeds 42, 123, 456) converge on the identical champion \texttt{[*]CCC(=O)C([*])=O}; the reported per-algorithm means are therefore repeated Packmol draws of one molecule, not a measurement of algorithmic difference between DQN and PPO (\S\ref{sec:stats}).
 Each method evaluates ${\sim}$100 candidates in ${\sim}$450~s but discovers only 14 unique PSMILES, indicating substantial re-evaluation.
 The fixed mutation library confines both agents to ester and ether backbones; neither discovers amide-rich or nitrogen-heterocyclic motifs.
 In the language of \S\ref{sec:formulation}, RL operates with $\mathcal{W}_t = \emptyset$ and a fixed $\{\alpha\}$, so it cannot escape the chemical neighborhood of its PEG seed.
 
-Optuna evaluates 143 candidates across 20 trials, discovering 26 unique PSMILES and reaching $-1902$~kJ/mol, a substantial improvement over RL at 15$\times$ the wall time (6807~s).
-TPE's explicit acquisition function samples more broadly, finding the urea-bridged structure \texttt{[*]NC(=O)NC([*])=O} ($-1683$~kJ/mol) that RL never encounters.
+Optuna evaluates $144\pm1$ candidates across 20 trials per seed (seeds 42, 123, 456), discovering 26--27 unique PSMILES per seed and reaching $-1815 \pm 86$~kJ/mol across seeds, a substantial improvement over RL at 15$\times$ the wall time (${\sim}$6800~s per seed).
+Each seed converges on a different champion: seed~42 finds \texttt{[*]NNC(=O)C([*])=O} ($-1902$~kJ/mol), seed~123 finds \texttt{[*]CC(O)CC([*])O} ($-1813$~kJ/mol), and seed~456 finds the same \texttt{[*]CCC(=O)C([*])=O} champion as every RL run.
+TPE's explicit acquisition function samples more broadly than RL's fixed mutation library, finding the urea-bridged structure \texttt{[*]NC(=O)NC([*])=O} ($-1683$~kJ/mol) that RL never encounters.
 However, it also proposes a hydrolytically unstable peroxide-ester (\texttt{[*]OOC(=O)C([*])=O}, $-1171$~kJ/mol), illustrating energy-only optimization without chemical judgment.
 
 \subsection{Agentic campaigns}
@@ -330,16 +354,16 @@ However, it also proposes a hydrolytically unstable peroxide-ester (\texttt{[*]O
 We ran three independent 25-iteration LLM campaigns, each with a different exploration strategy.
 
 \textbf{Campaign~A} emphasizes synthetic repeat units, heterocyclic urethanes, and mutation-guided refinement.
-It evaluates over 115 candidates and yields three scaffolds below $-2100$~kJ/mol, with best energy $-2263$~kJ/mol for poly(N-acetyl-1,2-diaminoethane), a 19\% gain over Optuna and 68\% over DQN (Figure~\ref{fig:running_best}).
+It evaluates 122 candidates (105 unique PSMILES; 21 additional calls failed on Packmol timeout) and yields three scaffolds below $-2100$~kJ/mol, with best single-draw energy $-2263$~kJ/mol for poly(N-acetyl-1,2-diaminoethane) -- a 19\% gain over Optuna's single-seed best and 68\% over DQN's mean, as originally reported, though \S\ref{sec:stats} shows this single draw is a favorable outlier and revises the comparison to 26--29\% once every method's champion is replicated (Figure~\ref{fig:running_best}).
 The running-best curve rises through oxazolidinone and lactamide intermediates to the C2 amide breakthrough at iteration~15, with hydroxamic and hydrazide analogs extending the frontier through iteration~25.
 
 \textbf{Campaign~B} starts from a curated polymer table (PEG, PLGA, chitosan), then pivots after mid-campaign stagnation toward amino acid polymers under a biomimetic hypothesis.
-Only 30 distinct PSMILES are evaluated, yet the running best improves from chitosan ($-1460$~kJ/mol) to polyhistidine ($-1545$~kJ/mol) at iteration~23.
+At least 28 distinct PSMILES are evaluated (3 of 25 iteration logs are missing from the surviving session, so this is a lower bound), yet the running best improves from chitosan ($-1460$~kJ/mol) to polyhistidine ($-1545$~kJ/mol) at iteration~23.
 Campaign~B explores a different subspace ($\alpha$-amino acid backbones) and independently reinforces the importance of dense hydrogen-bonding groups.
 
 \textbf{Campaign~C} emphasizes acidic polysaccharides and uronic acids.
 Polygalacturonic acid reaches $-1765$~kJ/mol at iteration~7 (Table~\ref{tab:agentic_top_c}), with polyglucuronic acid ($-1574$~kJ/mol) and polyhydrazide ($-1496$~kJ/mol) as runners-up.
-The campaign screened approximately 50+ candidates, with ${\sim}$10 Packmol failures (high-charge polylysine, aromatic polytyrosine) paralleling the physics-driven rejection observed in Campaigns~A and B.
+Only 10 of 25 iteration logs survive for this campaign, so its counts are lower bounds: at least 27 candidates were screened to completion (24 unique PSMILES), with 5 further Packmol failures (high-charge polylysine, aromatic polytyrosine) among the surviving logs, paralleling the physics-driven rejection observed in Campaigns~A and B; the original manuscript's ``50+'' estimate exceeded what the surviving logs can support and is corrected here.
 
 \begin{figure*}[t]
 \centering
@@ -407,9 +431,9 @@ The campaign screened approximately 50+ candidates, with ${\sim}$10 Packmol fail
     cmstyle,
     width=0.48\textwidth,
     height=5.4cm,
-    xlabel={Unique PSMILES evaluated},
+    xlabel={Unique PSMILES evaluated (Campaigns B, C are lower bounds)},
     ylabel={Best $E_{\mathrm{int}}$ (kJ/mol)},
-    xmin=8, xmax=58,
+    xmin=5, xmax=112,
     ymin=-2400, ymax=-900,
 ]
 \addplot[only marks, mark=square*, mark size=2.5pt, ragblue,
@@ -418,41 +442,91 @@ The campaign screened approximately 50+ candidates, with ${\sim}$10 Packmol fail
 \addplot[only marks, mark=triangle*, mark size=3pt, psmilesgreen,
          error bars/.cd, y dir=both, y explicit]
     coordinates {(14, -1314) +- (0, 185)};
-\addplot[only marks, mark=*, mark size=2.5pt, mdorange]
-    coordinates {(26, -1902)};
+\addplot[only marks, mark=*, mark size=2.5pt, mdorange,
+         error bars/.cd, y dir=both, y explicit]
+    coordinates {(26, -1815) +- (0, 86)};
 \addplot[only marks, mark=diamond*, mark size=3.5pt, activepurple]
-    coordinates {(25, -2263)};
+    coordinates {(105, -2263)};
 \addplot[only marks, mark=pentagon*, mark size=3.5pt, expbteal]
-    coordinates {(30, -1545)};
+    coordinates {(28, -1545)};
 \addplot[only marks, mark=+, mark size=3.5pt, expccopper,
          mark options={thick,scale=1.6}]
-    coordinates {(50, -1765)};
+    coordinates {(24, -1765)};
 \node[font=\fontsize{6}{7}\fontfamily{cmr}\selectfont, anchor=south west]
     at (axis cs:15.5,-1278) {DQN};
 \node[font=\fontsize{6}{7}\fontfamily{cmr}\selectfont, anchor=south west]
     at (axis cs:15.5,-1100) {PPO};
 \node[font=\fontsize{6}{7}\fontfamily{cmr}\selectfont, anchor=east]
-    at (axis cs:24,-1902) {Optuna};
+    at (axis cs:24,-1815) {Optuna};
 \node[font=\fontsize{6}{7}\fontfamily{cmr}\selectfont, anchor=west]
-    at (axis cs:26.5,-2263) {A};
+    at (axis cs:107,-2263) {A};
 \node[font=\fontsize{6}{7}\fontfamily{cmr}\selectfont, anchor=west]
-    at (axis cs:31.5,-1545) {B};
+    at (axis cs:29.5,-1500) {B$^+$};
 \node[font=\fontsize{6}{7}\fontfamily{cmr}\selectfont, anchor=west]
-    at (axis cs:51.5,-1765) {C};
+    at (axis cs:25.5,-1810) {C$^+$};
 \end{axis}
 \end{tikzpicture}%
 }
 \endgroup
-\caption{Cross-method comparison. (a)~Running-best interaction energy over 25 iterations for Campaigns A--C, with horizontal baselines for DQN mean, PPO mean, and Optuna's best. (b)~Best interaction energy vs.\ unique PSMILES evaluated; error bars show $\pm 1\sigma$ over three RL seeds.}
+\caption{Cross-method comparison. (a)~Running-best interaction energy over 25 iterations for Campaigns A--C, with horizontal baselines for DQN mean, PPO mean, and Optuna's best (seed~42). (b)~Best single-draw interaction energy vs.\ unique PSMILES evaluated; error bars show $\pm 1\sigma$ over three seeds (RL and Optuna alike). Campaign B and C unique-PSMILES counts (marked $^+$) are lower bounds from incomplete session logs (\S\ref{sec:results}); see \S\ref{sec:stats} for noise-corrected champion energies replacing these single draws.}
 \label{fig:results_panel}
 \end{figure*}
 
 \subsection{Cross-method comparison}
 
-Figure~\ref{fig:comparison} plots best energy against unique PSMILES evaluated for all methods.
+Figure~\ref{fig:comparison} plots best single-draw energy against unique PSMILES evaluated for all methods.
 RL agents consume their budget $B$ efficiently (8~min) but achieve high regret because their restricted degrees of freedom (Table~\ref{tab:dof}) confine the search to 14 structures near the PEG seed.
-Optuna reduces regret by 41\% relative to DQN's mean but at 15$\times$ the wall time and still without hypothesis-level reasoning.
-Campaign~A achieves the lowest simple regret with 25+ unique structures; Campaigns~B and~C explore complementary chemical subspaces, collectively confirming that the agentic framework's additional degrees of freedom (the implicit acquisition function (Eq.~\ref{eq:implicit_acq}) and the discovery-world state update $u_\text{selective}$) translate into better regret under matched budgets.
+Optuna reduces regret by 35\% relative to DQN's mean, using the honest three-seed Optuna mean rather than its single best seed, but at 15$\times$ the wall time and still without hypothesis-level reasoning.
+Campaign~A achieves the lowest simple regret with 105 unique structures; Campaigns~B and~C explore complementary chemical subspaces with far fewer evaluations, collectively suggesting that the agentic framework's additional degrees of freedom (the implicit acquisition function (Eq.~\ref{eq:implicit_acq}) and the discovery-world state update $u_\text{selective}$) contribute to lower regret under matched budgets -- a claim \S\ref{sec:stats} tests directly by removing packing noise from the comparison.
+
+\subsection{Statistical treatment}
+\label{sec:stats}
+
+The comparisons above, like the original manuscript, are single-draw: one Packmol packing per champion PSMILES.
+Because packing geometry is stochastic, we quantify and then remove this noise before drawing conclusions, addressing the referees' request for confidence intervals, hypothesis tests, and repeated runs.
+
+\paragraph{Noise model.}
+Pooling every PSMILES observed at least twice anywhere in the surviving logs ($n{=}50$ such groups) and regressing the within-group standard deviation against the group mean's magnitude, a proportional model $\sigma \approx 0.116\,|\bar{E}|$ fits better than an additive constant ($\sigma \approx 120$~kJ/mol; residual sum of squares 218{,}440 vs.\ 261{,}686), and $\sigma$ correlates with $|\bar{E}|$ (Pearson $r{=}0.50$, $p{=}2.3{\times}10^{-4}$).
+Packmol noise is therefore closer to ${\sim}$12\% of the interaction energy's magnitude than the ${\sim}$15\% figure asserted without support in the original manuscript, and it grows with $|E_\text{int}|$ -- so the deepest-scoring candidates are also the noisiest in absolute terms.
+
+\paragraph{Replicate study.}
+We re-evaluate the champion (or, for RL/Optuna, the champion PSMILES) of every method, plus two additional Campaign~A top candidates, urea (cited in \S\ref{sec:analysis} but never itself a campaign champion), and PEG (the RL/Optuna seed, as a low-$|E|$ anchor), each at $n{=}20$ independent Packmol seeds, $16$-way candidate-parallel, single-worker-equivalent by construction (\S\ref{sec:screening}).
+Table~\ref{tab:replicates} reports the mean, $n$, and a bootstrap 95\% CI ($10^4$ resamples) for each.
+
+\begin{table}[t]
+\centering
+\caption{Replicate-corrected champion/anchor energies, $n{=}20$ Packmol seeds per candidate unless noted.}
+\label{tab:replicates}
+\scriptsize
+\begin{tabular}{@{}lrr@{}}
+\toprule
+\textbf{Candidate} & \textbf{Mean} & \textbf{95\% CI ($n$)} \\
+\midrule
+RL/Optuna-456 champ. & $-1214$ & $[-1310,-1120]$ (20) \\
+Optuna-42 champ.      & $-1190$ & $[-1254,-1127]$ (20) \\
+Optuna-123 champ.     & $-1301$ & $[-1362,-1244]$ (20) \\
+Campaign~A champ.     & $-1533$ & $[-1635,-1428]$ (20) \\
+Campaign~A \#2        & $-1849$ & $[-1946,-1731]$ (20) \\
+Campaign~A \#3        & $-1413$ & $[-1531,-1294]$ (20) \\
+Polyhistidine (B)     & $-1054$ & $[-1125,-980]$ (19) \\
+Polygalact.\ acid (C) & $-1635$ & $[-1920,-1342]$ (5)\footnotemark[3] \\
+Urea                  & $-1625$ & $[-1721,-1516]$ (20) \\
+PEG (RL/Optuna seed)  & $-501$  & $[-559,-441]$ (20) \\
+\bottomrule
+\end{tabular}
+\\[2pt]
+{\scriptsize Energies in kJ/mol.}
+\footnotetext[3]{15 of 20 seeds failed on Packmol timeout for this candidate; the wide interval reflects the small surviving $n$.}
+\end{table}
+
+Two results follow directly.
+First, every champion regresses toward the mean under replication, most sharply Campaign~A's headline candidate ($-2263 \to -1533$~kJ/mol, a favorable single-draw outlier consistent with the ${\sim}$12\% noise model above) but also Optuna's seed-42 champion ($-1902 \to -1190$~kJ/mol).
+This is not predetermined by the noise model alone -- Campaign~A's \#2 candidate instead regresses \emph{upward} in magnitude ($-2200 \to -1849$~kJ/mol) and becomes the strongest binder of the ten once replicated -- so we report what the replicate draws show rather than assume every single-draw record was inflated.
+Second, despite this regression, Campaign~A's champion remains significantly better than both baselines: a Welch's $t$-test on the $n{=}20$ replicate samples gives $t{=}-4.27$, $p{=}1.3{\times}10^{-4}$ against the RL/Optuna-456 champion (mean difference $-319$~kJ/mol, bootstrap 95\% CI on the difference $[-463,-176]$, excluding zero) and $t{=}-5.37$, $p{=}7.3{\times}10^{-6}$ against the Optuna-42 champion (mean difference $-343$~kJ/mol, bootstrap CI $[-462,-221]$).
+Using these replicate means in place of single draws, Campaign~A's advantage is 26\% over RL and 29\% over Optuna, revising the originally reported 68\% and 19\% downward but leaving the qualitative conclusion -- that the agentic workflow reaches a better champion under a matched budget -- intact and statistically supported.
+
+We also note, for completeness, that the surviving raw logs contain six \emph{opportunistic} (non-randomized, campaign-embedded) re-evaluations of Campaign~A's champion, mean $-2023 \pm 172$~kJ/mol; the manuscript's originally reported figures for this quantity ($-2086 \pm 250$ in \S\ref{sec:sar} and ${\approx}{-1877}$ in Appendix Excerpt~5) were mutually inconsistent arithmetic errors on a two- and three-point subset of these six, respectively.
+The dedicated $n{=}20$ replicate study above supersedes both and is what we report as the headline number throughout this revision.
 
 %% =====================================================================
 \section{Analysis of Chemical Reasoning}
@@ -482,6 +556,7 @@ These traces show the agent using simulation outcomes to update qualitative mode
 \end{figure*}
 
 \subsection{Structure--activity relationships}
+\label{sec:sar}
 
 \begin{table*}[t]
 \centering
@@ -555,7 +630,7 @@ These traces show the agent using simulation outcomes to update qualitative mode
 Poly(N-acetyl-1,2-diaminoethane) (\texttt{[*]CNC(=O)NC([*])=O}, $-2263$~kJ/mol, iteration~15; Table~\ref{tab:agentic_top}) defines the structural optimum.
 Its C2 backbone carries a primary amine, a secondary amide, and a primary amide: three nitrogen atoms that provide multiple hydrogen-bond donors and complementary carbonyl acceptors.
 This spacing matches the Asn, Gln, and Arg side chains exposed on the insulin B-chain helix (PDB 4F1C).
-Replication in iteration~16 ($-1909$~kJ/mol) confirms robustness within the ${\sim}$15\% packing noise $\epsilon$ (Eq.~\ref{eq:oracle}); the two-evaluation mean of $-2086 \pm 250$~kJ/mol still exceeds Optuna's best by 10\%.
+Replication in iteration~16 ($-1909$~kJ/mol) is within the packing noise $\epsilon$ (Eq.~\ref{eq:oracle}) of the iteration-15 draw; a dedicated $n{=}20$ replicate study (\S\ref{sec:stats}, Table~\ref{tab:replicates}) puts this candidate's noise-corrected mean at $-1533 \pm 245$~kJ/mol (95\% CI $[-1648,-1419]$), still significantly stronger than either baseline's replicate-corrected champion ($p<0.001$, \S\ref{sec:stats}).
 
 Campaign~A's systematic probing reveals several local structure--activity rules.
 \emph{Backbone length:} the C3 variant failed to pack within 300~s, suggesting the C2 geometry is precisely complementary to insulin's surface.
@@ -563,6 +638,45 @@ Campaign~A's systematic probing reveals several local structure--activity rules.
 \emph{Heteroatom substitution:} thio-oxazolidinone scores $-830$~kJ/mol versus $-1665$~kJ/mol for the oxygen parent, a 50\% loss consistent with sulfur's weaker hydrogen-bond acceptance and larger van der Waals radius.
 \emph{Hydroxyl cooperativity:} the hydroxamic acid variant ($-2200$~kJ/mol) demonstrates near-optimal binding when CONHOH is combined with a secondary amide; similarly, secondary hydroxyl placement outperforms primary ($-1807$ vs.\ $-1576$~kJ/mol).
 \emph{Hydrazide motif:} introduced in the final iterations, secondary hydrazide ($-2145$~kJ/mol) enters the top~3, mirroring the primary/secondary amide trend.
+
+\subsection{Quantitative structure--activity descriptors}
+\label{sec:descriptors}
+
+The design rule above ("favor repeat units that present multiple NH and C{=}O contacts per monomer") is qualitative.
+To make it quantitative, we compute eight per-repeat-unit RDKit descriptors -- molecular weight (MW), topological polar surface area (TPSA), hydrogen-bond donor and acceptor counts ($n_\text{hbd}$, $n_\text{hba}$), rotatable-bond count, calculated log$P$, the count of N and O atoms ($n_{\text{N+O}}$), and the heteroatom fraction of heavy atoms -- for all 136 unique PSMILES resolved across the three campaigns, and correlate each against its mean interaction energy (Spearman $\rho$, $n{=}136$; Figure~\ref{fig:descriptors}, Table~\ref{tab:descriptors}).
+
+\begin{table}[t]
+\centering
+\caption{Spearman correlation of repeat-unit descriptors with $E_\text{int}$ across all 136 uniquely resolved campaign PSMILES.}
+\label{tab:descriptors}
+\footnotesize
+\begin{tabular}{lrrr}
+\toprule
+\textbf{Descriptor} & \textbf{$\rho$} & \textbf{95\% CI} & \textbf{$p$} \\
+\midrule
+$n_{\text{N+O}}$        & $-0.77$ & $[-0.84,-0.67]$ & $2{\times}10^{-27}$ \\
+TPSA                    & $-0.70$ & $[-0.78,-0.60]$ & $1{\times}10^{-21}$ \\
+c$\log P$               & $+0.69$ & $[0.60,0.76]$   & $1{\times}10^{-20}$ \\
+$n_\text{hba}$          & $-0.63$ & $[-0.72,-0.51]$ & $2{\times}10^{-16}$ \\
+$n_\text{hbd}$          & $-0.60$ & $[-0.70,-0.47]$ & $2{\times}10^{-14}$ \\
+Heteroatom fraction     & $-0.59$ & $[-0.70,-0.46]$ & $3{\times}10^{-14}$ \\
+MW                      & $-0.47$ & $[-0.61,-0.31]$ & $6{\times}10^{-9}$ \\
+Rotatable bonds         & $-0.29$ & $[-0.45,-0.12]$ & $6{\times}10^{-4}$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\columnwidth]{figures/descriptor_correlation_panel.png}
+\caption{Per-repeat-unit descriptors vs.\ mean interaction energy, all campaigns pooled ($n{=}136$ unique PSMILES); Spearman $\rho$ and 95\% CI annotated per panel.}
+\label{fig:descriptors}
+\end{figure}
+
+Every descriptor correlates with $E_\text{int}$ at $p<10^{-3}$, confirming the qualitative motif is a real, quantifiable trend rather than a post-hoc narrative fitted to a handful of top candidates.
+$n_{\text{N+O}}$ is the single strongest correlate ($\rho{=}{-0.77}$), ahead of TPSA ($\rho{=}{-0.70}$) and hydrogen-bond acceptor/donor counts ($\rho{=}{-0.63}/{-0.60}$); c$\log P$ correlates positively ($\rho{=}{+0.69}$), consistent with more polar, less lipophilic repeat units binding insulin's exposed, largely polar B-chain surface more strongly.
+Rotatable-bond count is the weakest correlate ($\rho{=}{-0.29}$), suggesting backbone flexibility plays a smaller role than heteroatom content once TPSA and $n_{\text{N+O}}$ are accounted for.
+These trends support, but do not replace, the mechanistic reading in \S\ref{sec:sar}: nitrogen- and oxygen-dense, polar repeat units bind more strongly on average, and the campaigns' top candidates sit at the dense-polar extreme of this distribution rather than being outliers from it.
 
 \subsection{Divergent exploration strategies}
 
@@ -573,6 +687,7 @@ Campaign~C stays in polyelectrolyte and polysaccharide chemistry, with a literat
 Together they are complementary: one stress-tests local structure--activity relationships, another tests protein-like repeat units, and the third probes acidic polysaccharide motifs under the same screening oracle $f$.
 
 \subsection{Hallucinations and physics as falsification}
+\label{sec:hallucination}
 
 LLM-driven name-to-structure pipelines can emit plausible-looking PSMILES that do not correspond to established repeat units.
 In Campaign~B the agent labels a brominated diaryl sulfone as ``polysulfone''; real polysulfone is a bisphenol--ether--sulfone copolymer.
@@ -590,24 +705,29 @@ None of the three agentic campaigns proposed peroxide linkers, illustrating how 
 %% =====================================================================
 
 Taken together, the results connect a domain-scale need (cold-chain insulin) to a concrete polymer-design workflow and then to broader lessons about agentic optimization under physics oracles.
-The agentic advantage documented in this work is structural, not statistical.
-Campaign~A's 68\% regret reduction over RL and 19\% over Optuna does not stem from evaluating vastly more structures (115+ vs.\ 143 for Optuna); it stems from the additional degrees of freedom available to the LLM agent (Table~\ref{tab:dof}).
+The workflow's edge over RL and Optuna is structural rather than purely a matter of evaluation count.
+Once packing noise is removed by replication (\S\ref{sec:stats}), Campaign~A's champion still beats both replicate-corrected baseline champions by 26--29\% ($p<0.001$), and this margin does not stem from evaluating vastly more structures (122 evaluations, 105 unique, vs.\ ${\sim}$144 per Optuna seed); it stems from the additional degrees of freedom available to the LLM agent (Table~\ref{tab:dof}).
 RL operates with $\mathcal{W}_t = \emptyset$ and a fixed mutation library $\{\alpha\}$, confining the search to ester and ether backbones near the PEG seed.
 Optuna adds an explicit acquisition function but no hypothesis-level reasoning.
 By conditioning on the full state $(\mathcal{D}_t, \mathcal{W}_t, \mathcal{H}_t)$, the LLM agent's implicit acquisition (Eq.~\ref{eq:implicit_acq}) accesses polymer families (heterocyclic urethanes, C2 diamide scaffolds, hydroxamic acids, hydrazides) that lie entirely outside the RL mutation library.
-Campaigns~B and C confirm that even sparser trajectories (30--50+ evaluations) extract consistent design rules.
+Campaigns~B and C reach consistent design rules from far sparser trajectories (at least 28 and 27 evaluations, respectively).
 Information gain from falsified hypotheses (Eq.~\ref{eq:infogain}) prunes unpromising families early, reducing future exploration cost, a mechanism unavailable to methods without a world model.
 
 These results should be interpreted in light of the screening oracle's limitations.
-The Packmol-matrix protocol packs polymer chains around insulin in vacuum, minimizes, and computes a single-point interaction energy.
-It does not sample conformational ensembles, account for explicit solvent, or compute binding free energies.
-Replication reveals ${\sim}$15\% stochastic variability (iteration~15: $-2263$~kJ/mol; iteration~16: $-1909$~kJ/mol), so energy differences below ${\sim}$200~kJ/mol should be interpreted cautiously; the ${\sim}$900~kJ/mol gap between the agentic best and RL remains robust.
+The Packmol-matrix protocol packs polymer chains around insulin in vacuum, minimizes, and computes a single-point interaction energy; it does not sample conformational ensembles, account for explicit solvent, or compute binding free energies.
+Packing noise scales with $|E_\text{int}|$ at roughly 12\% of its magnitude (\S\ref{sec:stats}), so single-draw energy differences much below ${\sim}$150--200~kJ/mol are not reliable without replication; the replicate-corrected 319~kJ/mol gap between the agentic best and the RL/Optuna-456 champion is well above that threshold and remains statistically robust.
 This oracle noise $\epsilon$ (Eq.~\ref{eq:oracle}) also limits the precision of the implicit acquisition.
-Improving $f$ through NPT dynamics with the UMA universal force field~\cite{wood2025uma} or free-energy perturbation would sharpen the objective surface and likely amplify the agentic advantage.
+Improving $f$ through NPT dynamics with the UMA universal force field~\cite{wood2025uma} or free-energy perturbation would sharpen the objective surface and is the most direct route to a tighter, less noise-dominated comparison.
 
 The energy metric itself does not capture synthetic accessibility or thermal stability.
 Optuna's peroxide-ester ($-1171$~kJ/mol) illustrates the risk of energy-only optimization: the labile O--O bond would be immediately flagged by any domain expert.
 The agentic workflow avoids such proposals through implicit chemical knowledge, but systematic integration of synthesizability scores into the objective remains planned work.
+
+Two multi-agent mechanisms could plausibly improve on the single-agent campaigns reported here, and we did not run either.
+A \emph{round-robin tournament} would have $k$ independent agents each propose a candidate per round, score all $k$ against the shared oracle $f$, and carry only the winner's discovery-world state forward -- trading $k\times$ the oracle budget for a per-round max over $k$ implicit-acquisition draws (Eq.~\ref{eq:implicit_acq}), which should tighten simple regret (Eq.~\ref{eq:regret}) at the cost of a proportionally larger $B$.
+A \emph{proposer/skeptic debate} would instead keep one shared discovery world but split the single agent role into a proposer that argues for a candidate and a skeptic that must find a physical or chemical objection before the oracle is called, adding an argumentative filter upstream of the existing physics-based falsification (\S\ref{sec:hallucination}) rather than downstream of it.
+Neither was implemented because our MCP server and the OpenCode/Cursor clients that drive it expose one agent session per discovery run, with no first-party mechanism for two sessions to negotiate over a shared \texttt{discovery\_world.json} mid-iteration; building that coordination layer was out of scope for this revision.
+Our best guess, extrapolating from the single-agent design-rule convergence already observed across Campaigns~A--C (\S\ref{sec:sar}), is that a tournament would mainly buy faster convergence to the same structural motif rather than a qualitatively different one, since all three campaigns already converge there independently; a debate mechanism is the more speculative of the two, since it depends on whether a skeptic role can be prompted to raise objections the physics oracle would not otherwise catch, which is untested.
 
 A practical advantage of the platform is its compatibility with local and edge deployment.
 The entire science stage (OpenMM, Packmol, RDKit, and the RL baselines) ran on CPU hosts in this study; the LLM issues tool calls and updates JSON state.
@@ -617,6 +737,23 @@ Kosmos~\cite{kosmos2025} executes ${\sim}$42,000 lines of code and reads 1,500 p
 Our platform operates at a smaller scale yet provides two capabilities Kosmos lacks: physics-grounded screening through explicit simulation and iterative structure--activity reasoning that produces falsifiable hypotheses.
 The probabilistic-chain formalism~\cite{stephens2025mathframing} provides a common language for comparing such architectures: differences in $\mathcal{F}$, $u$, and $\{\alpha\}$ map directly to differences in achievable regret.
 
+\subsection{Scope and epistemic status}
+\label{sec:epistemic}
+
+A concern raised about this manuscript applies to the computational-agent literature generally, not only to this platform: LLMs are pretrained autoregressive predictors, not logical-inference engines, and they make mistakes that a casual read of a discovery-world log can obscure.
+Two design choices here partially, not fully, address this.
+First, every hypothesis that reaches the discovery world has already passed an external, non-learned check -- RDKit parsing, prescreen chemistry rules, and the Packmol--OpenMM oracle -- before it can influence the next iteration (\S\ref{sec:hallucination}).
+This validates the platform as a screening workflow that tolerates a share of LLM error, not as evidence that the underlying model reasons correctly.
+Second, physics falsification is necessary but not sufficient: it catches sterically impossible or energetically unfavorable proposals, but not a plausible-sounding structure that happens to pack and minimize without incident.
+We document one such case in \S\ref{sec:hallucination} (Campaign~B's ``polysulfone'' mislabeling of a brominated diaryl sulfone).
+We did not run a systematic per-candidate audit of name--structure consistency across all three campaigns, so we report this as a known, unquantified failure mode rather than assert a hallucination rate we did not measure; an automated consistency check gating every hypothesis before it reaches the discovery world is a natural next addition to the platform.
+
+More fundamentally, nothing in this paper is experimental evidence of material performance.
+The interaction energy of \S\ref{sec:screening} is a single-point, vacuum-phase, force-field energy after minimization; it does not model solvation, conformational ensembles, aggregation, thermal degradation, or release kinetics, and no candidate reported here has been synthesized or measured.
+What we have shown is that this agentic, physics-grounded workflow searches that proxy objective more effectively than the RL and Bayesian-optimization baselines under a matched budget (\S\ref{sec:stats}); we have not shown that the resulting polymers stabilize insulin in a vial or on skin.
+Closing that gap needs, at minimum: differential scanning calorimetry and circular dichroism to test whether the top-ranked candidates (Table~\ref{tab:agentic_top}) measurably raise insulin's thermal or conformational stability relative to a PEG or urea control; an HPLC-based aggregation assay under accelerated storage; and a controlled release assay from the candidate matrix.
+We regard the present results as a computational triage step that narrows a combinatorially large space to a short list worth that investment, not as a substitute for it.
+
 %% =====================================================================
 \section{Conclusions}
 %% =====================================================================
@@ -625,13 +762,14 @@ We have presented an agentic discovery platform that couples LLM-driven reasonin
 Three independent campaigns converge on a single design rule: dense hydrogen-bond donors and acceptors per repeat unit, while physics validation rejects hallucinated structures before they propagate.
 Falsified hypotheses produce high information gain (Eq.~\ref{eq:infogain}), accelerating convergence by pruning entire chemical families.
 
-The formal framework developed here (probability chain, implicit acquisition, simple regret) reveals that the agentic advantage is not about more evaluations but about more degrees of freedom in the optimization: the LLM agent conditions on a structured world model and a full MCP tool set, whereas RL and Bayesian optimization operate on strict subsets of this space (Table~\ref{tab:dof}).
+The formal framework developed here (probability chain, implicit acquisition, simple regret) locates the source of the workflow's edge in the optimization's degrees of freedom rather than in evaluation count: the LLM agent conditions on a structured world model and a full MCP tool set, whereas RL and Bayesian optimization operate on strict subsets of this space (Table~\ref{tab:dof}); this margin survives noise correction (\S\ref{sec:stats}).
 This analysis, grounded in the formalism of Stephens and Salawu~\cite{stephens2025mathframing} and budget-constrained regret theory~\cite{shahriari2016bayesopt}, provides a principled basis for comparing future agentic strategies.
 
 Because the simulation stage is CPU-bound, the entire workflow runs on commodity hardware, compatible with local and edge LLM deployments~\cite{xu2024ondevice,qu2024mobileedge} and local serving stacks~\cite{ollama2023}, making it accessible to resource-constrained laboratories.
 Replacing the current single-point screening oracle with higher-fidelity molecular dynamics (explicit solvent, free-energy perturbation, universal force fields~\cite{wood2025uma}) would tighten estimates of interaction strength and is the natural next step.
-Beyond insulin, the same platform architecture generalizes to any protein-stabilization or biologics-formulation problem (vaccines, enzyme therapeutics, antibody storage) wherever a computationally tractable screening oracle exists.
-Top candidates from the campaigns reported here merit experimental follow-up with stability and release assays.
+The same platform architecture is not specific to insulin, but we have not run it on any other protein-stabilization or biologics-formulation problem (vaccines, enzyme therapeutics, antibody storage); transfer to those settings is plausible given a comparably tractable screening oracle, but remains untested rather than demonstrated.
+This work is a computational screening study: every conclusion rests on a single-point, vacuum-phase energy-minimization oracle, and no candidate has been synthesized or measured (\S\ref{sec:epistemic}).
+Top candidates from Campaign~A merit exactly that experimental follow-up -- differential scanning calorimetry and circular dichroism for thermal stability, HPLC for aggregation, and a release assay -- before any claim of practical utility (\S\ref{sec:epistemic}).
 
 Code, benchmark scripts, and session folders are available in the project repository.
 
