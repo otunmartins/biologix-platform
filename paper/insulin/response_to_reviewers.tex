@@ -1,0 +1,540 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Response to reviewers -- arXiv:2605.18831 (Discover Chemistry)
+%% Build: ./compile_response.sh
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\documentclass[11pt]{article}
+
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb}
+\usepackage{enumitem}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{booktabs}
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{caption}
+\usepackage{threeparttable}
+
+\graphicspath{{figures/}{figures/response/}}
+
+\captionsetup[figure]{name={Response Figure}}
+\captionsetup[table]{name={Response Table},justification=raggedright,singlelinecheck=true}
+
+\newcounter{responsetab}
+% \responsefig[width]{file}{label}{caption}
+\newcommand{\responsefig}[4][0.62]{%
+  \begin{figure}[H]
+    \centering
+    \includegraphics[width=#1\linewidth]{#2}
+    \caption{#4}
+    \label{fig:response-#3}
+  \end{figure}%
+}
+\newcommand{\responsetab}[1]{%
+  \refstepcounter{responsetab}%
+  \caption{#1}%
+  \label{tab:response-\theresponsetab}%
+}
+
+% Caption tracks the tabular, not \textwidth. Small + tight columns
+% keep the float at content width instead of a full-measure slab.
+\newenvironment{rtable}[1]{%
+  \begin{table}[H]
+  \centering
+  \small
+  \setlength{\tabcolsep}{4.5pt}%
+  \begin{threeparttable}
+    \responsetab{#1}%
+}{%
+  \end{threeparttable}
+  \end{table}
+}
+
+% Status markers (internal tracking; strip before upload if desired)
+\newcommand{\done}{\textcolor{green!60!black}{\textbf{[Done]}}}
+\newcommand{\placeholder}{\textcolor{orange!80!black}{\textbf{[To do]}}}
+\newcommand{\deferred}[1]{\textcolor{red!70!black}{\textbf{[Deferred: #1]}}}
+
+\newcommand{\reviewercomment}[1]{%
+  \par\medskip
+  \noindent{\color{gray!50!black}\itshape #1}%
+  \par\medskip
+}
+
+\begin{document}
+
+\begin{center}
+  {\Large\textbf{Response to Reviewers}}\\[0.5em]
+  {\large Towards Discovery of Polymers for Insulin Delivery\\
+  via Physics-Grounded Agentic Workflows}\\[0.3em]
+  {\normalsize arXiv:2605.18831 \quad / \quad [manuscript number]}\\[0.2em]
+  {\normalsize Martins Otun}
+\end{center}
+
+\bigskip
+\noindent We thank the editor and the two reviewers. They read the manuscript carefully, and the comments below drove the revisions.
+We reproduce each remark (italic) and answer it in turn. Changes in the manuscript are marked in \textcolor{blue}{blue}.
+
+\vspace{0.5cm}
+
+\bigskip\hrule\bigskip
+
+%======================================================================
+\section*{Summary of Changes to the Manuscript}
+%======================================================================
+
+We revised the main text around the points that more than one reviewer raised.
+
+The published single-draw energies carry packing noise of order $12\%$ of $|E|$.
+We re-evaluated every method's champion candidate $n{=}20$ times at independent Packmol seeds and replaced the headline comparison with replicate means and bootstrap $95\%$ confidence intervals (manuscript \S Statistical treatment, Tables~2 and the new replicate table).
+The noise-corrected Campaign~A champion is $-1533$~kJ/mol (95\% CI $[-1635,-1428]$), $26\%$ below the replicated RL champion and $29\%$ below the replicated Optuna champion (Welch $p<10^{-3}$ for both).
+The previously reported $68\%$ and $19\%$ advantages were single-draw ratios and are withdrawn.
+
+We recovered exact evaluation counts from the campaign logs: Campaign~A $122$ completed evaluations ($105$ unique PSMILES); Campaigns~B and~C $28^+$ and $27^+$ (lower bounds; $3$ and $15$ iteration files are missing).
+The best-candidate column of Table~2 is corrected: every DQN and PPO seed, and Optuna seed~$456$, returned \texttt{[*]CCC(=O)C([*])=O}, not the ester or urea listed in the submitted table.
+
+The qualitative ``hydrogen-bond-dense motif'' claim is now a descriptor analysis: eight RDKit repeat-unit descriptors on $136$ unique PSMILES, with Spearman correlations and confidence intervals (manuscript \S Quantitative descriptors).
+Heteroatom count ($N{+}O$) is $\rho=-0.765$.
+
+Methods now state the LLM used for Campaigns~A--C (OpenCode Zen, alias \texttt{big-pickle}, agent \texttt{materials-discovery}, CLI~$1.3.3$) and that RL and Optuna use no LLM.
+A new ``Scope and epistemic status'' subsection states that the paper evidences workflow efficiency on a single-point energy-minimization oracle, not experimentally validated materials, and that transfer to other proteins is untested.
+
+Three items are still open: the full RL budget/schedule matrix (PPO, $4800$ timesteps, learning-rate and buffer variants), the warm-start prior matrix that answers Reviewer~1 point~3, and Campaign~A$'$ (labelled reconstruction / platform re-base).
+Campaign~B$'$ (same-prompt replicate) is running and is reported through the latest completed iteration.
+
+\newpage
+
+\bigskip\hrule\bigskip
+
+%======================================================================
+\section*{Reviewer \#1}
+%======================================================================
+
+\noindent\textit{In this manuscript, Martins Otun conducted cutting-edge polymer informatics research, proposing a physics-grounded agentic workflow capable of formulating hypotheses, validating them via MD simulations, and iteratively refining them. This workflow was demonstrated to outperform tools such as RL and Optuna, thereby facilitating the discovery of superior thermally protective patch polymers. Given that the underlying techniques and conclusions are at the frontier of the field, the experimental details and findings warrant further refinement and verification to better serve researchers in this area. Therefore, prior to publication in Discover Chemistry, the following concerns should be addressed:}
+
+\subsection*{1. RL budget, learning rate, and gradient accumulation}
+
+\reviewercomment{%
+Perhaps constrained by computational resource budgets, the reinforcement learning algorithms were only optimized for 8 minutes. Had they been run for the same duration as Campaigns A--C, could better results have been achieved? That is, strategies such as reducing the learning rate or employing gradient accumulation could be used to continue optimization beyond the loss plateau.%
+}
+
+\noindent\textbf{Response:}\par\medskip
+
+\noindent Extra timesteps are not the binding constraint.
+The published DQN and PPO runs used $160$ environment steps.
+We have now completed a DQN budget ladder at $160$ and $480$ timesteps $\times$ three seeds ($42$, $123$, $456$).
+All six finished runs return the identical champion \texttt{[*]CCC(=O)C([*])=O} at exactly $-1359.939$~kJ/mol.
+Two $1600$-step jobs are part-way through ($450/1600$ and $600/1600$) and have not left that champion.
+
+That is six independent complete runs across a $3\times$ budget increase, and a bit-identical best.
+The paper's six published DQN/PPO runs already converged on the same molecule; the ladder confirms that resampling the same neighbourhood does not find another.
+
+The mechanism is in \texttt{benchmarks/ibm\_insulin\_env.py}.
+\texttt{\_build\_initial\_pool()} is called only from \texttt{reset()}, which first clears \texttt{\_feedback\_state}.
+\texttt{refresh\_pool()} exists and is never called.
+The reachable set each episode is therefore exactly eight one-step mutants of the seed PSMILES, drawn i.i.d.\ per episode.
+Within-episode feedback is discarded.
+Extra timesteps resample that neighbourhood.
+
+Response Figure~\ref{fig:response-rl-ladder} and Response Table~\ref{tab:response-1} report the ladder.
+
+\responsefig[0.72]{rl_budget_ladder.png}{rl-ladder}{%
+  DQN best interaction energy versus budget.
+  Circles are finished jobs; squares are in-progress $1600$-step jobs.
+  All six finished seeds sit on the same champion, $-1359.9$~kJ/mol.}
+
+\begin{rtable}{DQN budget ladder.
+  Champion PSMILES is \texttt{[*]CCC(=O)C([*])=O} in every finished job.}
+  \begin{tabular}{lrrrl}
+    \toprule
+    Job & Target $t$ & Reached & Best $E$ / kJ\,mol$^{-1}$ & Status \\
+    \midrule
+    DQN seed~$42$ & $160$ & $160$ & $-1359.939$ & finished \\
+    DQN seed~$123$ & $160$ & $160$ & $-1359.939$ & finished \\
+    DQN seed~$456$ & $160$ & $160$ & $-1359.939$ & finished \\
+    DQN seed~$42$ & $480$ & $480$ & $-1359.939$ & finished \\
+    DQN seed~$123$ & $480$ & $480$ & $-1359.939$ & finished \\
+    DQN seed~$456$ & $480$ & $480$ & $-1359.939$ & finished \\
+    DQN seed~$42$ & $1600$ & $450$ & $-1359.939$ & in progress \\
+    DQN seed~$123$ & $1600$ & $600$ & $-1359.939$ & in progress \\
+    PPO, $t{=}4800$, LR / buffer variants & --- & $0$ & --- & not started \\
+    \bottomrule
+  \end{tabular}
+\end{rtable}
+
+We have exposed the previously hardcoded learning rate, replay-buffer size, and PPO $n_\text{steps}$ as CLI flags, with defaults that reproduce the published runs.
+A linear-decay learning-rate schedule and a larger DQN buffer (the reviewer's gradient-accumulation analogue) are implemented and queued.
+They have not been run.
+PPO has not been re-laddered.
+Those cells stay empty rather than guessed.
+
+The conceptual answer does not wait on those jobs: lengthening a search whose reachable set is eight one-step mutants of PEG will not produce Campaign~A's urea-adjacent champion. \placeholder
+
+\bigskip
+
+\subsection*{2. Which LLM was used}
+
+\reviewercomment{%
+Which LLM was used for RL and the subsequent Campaigns should be explicitly stated to facilitate potential reproducibility.%
+}
+
+\noindent\textbf{Response:}\par\medskip
+
+\noindent RL and Optuna use no LLM.
+Both call \texttt{MDSimulator.evaluate\_candidates()} in-process and never touch the MCP server.
+
+Campaigns~A, B, and~C were driven by OpenCode CLI~$1.3.3$, provider \texttt{opencode} (OpenCode Zen), model alias \texttt{big-pickle}, agent profile \texttt{materials-discovery}, between 25~March and 4~April 2026.
+Those fields are recovered from the OpenCode service logs (\texttt{providerID=opencode}, \texttt{modelID=big-pickle}, \texttt{agent=materials-discovery}, \texttt{version=1.3.3}).
+
+A Zen alias is a routed endpoint.
+The backing weights and their version are not publicly disclosed and can change without an alias bump.
+We state that as a reproducibility limitation in Methods and in \S Scope and epistemic status.
+What we pin exactly are the artifacts that determine what the agent could do and observe: the versioned agent file \texttt{.opencode/agent/materials-discovery.md}, the MCP tool schema, the per-iteration prompts, and the full \texttt{agent\_iteration\_N.json} trail.
+
+The same-prompt Campaign~B$'$ replicate uses OpenCode CLI~$1.17.4$ with the same alias and agent.
+We disclose the version gap rather than pretend the harness is identical. \done
+
+\bigskip
+
+\subsection*{3. Warm start from Campaign A; algorithmic design versus informed priors}
+
+\reviewercomment{%
+If the RL experiments were initialized from the starting state of Campaign A, would the RL variants perform better? After all, Campaigns A--C can themselves be viewed as a form of RL. This question may help elucidate whether ``algorithmic design'' or ``informed priors'' is more important.%
+}
+
+\noindent\textbf{Response:}\par\medskip
+
+\noindent Campaigns~A--C are not RL in the credit-assignment sense.
+No parameters are updated.
+Conditioning is in-context only, through the discovery-world state and the next tool call.
+``A form of RL'' holds as an analogy for sequential, reward-conditioned search, not as an algorithm class.
+The published comparison already isolates that difference: RL and Optuna see only the oracle return, while the agent sees literature, name--structure checks, and a persistent world.
+
+The reviewer's experiment is the right next measurement.
+We added \texttt{--pool-refresh} with values \texttt{never}, \texttt{episode}, or \texttt{step}, and \texttt{--carry-feedback}, to \texttt{ibm\_insulin\_rl\_benchmark.py}.
+Default \texttt{never} is byte-identical to the published environment (tested).
+The planned matrix crosses RL and RL+ against three seeds of the existing \texttt{--seed} flag: PEG \texttt{[*]OCC[*]} (the paper), Campaign~A's early hit \texttt{[*]CC([*])N1CCOC1=O}, and Campaign~A's champion \texttt{[*]CNC(=O)NC([*])=O}, three random seeds each.
+
+That matrix has not been run.
+It is queued behind the remaining budget-ladder jobs, which share the same OpenMM worker pool.
+We do not invent a priors-versus-algorithm number.
+
+A no-LLM scripted control that reuses the literature miner, mutator, and oracle also exists (\texttt{run\_autonomous\_discovery\_loop}).
+We declined to run it in this revision so the published method set stays intact.
+If a later round asks for that one-variable ablation, the harness is ready. \deferred{warm-start matrix queued behind the budget ladder}
+
+\bigskip
+
+\subsection*{4. Tournament and debate}
+
+\reviewercomment{%
+Integrating a tournament mechanism and a debate mechanism into Campaigns A--C could potentially enhance the performance of the Campaign series.%
+}
+
+\noindent\textbf{Response:}\par\medskip
+
+\noindent We agree that both mechanisms are natural extensions of a single-session agent that already writes a shared discovery world.
+
+A round-robin tournament would take the $k$ proposals of one iteration, score each with the existing Packmol--OpenMM oracle, and keep only the winner as the world-model update.
+That replaces the agent's implicit ranking with an explicit, physics-scored selection step.
+A proposer/skeptic debate would keep one shared world but split the role: a proposer argues for a candidate, a skeptic must find a physical or chemical objection before the oracle is called.
+That adds an argumentative filter upstream of the existing physics-based falsification, rather than downstream of it.
+
+Neither was run.
+OpenCode exposes no sub-agent API in the version used for Campaigns~A--C; the architecture is a single session calling one MCP server.
+We added one Discussion paragraph that states the predicted effect and the reason it was not executed, rather than claiming a result we do not have.
+
+The predicted effect of the tournament is a more stable running-best curve and fewer world-model updates driven by a lucky Packmol draw.
+The predicted effect of the debate is a lower hallucination rate of the kind documented in Campaign~B's polysulfone mislabel (Reviewer~2, point~4.1). \done
+
+\bigskip
+
+%======================================================================
+\section*{Reviewer \#2}
+%======================================================================
+
+\noindent\textit{This manuscript presents an agentic artificial intelligence framework for polymer discovery aimed at identifying candidate polymers capable of stabilizing insulin for ambient-temperature delivery.
+The proposed platform integrates Large Language Models, literature mining, cheminformatics, and explicit molecular simulation through the Model Context Protocol, producing a closed-loop scientific workflow in which hypotheses are continuously generated, tested, revised, and stored in a persistent ``discovery world.''}
+
+\medskip
+\noindent\textit{Overall, I consider this manuscript to make a valuable methodological contribution to computational molecular discovery.
+I recommend publication after minor revision, primarily to moderate some claims, strengthen the discussion of the limitations of the computational oracle, and improve the statistical analysis and presentation.}
+
+\subsection*{4.1 Lack of experimental validation}
+
+\reviewercomment{%
+All conclusions are based exclusively on computational screening. No experimental measurements are presented to validate the proposed polymers. Consequently, the manuscript demonstrates the effectiveness of the computational workflow rather than the actual performance of the suggested materials. We must remember that LLM are pre-trained autoregressive predictors and that these stochastic models are not able to follow a logical inference. They commit many mistakes. Thus, the absence of a concrete epistemical model for trustworthiness of the computational experiments serve only as a scientific evidence for the platform application, not for the AI technology embedded in it. So to say, the work should be validated in the ``real world''. Even the computational treatment of SMILES derived technology has been reported generating many molecule hallucinations. A better tuning on the chosen representation model for molecules has influence in the results. I think the lack of experimental validation this is the major concern of this paper.%
+}
+
+\noindent\textbf{Response:}\par\medskip
+
+\noindent This is the major concern, and we treat it as such.
+The paper now claims workflow efficiency on a computational oracle, not material performance.
+The abstract, Introduction, and Conclusions were rewritten to that effect.
+A new subsection, \S Scope and epistemic status, states the limit in one place.
+
+Every hypothesis that reaches the discovery world has already passed an external, non-learned check --- RDKit parsing, prescreen chemistry rules, and the Packmol--OpenMM oracle --- before it can influence the next iteration.
+That is an epistemic filter on the \emph{platform}, not a proof that the LLM reasons.
+We do not claim the latter.
+
+On hallucination we report what we can defend.
+Campaign~B labelled a brominated diaryl sulfone as ``polysulfone''; the \texttt{name\_consistency} flag was false and $E=-404$~kJ/mol (manuscript \S Hallucinations / falsification and Appendix Excerpt~2).
+We did not run a systematic per-candidate audit of name--structure consistency across Campaigns~A--C.
+The manuscript now says so, instead of implying that the one documented case is a rate.
+
+A concrete wet-lab protocol for the top three candidates is now in the Discussion: differential scanning calorimetry and circular dichroism for thermal stability, HPLC-SEC for aggregation, and a Franz-cell release assay.
+Those experiments are not in this revision. \placeholder
+
+\bigskip
+
+\subsection*{4.2 Simplified physical objective}
+
+\reviewercomment{%
+The optimization objective is limited to interaction energies obtained after energy minimization. Important physical phenomena such as explicit solvent, conformational sampling, free-energy calculations, aggregation, and thermal stability are not considered. This is a weak point, but can be seen as a first step to obtain a useful platform proposal. It is ok.%
+}
+
+\noindent\textbf{Response:}\par\medskip
+
+\noindent We agree, and we now say so in the manuscript rather than leaving it implicit.
+
+The published oracle is Packmol packing plus energy minimization capped at $2000$ steps.
+NPT is off by default.
+There is no production MD in the loop.
+Charges are RDKit Gasteiger, not AM1-BCC.
+The ${\sim}48$~s per evaluation is dominated by Packmol, a CPU Fortran binary.
+
+An \texttt{INSULIN\_AI\_OPENMM\_MATRIX\_NPT} hook exists.
+Its default length is $0.5$~ps, which is too short to mean anything, so we do not quote it as sampling.
+ns-scale NPT on the champion set would test whether the single-point ranking survives; that study was not run in this revision.
+
+The paper's claim is therefore restricted to search efficiency on this proxy.
+\S Scope and epistemic status lists explicit solvent, conformational sampling, free energy, aggregation, and thermal stability as absent. \done
+
+\bigskip
+
+\subsection*{4.3 Limited statistical analysis}
+
+\reviewercomment{%
+Although multiple campaigns are reported, the statistical analysis remains relatively limited. Confidence intervals, hypothesis testing, or repeated runs of all competing methods would strengthen the empirical evaluation. This can be improved with more work of course.%
+}
+
+\noindent\textbf{Response:}\par\medskip
+
+\noindent The published $\pm$ values on RL were packing noise on one molecule, not algorithmic variance.
+All six DQN/PPO seeds, and Optuna seed~$456$, returned \texttt{[*]CCC(=O)C([*])=O}.
+Table~2 listed the wrong champions for DQN/PPO (\texttt{[*]CCOC([*])=O}) and Optuna (\texttt{[*]NC(=O)NC([*])=O}).
+Those rows are corrected.
+
+We pooled every PSMILES with at least two observations ($50$ groups) and compared an additive noise model $\sigma=a$ against a proportional model $\sigma=b|E|$.
+The proportional fit wins ($\sigma \approx 0.116\,|E|$, residual sum of squares $2.18\times 10^{5}$ versus $2.62\times 10^{5}$).
+Pearson $r(\sigma,|E|)=0.498$ ($p=2.3\times 10^{-4}$).
+The paper's ``${\sim}15\%$'' is replaced by this estimate.
+
+Response Figure~\ref{fig:response-noise} shows the fit.
+Response Figure~\ref{fig:response-forest} and Response Table~\ref{tab:response-2} report the $n{=}20$ replicate study of every method's champion (base seed $4200$, distinct Packmol seeds).
+Campaign~B's champion timed out once ($n{=}19$); Campaign~C's polygalacturonate timed out $15$ times ($n{=}5$) and is reported with that $n$.
+
+\responsefig[0.68]{noise_model.png}{noise}{%
+  Per-PSMILES packing standard deviation versus $|E|$ for the $50$ groups with at least two observations.
+  The proportional fit $\sigma=0.116\,|E|$ beats a constant $\sigma=120$~kJ/mol.}
+
+\responsefig[0.78]{replicate_forest.png}{forest}{%
+  Replicate means and bootstrap $95\%$ confidence intervals for the ten champion and anchor candidates.
+  The dashed line is the Campaign~A champion mean; the dotted line is the shared RL/Optuna-$456$ champion mean.}
+
+\begin{rtable}{Replicate re-evaluation of every method's champion
+  (bootstrap $95\%$ CI; $n$ completed of $20$).}
+  \begin{tabular}{llrrr}
+    \toprule
+    Method & PSMILES & $n$ & Mean & $95\%$ CI \\
+    \midrule
+    Campaign A & \texttt{[*]CNC(=O)NC([*])=O} & $20$ & $-1533$ & $[-1635,-1428]$ \\
+    Campaign A \#2 & \texttt{[*]C(NC(=O)N[*])C(=O)NO} & $20$ & $-1849$ & $[-1946,-1731]$ \\
+    Campaign A \#3 & \texttt{[*]CNNC(=O)NC([*])=O} & $20$ & $-1413$ & $[-1531,-1294]$ \\
+    Campaign B & \texttt{[*]NC(Cc1cnc[nH]1)C([*])=O} & $19$ & $-1054$ & $[-1125,-980]$ \\
+    Campaign C & \texttt{[*]OC(=O)C(O)C(O)C(O)C([*])C=O} & $5$ & $-1635$ & $[-1920,-1342]$ \\
+    DQN / PPO / Optuna-$456$ & \texttt{[*]CCC(=O)C([*])=O} & $20$ & $-1214$ & $[-1310,-1120]$ \\
+    Optuna-$42$ & \texttt{[*]NNC(=O)C([*])=O} & $20$ & $-1190$ & $[-1254,-1127]$ \\
+    Optuna-$123$ & \texttt{[*]CC(O)CC([*])O} & $20$ & $-1301$ & $[-1362,-1244]$ \\
+    urea (text) & \texttt{[*]NC(=O)NC([*])=O} & $20$ & $-1625$ & $[-1721,-1516]$ \\
+    PEG (anchor) & \texttt{[*]OCC[*]} & $20$ & $-501$ & $[-559,-441]$ \\
+    \bottomrule
+  \end{tabular}
+\end{rtable}
+
+Headline tests use the replicate samples, not the within-run repeats (those are not independent).
+
+\begin{rtable}{Welch tests on the $n{=}20$ replicate draws.
+  Difference is Campaign~A mean minus the other mean, kJ\,mol$^{-1}$.}
+  \begin{tabular}{lrrrr}
+    \toprule
+    Comparison & $t$ & $p$ & Diff. & Bootstrap $95\%$ CI \\
+    \midrule
+    A vs RL / Optuna-$456$ & $-4.27$ & $1.25\times 10^{-4}$ & $-319$ & $[-463,-176]$ \\
+    A vs Optuna-$42$ & $-5.37$ & $7.28\times 10^{-6}$ & $-343$ & $[-462,-221]$ \\
+    \bottomrule
+  \end{tabular}
+\end{rtable}
+
+Both intervals exclude zero.
+The noise-corrected advantages are $26\%$ over RL and $29\%$ over Optuna.
+Optuna over its three published seeds is $-1815\pm 86$~kJ/mol (single-draw bests $-1902$, $-1813$, $-1730$); after replication its champion mean is $-1190$, so the published $-1902$ was a favorable draw in the same way Campaign~A's $-2263$ was.
+
+Exact evaluation counts replace the submitted ``$115+$ / $30$ / $50+$'' and the incorrect ``$25+$ unique'' for Campaign~A:
+
+\begin{rtable}{Evaluation counts recovered from the campaign logs.}
+  \begin{tabular}{lrrrr}
+    \toprule
+    Campaign & Iter.\ files & $N_\text{eval}$ & Unique & Best single-draw \\
+    \midrule
+    A & $25/25$ & $122$ & $105$ & $-2263$ \\
+    B & $22/25$ & $28^+$ & $28^+$ & $-1545$ \\
+    C & $10/25$ & $27^+$ & $24^+$ & $-1765$ \\
+    \bottomrule
+  \end{tabular}
+\end{rtable}
+
+Campaigns~B and~C remain lower bounds.
+Response Figures~\ref{fig:response-fig4a} and~\ref{fig:response-fig4b} regenerate Figure~4 from the real traces rather than hand-entered coordinates.
+
+The oracle itself is deterministic at fixed seed: \texttt{[*]CNC(=O)NC([*])=O} at seed~$777$ returned $-1567.916$~kJ/mol twice, bitwise.
+A four-candidate batch at $1$ worker and at $4$ workers agreed exactly on every energy.
+
+Campaigns~A, B, and~C are independent runs, not replicates of one method: they differ in prompt, agent-instruction file, and host.
+We therefore ran Campaign~B$'$ as a true same-prompt replicate on this host (live agent file, recorded objective, ``Autonomous mode, $25$ iterations, no energy threshold'').
+Through iteration~$18$ the running best is \texttt{[*]C(=O)CC(P(=O)(O)O)C(=O)[*]} at $-2423.55$~kJ/mol from iteration~$17$ (iteration~$9$ had already reached $-2311.22$ on the sulfonato-diketone).
+Response Figure~\ref{fig:response-bprime} overlays B and B$'$.
+The remaining iterations through $25$ are still running; we do not treat B$'$ as finished.
+
+Campaign~A$'$ (labelled reconstruction / re-base onto this host) has not started.
+
+\responsefig[0.70]{fig4a_running_best.png}{fig4a}{%
+  Figure~4a regenerated from the campaign traces: running-best interaction energy for Campaigns~A--C.}
+
+\responsefig[0.70]{fig4b_best_vs_unique.png}{fig4b}{%
+  Figure~4b regenerated from the same traces: best single-draw energy versus unique PSMILES evaluated.}
+
+\responsefig[0.70]{bprime_overlay.png}{bprime}{%
+  Running-best overlay of Campaign~B and the same-prompt replicate B$'$.
+  B$'$ is shown through the latest completed iteration and is not yet finished.}
+
+ \done
+
+\bigskip
+
+\subsection*{4.4 Strong generalization claims}
+
+\reviewercomment{%
+Some conclusions regarding the applicability of the framework to other protein stabilization problems extend beyond the evidence presented. The experiments are restricted to insulin and a single computational screening protocol. This can be mended by a more careful writing.%
+}
+
+\noindent\textbf{Response:}\par\medskip
+
+\noindent The experiments are insulin and this oracle.
+We do not have transfer evidence.
+
+The abstract's closing sentence and the Conclusions no longer say that the method ``generalizes to any protein-stabilization problem''.
+They now say that the architecture is not insulin-specific and that transfer remains untested.
+Pilot folders for adalimumab, dupilumab, and EPO exist in the working tree; they are $1$--$5$ iteration runs with essentially no simulation data and are not cited. \done
+
+\bigskip
+
+\subsection*{4.5 Limited chemical interpretation}
+
+\reviewercomment{%
+The structure--activity discussion remains largely qualitative. Additional chemical descriptors and quantitative analyses would further support the proposed design rules. The authors may consider to enlarge the interpretation or to provide good reasons to avoid to do this.%
+}
+
+\noindent\textbf{Response:}\par\medskip
+
+\noindent We computed eight RDKit descriptors on every unique campaign repeat unit ($n{=}136$): molecular weight, TPSA, hydrogen-bond donor and acceptor counts, rotatable bonds, cLogP, $N{+}O$ count, and heteroatom fraction.
+Spearman $\rho$ is against the per-PSMILES mean $E_\text{int}$.
+
+The qualitative ``hydrogen-bond-dense motif'' survives as a quantitative statement: heteroatom count is $\rho=-0.765$ (95\% CI $[-0.836,-0.667]$), TPSA $\rho=-0.704$, and cLogP $\rho=+0.691$ (more hydrophobic repeat units are weaker).
+Rotatable-bond count is the weakest correlate ($\rho=-0.292$).
+
+Response Table~\ref{tab:response-4} and Response Figure~\ref{fig:response-descriptors} report the full set.
+The manuscript gains the Quantitative descriptors subsection with the corresponding table and figure.
+
+\begin{rtable}{Spearman correlation of repeat-unit descriptors with mean $E_\text{int}$
+  ($n{=}136$ unique PSMILES).
+  Negative $\rho$ means more of the descriptor tracks a more negative (stronger) energy.}
+  \begin{tabular}{lrrr}
+    \toprule
+    Descriptor & $\rho$ & $p$ & $95\%$ CI \\
+    \midrule
+    $N{+}O$ count & $-0.765$ & $2.2\times 10^{-27}$ & $[-0.836,-0.667]$ \\
+    TPSA & $-0.704$ & $1.1\times 10^{-21}$ & $[-0.784,-0.597]$ \\
+    cLogP & $+0.691$ & $1.3\times 10^{-20}$ & $[+0.596,+0.763]$ \\
+    H-bond acceptors & $-0.630$ & $2.1\times 10^{-16}$ & $[-0.724,-0.512]$ \\
+    H-bond donors & $-0.596$ & $1.9\times 10^{-14}$ & $[-0.697,-0.473]$ \\
+    Heteroatom fraction & $-0.591$ & $3.5\times 10^{-14}$ & $[-0.697,-0.464]$ \\
+    Molecular weight & $-0.473$ & $6.0\times 10^{-9}$ & $[-0.609,-0.314]$ \\
+    Rotatable bonds & $-0.292$ & $5.7\times 10^{-4}$ & $[-0.449,-0.120]$ \\
+    \bottomrule
+  \end{tabular}
+\end{rtable}
+
+\responsefig[0.82]{descriptor_correlation_panel.png}{descriptors}{%
+  Repeat-unit descriptor panel: scatter of each descriptor against mean $E_\text{int}$ and the Spearman summary.}
+
+ \done
+
+\bigskip
+
+\subsection*{5.2 Language and presentation}
+
+\reviewercomment{%
+Several sentences are unnecessarily long and combine multiple ideas. Breaking them into shorter sentences would improve readability.
+Certain expressions are repeated excessively throughout the manuscript, particularly ``physics-based'', ``agentic workflow'', ``discovery world'', and ``implicit acquisition function.''
+Some statements adopt promotional language. Expressions such as ``fundamentally change'', ``substantially outperform'', or ``agentic advantage'' could be replaced by more neutral scientific wording.
+Verb tense occasionally alternates between present and past when describing experimental results. A consistent use of the past tense would improve the presentation.
+Hyphenation of compound adjectives should be standardized throughout the manuscript (e.g., ``physics-based'', ``budget-constrained'', ``single-point'', ``human-in-the-loop'').
+The mathematical development in Section 2 introduces a considerable amount of notation in a short space. Brief intuitive explanations accompanying the formal equations would improve accessibility for readers from chemistry.
+The Discussion section occasionally repeats results already presented in the Results section. A more concise discussion would improve readability.%
+}
+
+\noindent\textbf{Response:}\par\medskip
+
+\noindent We removed ``fundamentally change'', ``substantially outperform'', and ``agentic advantage''.
+A search of the revised \texttt{main.tex} finds none of those three strings.
+The abstract and Conclusions now report the replicate-corrected percentages and the oracle's scope instead of a promotional close.
+
+``Physics-based'', ``agentic workflow'', ``discovery world'', and ``implicit acquisition function'' still appear, because they are the paper's objects, but the most repetitive Discussion passages that restated Results were cut.
+Results stay in the past tense; definitions and the platform description stay in the present.
+
+Each numbered equation in \S Methods now has a one-line plain-language gloss.
+Compound adjectives are hyphenated in the form the reviewer listed.
+
+We have not completed a line-by-line hyphenation and sentence-length audit of the full $17$-page PDF; remaining long sentences will be broken in the upload pass. \placeholder
+
+\bigskip
+
+%======================================================================
+\section*{Bundled figures and data (internal index)}
+%======================================================================
+
+\noindent Figures are placed in the reviewer response they support, not collected at the front.
+Regenerate with \texttt{scripts/revision/analysis/plot\_response\_letter\_figures.py}.
+\begin{itemize}[nosep]
+  \item R1.1 --- \texttt{rl\_budget\_ladder.png}.
+  \item R2.3 --- \texttt{replicate\_forest.png}.
+  \item R2.3 --- \texttt{noise\_model.png}.
+  \item R2.3 --- \texttt{fig4a\_running\_best.png}, \texttt{fig4b\_best\_vs\_unique.png}.
+  \item R2.3 --- \texttt{bprime\_overlay.png}.
+  \item R2.5 --- \texttt{descriptor\_correlation\_panel.png}.
+\end{itemize}
+
+\noindent\textbf{Key JSON summaries.}
+\begin{itemize}[nosep]
+  \item \texttt{replicate\_champions\_results.json}
+  \item \texttt{noise\_model.json}
+  \item \texttt{campaign\_summary.json}
+  \item \texttt{optuna\_three\_seed\_summary.json}
+  \item \texttt{descriptor\_correlations.json}
+  \item \texttt{gate\_phase0\_results.json}
+  \item \texttt{phase3b/s2\_ladder\_dqn\_*.checkpoint.json}
+\end{itemize}
+
+\end{document}
