@@ -52,4 +52,7 @@ The Docker and Modal image pins `mcp>=1.30`. Server-level tests expect that vers
   OpenMM result records `openmm_platform`.
 - Advertised tool schemas must stay portable: no `anyOf`, `$ref`, or `$defs`.
   `tests/test_tool_schema_portability.py` checks this.
-- Deploy detached: `setsid nohup modal deploy modal_app.py > /tmp/modal_deploy.log 2>&1 &`.
+- Deploy with `scripts/deploy_modal.sh` (detached: `setsid nohup scripts/deploy_modal.sh > /tmp/modal_deploy.log 2>&1 &`).
+  Code-only changes deploy in minutes. Changing a base-context input rebuilds the
+  base image (about an hour): see `BASE_CONTEXT_FILES` in `modal_app.py`. A new
+  file that the Dockerfile build reads must be added there.

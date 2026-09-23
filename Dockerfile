@@ -162,7 +162,11 @@ RUN sed -i 's/\r$//' /app/docker/entrypoint.sh /app/docker/restore_terminal.sh /
     && chmod +x /app/docker/entrypoint.sh /app/docker/restore_terminal.sh /app/scripts/docker_cpu_limit.sh /app/scripts/docker_run.sh /app/scripts/docker_compose_run.sh /app/scripts/host_docker_tty_guard.sh
 
 # Fail the image build if any simulation, retrosynthesis, ADMET, model-data,
-# executable, or structure dependency is absent.
-RUN python scripts/verify_modal_image.py
+# executable, or structure dependency is absent. The Modal base image builds
+# from a dependency-only context (VERIFY_IMAGE=0, no project source) and runs
+# the same verifier after deploy: `modal run modal_app.py::verify_runtime`.
+ARG VERIFY_IMAGE=1
+RUN if [ "$VERIFY_IMAGE" = "1" ]; then python scripts/verify_modal_image.py; \
+    else echo "VERIFY_IMAGE=0: verifier deferred to modal_app.py::verify_runtime"; fi
 
 ENTRYPOINT ["/app/docker/entrypoint.sh"]

@@ -31,7 +31,49 @@ def test_modal_app_uses_full_dockerfile_and_only_runtime_volumes() -> None:
 
     source = MODAL_APP_PATH.read_text(encoding="utf-8")
     assert "modal.Image.from_dockerfile" in source
-    assert "build_args" not in source
+    # The only build arg defers the in-build verifier (it needs the mounted source).
+    assert 'build_args={"VERIFY_IMAGE": "0"}' in source
+
+
+def test_base_image_context_excludes_project_source() -> None:
+    """Editing code must not rebuild the conda/model base image."""
+    module = _load_modal_app()
+    excluded = module._outside_base_context
+    for source_path in (
+        "biologix_ai_mcp_server.py",
+        "modal_app.py",
+        "src/python/biologix_ai/mcp_jobs.py",
+        "src/python/biologix_ai/protocol/PROTOCOL.md",
+        "tests/test_mcp_jobs.py",
+        "CLAUDE.md",
+        "clients/AGENTS.md",
+        ".git/HEAD",
+        "scripts/deploy_modal.sh",
+        "scripts/verify_modal_image.py",
+    ):
+        assert excluded(Path(source_path)), source_path
+    for dependency_path in (
+        "Dockerfile",
+        "environment-simulation.yml",
+        "pyproject.toml",
+        "README.md",
+        "scripts/install_submodules.sh",
+        "scripts/setup_aizynthfinder.sh",
+        "scripts/build_precursor_db.py",
+        "src/python/biologix_ai/retrosynthesis/retrosyn_bootstrap.py",
+        "data/biologics/biologic_3WD5.pdb",
+        "extern/RetroSynthesisAgent/setup.py",
+    ):
+        assert not excluded(Path(dependency_path)), dependency_path
+    # .dockerignore still applies inside the allowed directories.
+    assert excluded(Path("data/aizynthfinder/config.yml"))
+
+
+def test_runtime_image_mounts_the_source_every_function_imports() -> None:
+    source = MODAL_APP_PATH.read_text(encoding="utf-8")
+    assert '"/app/src/python"' in source and '"/app/scripts"' in source
+    assert '"/app/biologix_ai_mcp_server.py"' in source
+    assert "copy=True" not in source
 
 
 def test_modal_runtime_knobs_enable_full_native_amd64_stack() -> None:
@@ -149,6 +191,7 @@ def test_dockerfile_runs_full_image_verifier_after_data_snapshot() -> None:
     assert snapshot in dockerfile
     assert verifier in dockerfile
     assert dockerfile.index(snapshot) < dockerfile.index(verifier)
+    assert "ARG VERIFY_IMAGE=1" in dockerfile  # local Docker builds still verify by default
 
 
 def test_runtime_verifier_accepts_modal_runtime_mount_without_distribution_metadata() -> None:

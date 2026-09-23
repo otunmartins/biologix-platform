@@ -13,6 +13,18 @@ worker functions so it never blocks the web container:
 their inputs and return their artifacts in the call itself, so no Volume is
 shared between containers.
 
+The image has two parts so a code change deploys in minutes:
+
+* ``base_image``: the Dockerfile (conda env, AiZynthFinder models, precursor DB,
+  ADMET env) built from a dependency-only context (``BASE_CONTEXT_*``). Modal
+  caches a Dockerfile build as one layer keyed on its whole context, so this
+  rebuilds only when a dependency input changes.
+* the project source (``src/python``, ``scripts``, the server) is added when a
+  container starts, not built in.
+
+The Dockerfile's verifier needs that source, so it runs after deploy instead:
+``scripts/deploy_modal.sh`` deploys and then runs ``verify_runtime``.
+
 Deploy-time knobs (read from the shell running ``modal deploy``)::
 
     BIOLOGIX_GPU=L4|A10G|T4|L40S|A100|H100   GPU type of the GPU worker (default L4)
@@ -85,7 +97,50 @@ WORKER_ENV_GPU = {
     "BIOLOGIX_AI_OPENMM_CANDIDATE_TIMEOUT_S": "3000",
 }
 
-image = modal.Image.from_dockerfile(DOCKERFILE, context_dir=REPO_ROOT)
+# Files the Dockerfile build reads. Anything else (project source, tests, docs,
+# .git) is left out of the base context so editing it never rebuilds the base.
+BASE_CONTEXT_FILES = frozenset(
+    {
+        "Dockerfile",
+        ".dockerignore",
+        "environment-simulation.yml",
+        "pyproject.toml",
+        "README.md",
+        "scripts/build_precursor_db.py",
+        # install_submodules.sh bootstraps RetroSynthesisAgent with this module.
+        "src/python/biologix_ai/__init__.py",
+        "src/python/biologix_ai/retrosynthesis/__init__.py",
+        "src/python/biologix_ai/retrosynthesis/retrosyn_bootstrap.py",
+    }
+)
+BASE_CONTEXT_DIRS = ("extern/", "data/", "docker/")
+_DOCKERIGNORE = modal.FilePatternMatcher.from_file(REPO_ROOT / ".dockerignore")
+
+
+def _outside_base_context(path: Path) -> bool:
+    """Ignore rule for the base build: True excludes *path* (relative to the repo)."""
+    rel = Path(path).as_posix()
+    if _DOCKERIGNORE(Path(rel)):
+        return True
+    if rel in BASE_CONTEXT_FILES or rel.startswith(BASE_CONTEXT_DIRS):
+        return False
+    install_script = rel.startswith("scripts/") and rel.endswith(".sh") and rel.count("/") == 1
+    return not install_script or rel == "scripts/deploy_modal.sh"
+
+
+_SOURCE_IGNORE = ["**/__pycache__/**", "**/*.pyc"]
+
+base_image = modal.Image.from_dockerfile(
+    DOCKERFILE,
+    context_dir=REPO_ROOT,
+    ignore=_outside_base_context,
+    build_args={"VERIFY_IMAGE": "0"},
+)
+image = (
+    base_image.add_local_dir(REPO_ROOT / "src" / "python", "/app/src/python", ignore=_SOURCE_IGNORE)
+    .add_local_dir(REPO_ROOT / "scripts", "/app/scripts", ignore=_SOURCE_IGNORE)
+    .add_local_file(REPO_ROOT / "biologix_ai_mcp_server.py", "/app/biologix_ai_mcp_server.py")
+)
 runs_volume = modal.Volume.from_name("biologix-mcp-runs", create_if_missing=True)
 papers_volume = modal.Volume.from_name("biologix-mcp-papers", create_if_missing=True)
 VOLUME_MOUNTS = {

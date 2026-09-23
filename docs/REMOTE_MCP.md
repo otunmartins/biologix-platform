@@ -52,18 +52,28 @@ include every key because replacement removes omitted values:
 From the repository root:
 
 ```bash
-modal deploy modal_app.py
+scripts/deploy_modal.sh
 ```
 
-Modal prints the HTTPS endpoint for the `serve` function. The MCP URL is that
+It runs `modal deploy modal_app.py` and then `modal run modal_app.py::verify_runtime`
+(pass `--skip-verify` to deploy only). Modal prints the HTTPS endpoint for the `serve` function. The MCP URL is that
 endpoint with `/mcp` appended:
 
 ```bash
 export BIOLOGIX_MCP_URL="https://<workspace>--biologix-mcp-serve.modal.run/mcp"
 ```
 
-The image is intentionally large and the initial deployment downloads the full
-retrosynthesis data. Subsequent deployments reuse unchanged image layers.
+The image has two parts. The base image (conda environment, AiZynthFinder
+models, precursor database, ADMET environment) is built from the Dockerfile with a
+context that holds only its inputs: `Dockerfile`, `environment-simulation.yml`,
+`pyproject.toml`, `README.md`, the install scripts, `extern/`, `data/`, `docker/`,
+and the RetroSynthesisAgent bootstrap module. Modal caches a Dockerfile build as
+one layer keyed on that whole context, so the base rebuilds (about an hour) only
+when one of those inputs changes. The project source (`src/python`, `scripts`,
+`biologix_ai_mcp_server.py`) is added when each container starts, so a code change
+deploys in minutes. Because the image verifier needs that source, the base build
+skips it (`VERIFY_IMAGE=0`) and `deploy_modal.sh` runs it after deploying; local
+`docker build` still verifies during the build.
 
 ## Connect Claude Web
 
