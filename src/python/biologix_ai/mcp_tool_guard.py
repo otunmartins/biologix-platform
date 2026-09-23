@@ -14,6 +14,7 @@ import sys
 import time
 import traceback
 import contextlib
+import contextvars
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError
 from datetime import datetime, timezone
 from pathlib import Path
@@ -227,8 +228,11 @@ def _invoke_with_timeout(fn: Callable[[], Dict[str, Any]], timeout_s: Optional[f
             return {"ok": True, "result": result}
         return result
 
+    # Carry the caller's context into the timeout thread. A bare submit() starts
+    # it with an empty one, which silently detached every tool from the job its
+    # progress reports belong to (mcp_jobs.CURRENT_JOB).
     executor = ThreadPoolExecutor(max_workers=1)
-    future = executor.submit(_run_with_stdout_guard)
+    future = executor.submit(contextvars.copy_context().run, _run_with_stdout_guard)
     try:
         result = future.result(timeout=timeout_s)
     except FuturesTimeoutError:

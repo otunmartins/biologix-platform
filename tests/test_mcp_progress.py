@@ -53,3 +53,26 @@ def test_truncate_mcp_json_strips_heavy_fields() -> None:
 def test_truncate_mcp_json_passthrough_when_small() -> None:
     payload = {"ok": True, "value": 1}
     assert truncate_mcp_json(payload, max_bytes=65536) == payload
+
+
+def test_progress_survives_the_timeout_thread_and_reaches_the_job():
+    """run_guarded_tool runs the tool in its own thread; the job must follow it."""
+    import contextvars
+
+    from biologix_ai.mcp_jobs import CURRENT_JOB, Job, note_progress
+    from biologix_ai.mcp_tool_guard import run_guarded_tool
+
+    job = Job(job_id="j1", client="local", tool="openmm_evaluate_psmiles")
+
+    def _work():
+        note_progress("packing 8 polymer chains", stage="packmol")
+        return {"ok": True}
+
+    def _call():
+        CURRENT_JOB.set(job)
+        return run_guarded_tool("openmm_evaluate_psmiles", None, _work, timeout_s=30)
+
+    result = contextvars.copy_context().run(_call)
+    assert result["ok"] is True
+    assert job.progress == "packing 8 polymer chains"
+    assert job.stage == "packmol"
