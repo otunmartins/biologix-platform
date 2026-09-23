@@ -73,6 +73,76 @@ def _forwarded_env() -> Dict[str, str]:
     }
 
 
+PROGRESS_POLL_S = 3.0
+
+
+def _call_worker(
+    modal: Any,
+    function: Any,
+    spec_dict: Dict[str, Any],
+    progress_callback: Optional[Callable[[Dict[str, Any]], None]],
+) -> Dict[str, Any]:
+    """Run *function* on a worker container, relaying its stages while it works.
+
+    ``function.remote()`` blocks silently, so a client checking on the running job
+    saw only the call that started it. The call is spawned instead and polled;
+    between polls the worker's latest stage (written to a shared Dict under a key
+    passed in the spec) is handed to *progress_callback*.
+    """
+    import uuid  # noqa: PLC0415
+
+    from biologix_ai.compute.openmm_job import PROGRESS_DICT  # noqa: PLC0415
+
+    if progress_callback is None:
+        return function.remote(spec_dict)
+
+    key = uuid.uuid4().hex
+    spec_dict = {**spec_dict, "progress_key": key}
+    try:
+        store = modal.Dict.from_name(PROGRESS_DICT, create_if_missing=True)
+    except Exception:
+        store = None
+    call = function.spawn(spec_dict)
+    seen: Any = None
+    try:
+        while True:
+            try:
+                response = call.get(timeout=PROGRESS_POLL_S)
+                break
+            except modal.exception.TimeoutError as exc:
+                # The base class is Modal's "not ready yet". The worker's own
+                # timeout is a subclass and, like an expired output, is real.
+                if isinstance(
+                    exc, (modal.exception.FunctionTimeoutError, modal.exception.OutputExpiredError)
+                ):
+                    raise
+            entry = None
+            if store is not None:
+                try:
+                    entry = store.get(key)
+                except Exception:
+                    entry = None
+            if entry and entry != seen:
+                seen = entry
+                try:
+                    progress_callback(
+                        {
+                            "status": "progress",
+                            "stage": entry.get("stage", ""),
+                            "message": entry.get("message", ""),
+                        }
+                    )
+                except Exception:
+                    pass
+        return response
+    finally:
+        if store is not None:
+            try:
+                store.pop(key)
+            except Exception:
+                pass
+
+
 def run_openmm(
     spec: OpenMMJobSpec,
     *,
@@ -98,7 +168,7 @@ def run_openmm(
         spec_dict = spec.to_dict()
         spec_dict.update(target_for_spec(target_pdb_path))
         function = modal.Function.from_name(app_name, worker)
-        response = function.remote(spec_dict)
+        response = _call_worker(modal, function, spec_dict, progress_callback)
         payload = materialize_remote_result(response, run_dir)
         payload["compute"] = {"target": compute, "backend": "modal", "worker": worker}
         return payload

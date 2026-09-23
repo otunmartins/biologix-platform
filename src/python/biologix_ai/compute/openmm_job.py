@@ -11,9 +11,15 @@ from __future__ import annotations
 
 import os
 import tempfile
+import time
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
+
+# Cross-container progress: the worker writes its current stage here and the web
+# container, which holds the job a client is checking on, reads it back.
+PROGRESS_DICT = "biologix-job-progress"
+_PROGRESS_MIN_INTERVAL_S = 3.0
 
 # Where the target lives inside the image; a spec names it instead of shipping it.
 PACKAGE_ROOT = Path(__file__).resolve().parents[1]
@@ -35,6 +41,8 @@ class OpenMMJobSpec:
     target_package_path: str = ""
     target_pdb_text: str = ""
     env: Dict[str, str] = field(default_factory=dict)
+    # Where a worker reports its stage so the caller's job can show it.
+    progress_key: str = ""
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
@@ -169,6 +177,38 @@ def run_openmm_job(
     return out
 
 
+def modal_progress_writer(key: str) -> Optional[Callable[[Dict[str, Any]], None]]:
+    """A progress callback that records the latest stage under *key* in a Modal Dict.
+
+    Progress is a courtesy: a Dict that cannot be reached must never fail a
+    simulation, so every failure here is swallowed and the writer is skipped.
+    """
+    if not key:
+        return None
+    try:
+        import modal  # noqa: PLC0415 — present only inside Modal containers
+
+        store = modal.Dict.from_name(PROGRESS_DICT, create_if_missing=True)
+    except Exception:
+        return None
+    last: Dict[str, Any] = {"stage": None, "at": 0.0}
+
+    def write(event: Dict[str, Any]) -> None:
+        stage = str(event.get("stage") or "")
+        if event.get("status") != "progress" or not stage:
+            return
+        now = time.monotonic()
+        if stage == last["stage"] and now - last["at"] < _PROGRESS_MIN_INTERVAL_S:
+            return
+        last.update(stage=stage, at=now)
+        try:
+            store.put(key, {"stage": stage, "message": str(event.get("message") or ""), "at": time.time()})
+        except Exception:
+            pass
+
+    return write
+
+
 def run_openmm_job_remote(spec_dict: Dict[str, Any]) -> Dict[str, Any]:
     """Worker entry point: run in a scratch directory, return result and artifacts.
 
@@ -190,7 +230,12 @@ def run_openmm_job_remote(spec_dict: Dict[str, Any]) -> Dict[str, Any]:
             target = str(target_file)
         structures = root / "structures"
         structures.mkdir()
-        result = run_openmm_job(spec, target_pdb_path=target, artifacts_dir=str(structures))
+        result = run_openmm_job(
+            spec,
+            target_pdb_path=target,
+            artifacts_dir=str(structures),
+            progress_callback=modal_progress_writer(spec.progress_key),
+        )
         files: Dict[str, bytes] = {}
         total = 0
         for path in sorted(structures.rglob("*")):

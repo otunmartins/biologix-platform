@@ -7,7 +7,7 @@ import sys
 import time
 from concurrent.futures import ProcessPoolExecutor, TimeoutError as FuturesTimeoutError, as_completed
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 from biologix_ai.run_paths import repo_root_from_package, session_dir_from_env
 
@@ -291,10 +291,59 @@ def _gpu_platform_requested(matrix_kw: Dict[str, Any]) -> bool:
     return requested in ("cuda", "opencl", "auto")
 
 
+def _tail_progress_file(
+    path: str,
+    is_done: Callable[[], bool],
+    on_update: Callable[[str, str], None],
+    deadline: Optional[float] = None,
+    poll_s: float = 2.0,
+) -> bool:
+    """Feed each new ``stage<TAB>message`` line to *on_update* until the worker ends.
+
+    Returns True once *is_done()* (after a final drain, so the last stages are not
+    lost) and False if *deadline* (a ``time.monotonic()`` value) passes first. The
+    caller owns the timeout: this loop replaces a blocking ``wait()``, so it must
+    hand control back at the deadline or the candidate time limit would never fire.
+    """
+    last_size = 0
+    while True:
+        finished = is_done()
+        try:
+            with open(path, encoding="utf-8") as handle:
+                handle.seek(last_size)
+                new_text = handle.read()
+                last_size = handle.tell()
+        except OSError:
+            new_text = ""
+        for line in new_text.splitlines():
+            stage, sep, message = line.partition("\t")
+            if sep:
+                try:
+                    on_update(stage, message)
+                except Exception:
+                    pass  # a broken observer must never fail the simulation
+        if finished:
+            return True
+        if deadline is not None and time.monotonic() >= deadline:
+            return False
+        pause = poll_s if deadline is None else min(poll_s, max(0.05, deadline - time.monotonic()))
+        time.sleep(pause)
+
+
+def _timeout_result(psmiles: str, timeout_s: Optional[float]) -> Dict[str, Any]:
+    return {
+        "ok": False,
+        "error": f"candidate exceeded BIOLOGIX_AI_OPENMM_CANDIDATE_TIMEOUT_S={timeout_s}s",
+        "stage": "timeout",
+        "psmiles": psmiles,
+    }
+
+
 def _run_matrix_in_subprocess(
     psmiles: str,
     matrix_kw: Dict[str, Any],
     timeout_s: Optional[float],
+    on_progress: Optional[Callable[[str, str], None]] = None,
 ) -> Dict[str, Any]:
     """Run one matrix evaluation in a fresh ``python -m`` process (GPU platforms).
 
@@ -302,9 +351,15 @@ def _run_matrix_in_subprocess(
     ``CUDA_ERROR_NOT_INITIALIZED``; ``spawn``/``forkserver`` children re-import
     the caller's ``__main__`` (the MCP server, or Modal's container runtime). A
     new interpreter running :mod:`matrix_subprocess` avoids both.
+
+    With *on_progress*, the worker's stages are read back from a progress file
+    while this call waits, so a check-back on the running job reports what the
+    simulation is doing rather than the call that started it.
     """
     import subprocess
     import tempfile
+
+    from .openmm_complex import PROGRESS_FILE_ENV
 
     package_parent = str(Path(__file__).resolve().parents[2])
     env = dict(os.environ)
@@ -314,24 +369,32 @@ def _run_matrix_in_subprocess(
     with tempfile.TemporaryDirectory(prefix="biologix_matrix_") as work:
         request = Path(work) / "request.json"
         response = Path(work) / "response.json"
+        progress_file = Path(work) / "progress.tsv"
+        progress_file.touch()
+        env[PROGRESS_FILE_ENV] = str(progress_file)
         request.write_text(json.dumps({"psmiles": psmiles, "kwargs": matrix_kw}, default=list))
-        try:
-            proc = subprocess.run(
-                [sys.executable, "-m", "biologix_ai.simulation.matrix_subprocess",
-                 str(request), str(response)],
-                env=env,
-                stdout=sys.stderr,
-                stderr=sys.stderr,
-                timeout=timeout_s,
-                check=False,
+        proc = subprocess.Popen(
+            [sys.executable, "-m", "biologix_ai.simulation.matrix_subprocess",
+             str(request), str(response)],
+            env=env,
+            stdout=sys.stderr,
+            stderr=sys.stderr,
+        )
+        deadline = None if timeout_s is None else time.monotonic() + timeout_s
+        if on_progress is not None:
+            timed_out = not _tail_progress_file(
+                str(progress_file), lambda: proc.poll() is not None, on_progress, deadline
             )
-        except subprocess.TimeoutExpired:
-            return {
-                "ok": False,
-                "error": f"candidate exceeded BIOLOGIX_AI_OPENMM_CANDIDATE_TIMEOUT_S={timeout_s}s",
-                "stage": "timeout",
-                "psmiles": psmiles,
-            }
+        else:
+            try:
+                proc.wait(timeout=None if deadline is None else max(0.0, deadline - time.monotonic()))
+                timed_out = False
+            except subprocess.TimeoutExpired:
+                timed_out = True
+        if timed_out:
+            proc.kill()
+            proc.wait()
+            return _timeout_result(psmiles, timeout_s)
         if not response.is_file():
             return {
                 "ok": False,
@@ -342,38 +405,65 @@ def _run_matrix_in_subprocess(
         return json.loads(response.read_text())
 
 
+def _matrix_worker(psmiles: str, matrix_kw: Dict[str, Any], progress_file: str) -> Any:
+    """Pool child: aim the progress channel at the parent's file, then run.
+
+    The environment is set here, in the child, so it never leaks into the parent
+    process that other candidates and other clients share.
+    """
+    from .openmm_complex import PROGRESS_FILE_ENV, run_openmm_matrix_relax_and_energy
+
+    if progress_file:
+        os.environ[PROGRESS_FILE_ENV] = progress_file
+    return run_openmm_matrix_relax_and_energy(psmiles, **matrix_kw)
+
+
 def _run_matrix_eval_with_timeout(
     psmiles: str,
     matrix_kw: Dict[str, Any],
     timeout_s: Optional[float],
+    on_progress: Optional[Callable[[str, str], None]] = None,
 ) -> Dict[str, Any]:
-    """Run matrix evaluation in a subprocess so wall-clock limits can be enforced."""
+    """Run matrix evaluation in a subprocess so wall-clock limits can be enforced.
+
+    *on_progress(stage, message)* receives the worker's stages as they happen.
+    """
+    import shutil
+    import tempfile
+
     from .openmm_complex import run_openmm_matrix_relax_and_energy
 
     if _gpu_platform_requested(matrix_kw):
-        return _run_matrix_in_subprocess(psmiles, matrix_kw, timeout_s)
+        return _run_matrix_in_subprocess(psmiles, matrix_kw, timeout_s, on_progress)
     if timeout_s is None:
+        # In-process: the parent's stage hook already sees every stage directly.
         res = run_openmm_matrix_relax_and_energy(psmiles, **matrix_kw)
         if res is None:
             return {"ok": False, "error": "unknown failure", "stage": "openmm"}
         return res
 
+    progress_dir = tempfile.mkdtemp(prefix="biologix_progress_") if on_progress else ""
+    progress_file = os.path.join(progress_dir, "progress.tsv") if progress_dir else ""
+    if progress_file:
+        Path(progress_file).touch()
     executor = ProcessPoolExecutor(max_workers=1)
-    future = executor.submit(run_openmm_matrix_relax_and_energy, psmiles, **matrix_kw)
     try:
-        res = future.result(timeout=timeout_s)
-    except FuturesTimeoutError:
-        _shutdown_process_pool(executor, kill_alive=True)
-        return {
-            "ok": False,
-            "error": (
-                f"candidate exceeded BIOLOGIX_AI_OPENMM_CANDIDATE_TIMEOUT_S={timeout_s}s"
-            ),
-            "stage": "timeout",
-            "psmiles": psmiles,
-        }
-    else:
+        future = executor.submit(_matrix_worker, psmiles, matrix_kw, progress_file)
+        try:
+            if on_progress is not None:
+                deadline = time.monotonic() + timeout_s
+                if not _tail_progress_file(progress_file, future.done, on_progress, deadline):
+                    raise FuturesTimeoutError()
+                res = future.result()
+            else:
+                res = future.result(timeout=timeout_s)
+        except FuturesTimeoutError:
+            _shutdown_process_pool(executor, kill_alive=True)
+            return _timeout_result(psmiles, timeout_s)
         _shutdown_process_pool(executor, kill_alive=False)
+    finally:
+        if progress_dir:
+            shutil.rmtree(progress_dir, ignore_errors=True)
     if res is None:
         return {"ok": False, "error": "unknown failure", "stage": "openmm"}
     return res
@@ -800,7 +890,18 @@ class MDSimulator:
 
                 try:
                     res = _run_matrix_eval_with_timeout(
-                        psmiles, matrix_kw, candidate_timeout_s
+                        psmiles,
+                        matrix_kw,
+                        candidate_timeout_s,
+                        on_progress=(
+                            (
+                                lambda stage, msg: _emit_progress(
+                                    status="progress", stage=stage, message=msg
+                                )
+                            )
+                            if progress_callback is not None
+                            else None
+                        ),
                     )
                 except Exception as exc:
                     res = {"ok": False, "error": str(exc), "stage": "openmm", "psmiles": psmiles}

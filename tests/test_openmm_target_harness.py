@@ -86,11 +86,19 @@ def test_gpu_candidates_run_in_a_fresh_interpreter(monkeypatch) -> None:
     from biologix_ai.simulation import md_simulator
 
     calls = []
+    progress = []
     monkeypatch.setattr(
-        md_simulator, "_run_matrix_in_subprocess", lambda p, kw, t: calls.append(kw) or {"ok": True}
+        md_simulator,
+        "_run_matrix_in_subprocess",
+        lambda p, kw, t, on_progress=None: calls.append((kw, on_progress)) or {"ok": True},
     )
-    assert md_simulator._run_matrix_eval_with_timeout("[*]CC[*]", {"openmm_platform": "CUDA"}, 5) == {"ok": True}
-    assert calls and calls[0]["openmm_platform"] == "CUDA"
+    observer = lambda stage, message: progress.append(stage)  # noqa: E731
+    assert md_simulator._run_matrix_eval_with_timeout(
+        "[*]CC[*]", {"openmm_platform": "CUDA"}, 5, on_progress=observer
+    ) == {"ok": True}
+    kwargs, forwarded = calls[0]
+    assert kwargs["openmm_platform"] == "CUDA"
+    assert forwarded is observer  # the GPU path must not drop the progress observer
     assert md_simulator._gpu_platform_requested({}) is False
 
 

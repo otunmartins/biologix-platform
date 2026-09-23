@@ -15,11 +15,20 @@ which every MCP client receives, live in
 - `src/python/biologix_ai/protocol_gate.py`: the step order and the per-client state.
   Every result carries a `protocol` envelope with `next_required_tool`,
   `next_arguments`, `step_instructions`, and `user_stop_allowed`.
-- `src/python/biologix_ai/mcp_jobs.py`: moves tools off the event loop. A call longer
-  than `BIOLOGIX_TOOL_WAIT_S` (90 s over HTTP, unlimited over stdio). ChatGPT's proxy
-  completed a 144.5 s call but returned HTTP 504 at 240 s, so its ceiling is between
-  them; change this only with a measurement returns a job
-  that the agent waits on with `await_biologix_job`.
+- `src/python/biologix_ai/mcp_jobs.py`: moves tools off the event loop. A job is
+  registered before its work starts. A call that outlasts `BIOLOGIX_TOOL_WAIT_S`
+  (90 s over HTTP, unlimited over stdio) returns `status: "running"` with a
+  `job_id`, and the agent collects the result with `await_biologix_job`, as many
+  times as it takes. ChatGPT's proxy completed a 144.5 s call but returned HTTP 504
+  at 240 s, so its ceiling lies between them; change the window only with a
+  measurement. Each check-back reports `elapsed_s` and the tool's latest stage.
+- Progress reaches a check-back through two channels, and both are needed. Inside a
+  container, a candidate runs in a worker process (a forked pool child on CPU, a fresh
+  interpreter on GPU), so `_stage_heartbeat` appends each stage to a progress file
+  (`BIOLOGIX_AI_PROGRESS_FILE`) that the parent tails (`md_simulator._tail_progress_file`).
+  Across containers, the Modal worker writes its stage to the `biologix-job-progress`
+  Dict and the web container polls it (`compute._call_worker`). The tailer must hand
+  control back at the candidate deadline, or the time limit never fires.
 - `src/python/biologix_ai/mcp_stdio_guard.py`: a per-client `MCP_BUSY` lock.
 - `src/python/biologix_ai/mcp_client.py`: the client id: the OAuth client, else a hash of
   the bearer token, else the `Mcp-Session-Id` header. Don't key on the session alone:

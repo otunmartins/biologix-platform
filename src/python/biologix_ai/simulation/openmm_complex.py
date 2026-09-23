@@ -22,8 +22,33 @@ import numpy as np
 logger = logging.getLogger(__name__)
 
 
+PROGRESS_FILE_ENV = "BIOLOGIX_AI_PROGRESS_FILE"
+
+
+def _append_progress_file(stage: str, msg: str) -> None:
+    """Append ``stage<TAB>message`` to the file the parent process is tailing.
+
+    A candidate runs in a worker process (a forked pool child on CPU, a fresh
+    interpreter on GPU), and ``_STAGE_HEARTBEAT_HOOK`` lives only in the parent,
+    so nothing the worker reports reached a check-back on the running job. A file
+    is the one channel that both start methods share. Failures are swallowed:
+    progress is a courtesy and must never fail a simulation.
+    """
+    path = os.environ.get(PROGRESS_FILE_ENV, "").strip()
+    if not path:
+        return
+    try:
+        clean = " ".join(str(msg).split())
+        with open(path, "a", encoding="utf-8") as handle:
+            handle.write(f"{stage}\t{clean}\n")
+    except OSError:
+        pass
+
+
 def _stage_heartbeat(stage: str, msg: str) -> None:
     """Emit stage progress to stderr unless the user opted out via BIOLOGIX_AI_EVAL_QUIET."""
+    # Before the quiet check: silencing stderr must not silence the job's progress.
+    _append_progress_file(stage, msg)
     if os.environ.get("BIOLOGIX_AI_EVAL_QUIET", "").strip().lower() in (
         "1",
         "true",
