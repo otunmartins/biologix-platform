@@ -1202,7 +1202,9 @@ def openmm_evaluate_psmiles(
         if target is not None and target.fetch_ok and target.pdb_path:
             target_pdb = target.pdb_path
             target_chains = ",".join(target.chains)
-        elif session is None:
+        else:
+            # Sessions from before biologic_target.json (and runs without a
+            # session) keep the target start_biologics_session exported.
             target_pdb = os.environ.get("BIOLOGIX_AI_TARGET_PROTEIN_PDB", "")
             target_chains = os.environ.get("BIOLOGIX_AI_TARGET_PROTEIN_CHAINS", "")
         ad = (artifacts_dir or "").strip()
@@ -1506,11 +1508,13 @@ def start_biologics_session(
     polymer_target: str = "",
     run_name: str = "",
     fetch_pdb: bool = True,
+    biologic_name: str = "",
 ) -> str:
     """Start a discovery session: new ``runs/<id>/``, world file, and the prepared target.
 
     Pass ``biologic_target=resolved_target`` from resolve_biologic_target (any form it
-    accepts works). The prepared structure and its metadata are written to
+    accepts works) and ``biologic_name`` = the user's name for it (e.g. semaglutide),
+    which literature mining and screening use. The prepared structure and its metadata are written to
     ``<session>/structures/biologic_target.{pdb,json}``; openmm_evaluate_psmiles reads
     the target from there. Returns ``session_dir``: pass it as ``run_dir`` to every
     later tool.
@@ -1526,6 +1530,10 @@ def start_biologics_session(
             session_dir=d,
             fetch_pdb=fetch_pdb,
         )
+        display_name = (biologic_name or "").strip() or biologic_target.strip()
+        if bio.fetch_ok and (biologic_name or "").strip():
+            bio.canonical_name = display_name
+            bio = bio_res._write_target(d / "structures", bio, Path(bio.pdb_path))
         if bio.pdb_path and bio.fetch_ok:
             os.environ["BIOLOGIX_AI_TARGET_PROTEIN_PDB"] = bio.pdb_path
             os.environ["BIOLOGIX_AI_TARGET_PROTEIN_CHAINS"] = ",".join(bio.chains)
@@ -1534,14 +1542,14 @@ def start_biologics_session(
             os.environ.pop("BIOLOGIX_AI_TARGET_PROTEIN_CHAINS", None)
 
         obj = (
-            f"Biologics stabilisation: {biologic_target}"
+            f"Biologics stabilisation: {display_name}"
             + (f"; polymer: {polymer_target}" if polymer_target.strip() else "")
         )
         ensure_world_for_session(d, objective=obj)
         wpath = world_path_for_session(d)
         world = load_world(wpath)
         meta_links = {
-            "biologic_target": biologic_target.strip(),
+            "biologic_target": display_name,
             "polymer_target": (polymer_target or "").strip(),
             "biologic_pdb_id": bio.pdb_id,
             "biologic_pdb_path": bio.pdb_path,

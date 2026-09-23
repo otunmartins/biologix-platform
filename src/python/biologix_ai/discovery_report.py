@@ -189,6 +189,11 @@ def target_structure_lines(session_dir: Path) -> List[str]:
         lines.append(f"- **Residues:** {meta['n_residues']}")
     if meta.get("n_atoms"):
         lines.append(f"- **Atoms with hydrogens (AMBER14):** {meta['n_atoms']}")
+    ph = meta.get("protonation_ph", 7.0)
+    lines.append(
+        f"- **Protonation:** pH {float(ph):.1f} "
+        "(OpenMM addHydrogens; the resolver does not pick a different pH)"
+    )
     if meta.get("max_extent_nm"):
         lines.append(f"- **Largest extent:** {meta['max_extent_nm']} nm")
     mods = meta.get("modifications") or []
@@ -212,7 +217,8 @@ def target_structure_lines(session_dir: Path) -> List[str]:
     lines.append("")
     lines.append(
         "Energies in this report are for this prepared model. Removed ligands, glycans, "
-        "lipid side chains, and unobserved residues are absent from the simulation."
+        "lipid side chains, and unobserved residues are absent from the simulation. "
+        "Each OpenMM result records random_seed; the NPT leg uses that seed."
     )
     lines.append("")
     return lines

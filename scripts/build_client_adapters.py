@@ -110,7 +110,7 @@ without these files. They make the model adopt the protocol from the first messa
                 "biologix": {
                     "type": "http",
                     "url": "${BIOLOGIX_MCP_URL:-" + MCP_URL + "}",
-                    "headers": {"Authorization": "Bearer ${BIOLOGIX_MCP_TOKEN:-}"},
+                    "headers": {"Authorization": "Bearer ${BIOLOGIX_MCP_TOKEN}"},
                 }
             }
         }

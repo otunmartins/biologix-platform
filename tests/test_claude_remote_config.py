@@ -148,7 +148,7 @@ def test_project_mcp_config_uses_environment_token() -> None:
     assert server["type"] == "http"
     assert server["url"].startswith("${BIOLOGIX_MCP_URL:-https://")
     assert server["url"].endswith(".modal.run/mcp}")
-    assert server["headers"]["Authorization"] == "Bearer ${BIOLOGIX_MCP_TOKEN:-}"
+    assert server["headers"]["Authorization"] == "Bearer ${BIOLOGIX_MCP_TOKEN}"
 
 
 def test_protocol_preserves_linear_hitl_protocol() -> None:

@@ -432,11 +432,18 @@ class ProtocolGate:
         return {
             "ok": False,
             "error": PROTOCOL_ORDER_ERROR,
+            "not_a_failure": envelope["stage"] != "blocked",
             "tool": tool,
             "stage": envelope["stage"],
             "required_next_tool": required_tool,
             "next_arguments": envelope.get("next_arguments", {}),
             "reason": reason,
+            "rule": (
+                "This is not a failure and not a checkpoint: call required_next_tool now "
+                "and continue the pipeline."
+                if envelope["stage"] != "blocked"
+                else envelope.get("rule", "")
+            ),
             "protocol": envelope,
         }
 
@@ -760,8 +767,7 @@ class ProtocolGate:
                 if target not in state.retro_submitted:
                     state.retro_submitted.append(target)
                 state.retro_submissions[target] = state.retro_submissions.get(target, 0) + 1
-                blocking = payload.get("blocking_reactants") if isinstance(payload, dict) else None
-                state.retro_blocking[target] = [str(b) for b in blocking or []]
+                state.retro_blocking[target] = _blocking_reactants(payload)
             return
         if tool == "plan_retrosynthesis":
             target = self._retro_target(arguments, state)
@@ -837,6 +843,8 @@ class ProtocolGate:
             else:
                 next_tool = "start_biologics_session"
                 next_arguments = {"biologic_target": client.resolved_target}
+                if client.biologic_target and client.biologic_target != client.resolved_target:
+                    next_arguments["biologic_name"] = client.biologic_target
                 if client.polymer_target:
                     next_arguments["polymer_target"] = client.polymer_target
             return {
@@ -1032,6 +1040,17 @@ def _done_labels(state: ProtocolState) -> List[str]:
     return labels
 
 
+def _blocking_reactants(payload: Any) -> List[str]:
+    """Blocking reactants from submit_retro_extractions (nested under ``validation``)."""
+    if not isinstance(payload, dict):
+        return []
+    validation = payload.get("validation")
+    blocking = payload.get("blocking_reactants")
+    if blocking is None and isinstance(validation, dict):
+        blocking = validation.get("blocking_reactants")
+    return [str(b) for b in blocking or []]
+
+
 def _openmm_disposition(payload: Any) -> str:
     """``pass`` when every OpenMM candidate completed, else ``fail``."""
     outcomes = payload.get("candidate_outcomes") if isinstance(payload, dict) else None
@@ -1121,6 +1140,15 @@ def _wrap_tool_fn(name: str, fn: Callable[..., Any], gate: ProtocolGate) -> Call
             if active is not None:
                 kwargs["run_dir"] = str(active)
                 arguments["run_dir"] = str(active)
+        if name == "start_biologics_session" and "biologic_name" in sig.parameters:
+            # Keep the user's name for the biologic when the session is started
+            # from a resolved form such as 4ZGM:B (literature and screening use it).
+            known = gate.client().biologic_target
+            if known and not _clean(arguments.get("biologic_name")) and known != _clean(
+                arguments.get("biologic_target")
+            ):
+                kwargs["biologic_name"] = known
+                arguments["biologic_name"] = known
         refusal = gate.check(name, arguments)
         if refusal is not None:
             return json.dumps(refusal, indent=2, default=str)

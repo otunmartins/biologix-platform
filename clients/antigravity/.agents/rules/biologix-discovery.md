@@ -30,6 +30,9 @@ those results.
 - A long tool returns `status: "running"` with a `job_id`. Call
   `await_biologix_job(job_id)` until the result arrives. That is not a failure
   and not a checkpoint; do not summarize or estimate while you wait.
+- `PROTOCOL_ORDER`, `JOB_RUNNING`, and `MCP_BUSY` are not failures. They name
+  the tool to call instead (`required_next_tool` or `next_required_tool`): call
+  it and continue without stopping.
 - `biologix_runtime_status` reports the server's dependencies and compute. You
   may call it at any time; it never changes the pipeline.
 
@@ -53,9 +56,9 @@ successful calls, then always stop at Step 7 and wait for the user.
 
 ## Failure policy
 
-If a tool reports an error, a timeout, a missing dependency, or `abort: true`,
-stop the pipeline. Show the user the exact server error and the last completed
-stage. Never replace a failed scientific calculation with an estimate or a
+Apart from the three redirects above, if a tool reports an error, a timeout, a
+missing dependency, or `abort: true`, stop the pipeline. Show the user the exact
+server error and the last completed stage. Never replace a failed scientific calculation with an estimate or a
 workaround, and never invent a local install or command-line substitute.
 
 One exception is structure resolution. If `resolve_biologic_target` fails, find
@@ -69,7 +72,7 @@ asking the user. After two failed retries the server stops the pipeline.
    `resolved_target`, `chains`, `modifications`, `removed_heterogens`,
    `warnings`, and `suggested_compute`.
 2. Call `start_biologics_session(biologic_target=<resolved_target>,
-   polymer_target, run_name)`.
+   biologic_name=<the user's name for it>, polymer_target, run_name)`.
 3. Keep the returned `run_dir` and pass it to every later tool.
 
 ## Step 3 — Literature and validation

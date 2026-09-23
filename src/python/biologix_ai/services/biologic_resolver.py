@@ -123,6 +123,10 @@ class BiologicTarget(BaseModel):
     rebuilt_gaps: list[dict] = Field(default_factory=list, description="Internal missing residues rebuilt")
     n_residues: int = 0
     n_atoms: int = Field(default=0, description="Atoms after hydrogens, as OpenMM builds the protein")
+    protonation_ph: float = Field(
+        default=7.0,
+        description="pH passed to OpenMM addHydrogens. Histidines follow this pH.",
+    )
     max_extent_nm: float = 0.0
     large_target: bool = False
     suggested_compute: str = Field(default="", description="gpu when the target is large")
@@ -721,7 +725,10 @@ def force_field_check(pdb_path: Path) -> Tuple[int, str]:
     """
     import openmm.app as app  # noqa: PLC0415
 
-    from biologix_ai.simulation.openmm_complex import target_protein_chains  # noqa: PLC0415
+    from biologix_ai.simulation.openmm_complex import (  # noqa: PLC0415
+        PROTONATION_PH,
+        target_protein_chains,
+    )
     from biologix_ai.simulation.openmm_insulin import (  # noqa: PLC0415
         load_insulin_modeller,
         prepare_insulin_ab_pdb,
@@ -733,7 +740,7 @@ def force_field_check(pdb_path: Path) -> Tuple[int, str]:
         try:
             modeller = load_insulin_modeller(str(work_pdb), add_ssbond=True)
             forcefield = app.ForceField("amber14-all.xml")
-            modeller.addHydrogens(forcefield)
+            modeller.addHydrogens(forcefield, pH=PROTONATION_PH)
             forcefield.createSystem(modeller.topology, nonbondedMethod=app.NoCutoff)
         except Exception as exc:  # ValueError "No template found for residue ..."
             return 0, f"AMBER14 cannot parameterize the target: {exc}"

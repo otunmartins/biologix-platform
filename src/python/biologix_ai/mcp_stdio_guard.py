@@ -43,9 +43,10 @@ def mcp_busy_json(session_dir: Optional[Path] = None) -> str:
     payload = {
         "ok": False,
         "error": MCP_BUSY_ERROR,
+        "not_a_failure": True,
         "hint": (
-            "Another biologix-ai MCP tool call is in flight. "
-            "Call biologix-ai MCP tools one at a time and wait for JSON before the next."
+            "Another biologix-ai MCP tool call is in flight. This is not a failure: wait for "
+            "it to return, then retry this call. Call Biologix tools one at a time."
         ),
     }
     log_tool_event(

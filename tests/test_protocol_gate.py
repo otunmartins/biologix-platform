@@ -533,7 +533,11 @@ def test_successful_resolve_passes_resolved_target_to_the_session(harness) -> No
     resolved = call("resolve_biologic_target", name_or_pdb_id="semaglutide")
     envelope = _protocol(resolved)
     assert envelope["next_required_tool"] == "start_biologics_session"
-    assert envelope["next_arguments"] == {"biologic_target": "4ZGM:B", "polymer_target": "PEG"}
+    assert envelope["next_arguments"] == {
+        "biologic_target": "4ZGM:B",
+        "biologic_name": "semaglutide",
+        "polymer_target": "PEG",
+    }
 
 
 def test_failed_resolve_retries_without_the_user_then_blocks(harness) -> None:
@@ -624,3 +628,27 @@ def test_blocking_reactants_route_to_diagnose_and_retries_are_capped(harness) ->
     compliance = _protocol(call("check_excipient_compliance", psmiles=PASS_A, run_dir=session))
     assert compliance["next_arguments"]["disposition"] == "fail"
     assert planned["next_required_tool"] == "check_monomers_batch"
+
+
+def test_real_submit_payload_nests_blocking_reactants_under_validation(harness) -> None:
+    from biologix_ai.protocol_gate import _blocking_reactants
+
+    assert _blocking_reactants({"ok": True, "validation": {"blocking_reactants": ["CCO"]}}) == ["CCO"]
+    assert _blocking_reactants({"ok": True, "blocking_reactants": ["N"]}) == ["N"]
+    assert _blocking_reactants({"ok": True, "validation": {}}) == []
+
+
+def test_session_keeps_the_users_biologic_name(harness) -> None:
+    call = harness["call"]
+    harness["config"]["resolved_target"] = "4ZGM:B"
+    call("begin_biologix_discovery", biologic_target="semaglutide", polymer_target="suggest")
+    resolved = call("resolve_biologic_target", name_or_pdb_id="semaglutide")
+    assert _protocol(resolved)["next_arguments"]["biologic_name"] == "semaglutide"
+
+
+def test_order_refusals_say_they_are_not_failures(harness) -> None:
+    call = harness["call"]
+    _start_session(call, harness["session"])
+    refused = call("screen_candidate_library", psmiles_list=PASS_A, run_dir=str(harness["session"]))
+    assert refused["error"] == PROTOCOL_ORDER_ERROR
+    assert refused["not_a_failure"] is True and "not a failure" in refused["rule"]

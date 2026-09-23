@@ -48,6 +48,61 @@ def register_stage_heartbeat_hook(hook: Optional[Any]) -> None:
     _STAGE_HEARTBEAT_HOOK = hook
 
 
+def seeded_langevin(temperature_k: float, friction_per_ps: float, dt_ps: float, seed: int):
+    """Langevin integrator whose random stream is fixed by *seed*.
+
+    OpenMM draws a fresh seed when none is set, so an unseeded NPT leg is not
+    comparable across runs of the same candidate.
+
+    Parameters
+    ----------
+    temperature_k : float
+        Temperature in kelvin.
+    friction_per_ps : float
+        Collision frequency in 1/ps.
+    dt_ps : float
+        Timestep in picoseconds.
+    seed : int
+        Random seed. The same seed reproduces the same trajectory.
+    """
+    import openmm  # noqa: PLC0415 — optional dependency, same as the rest of this module
+    import openmm.unit as unit  # noqa: PLC0415
+
+    integrator = openmm.LangevinIntegrator(
+        float(temperature_k) * unit.kelvin,
+        float(friction_per_ps) / unit.picosecond,
+        float(dt_ps) * unit.picoseconds,
+    )
+    integrator.setRandomNumberSeed(int(seed))
+    return integrator
+
+
+def seeded_barostat(pressure_bar: float, temperature_k: float, frequency: int, seed: int):
+    """Monte Carlo barostat whose volume moves are fixed by *seed*.
+
+    Parameters
+    ----------
+    pressure_bar : float
+        Pressure in bar.
+    temperature_k : float
+        Temperature in kelvin.
+    frequency : int
+        Steps between barostat attempts.
+    seed : int
+        Random seed, the same value passed to :func:`seeded_langevin`.
+    """
+    import openmm  # noqa: PLC0415 — optional dependency, same as the rest of this module
+    import openmm.unit as unit  # noqa: PLC0415
+
+    barostat = openmm.MonteCarloBarostat(
+        float(pressure_bar) * unit.bar,
+        float(temperature_k) * unit.kelvin,
+        int(frequency),
+    )
+    barostat.setRandomNumberSeed(int(seed))
+    return barostat
+
+
 def _cpu_platform():
     """Return the OpenMM CPU platform with a fixed thread count.
 
@@ -68,6 +123,10 @@ def _cpu_platform():
     platform.setPropertyDefaultValue("Threads", n_threads)
     return platform
 
+
+# OpenMM Modeller.addHydrogens default. Resolution and the matrix run must pass the
+# same value; histidine protonation follows this pH, not a predicted pKa.
+PROTONATION_PH = 7.0
 
 PLATFORM_ENV = "BIOLOGIX_AI_OPENMM_PLATFORM"
 _GPU_PLATFORMS = ("CUDA", "OpenCL")
@@ -425,7 +484,7 @@ def run_openmm_relax_and_energy(
         Path(work_pdb).unlink(missing_ok=True)
 
     protein_ff = app.ForceField("amber14-all.xml")  # vacuum; avoids C-term template issues
-    modeller.addHydrogens(protein_ff)
+    modeller.addHydrogens(protein_ff, pH=PROTONATION_PH)
     protein_top = modeller.topology
     protein_pos = modeller.positions
     n_protein = protein_top.getNumAtoms()
@@ -504,6 +563,8 @@ def run_openmm_relax_and_energy(
         "n_polymer_atoms": n_lig,
         "gromacs_only": False,
         "openmm_platform": dict(select_openmm_platform()[1]),
+        "random_seed": int(random_seed),
+        "protonation_ph": PROTONATION_PH,
     }
     if save_complex_pdb:
         outp = Path(save_complex_pdb).expanduser().resolve()
@@ -709,7 +770,7 @@ def run_openmm_matrix_relax_and_energy(
         prepare_insulin_ab_pdb(str(pdb_path), str(prep_pdb), chains=chains)
         modeller = load_insulin_modeller(str(prep_pdb), add_ssbond=True)
         protein_ff = app.ForceField("amber14-all.xml")
-        modeller.addHydrogens(protein_ff)
+        modeller.addHydrogens(protein_ff, pH=PROTONATION_PH)
         protein_top = modeller.topology
         protein_pos = modeller.positions
         n_protein = protein_top.getNumAtoms()
@@ -985,18 +1046,10 @@ def run_openmm_matrix_relax_and_energy(
             dt_ps = 0.002
             barostat_freq = max(1, int(barostat_interval_fs / 2))
             combined_sys_npt.addForce(
-                openmm.MonteCarloBarostat(
-                    pressure_bar * unit.bar,
-                    temperature_k * unit.kelvin,
-                    barostat_freq,
-                )
+                seeded_barostat(pressure_bar, temperature_k, barostat_freq, random_seed)
             )
             npt_steps = int(npt_duration_ps / dt_ps)
-            integ_npt = openmm.LangevinIntegrator(
-                temperature_k * unit.kelvin,
-                1 / unit.picosecond,
-                dt_ps * unit.picoseconds,
-            )
+            integ_npt = seeded_langevin(temperature_k, 1.0, dt_ps, random_seed)
             ctx_npt = openmm.Context(combined_sys_npt, integ_npt, platform)
             ctx_npt.setPeriodicBoxVectors(box_vec_omm[0], box_vec_omm[1], box_vec_omm[2])
             ctx_npt.setPositions(pos_min)
@@ -1058,6 +1111,8 @@ def run_openmm_matrix_relax_and_energy(
             "gromacs_only": False,
             "openmm_platform": dict(platform_info),
             "n_protein_chains": len(list(protein_top.chains())),
+            "random_seed": int(random_seed),
+            "protonation_ph": PROTONATION_PH,
         }
         if box_requested_nm is not None and float(box_requested_nm) < box_floor_nm:
             out["box_enlarged"] = {

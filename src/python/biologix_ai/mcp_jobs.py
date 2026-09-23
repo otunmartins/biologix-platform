@@ -140,6 +140,7 @@ def job_running_refusal(job: Job, tool: str) -> str:
         {
             "ok": False,
             "error": JOB_RUNNING,
+            "not_a_failure": True,
             "refused_tool": tool,
             "reason": f"{job.tool} (job {job.job_id}) has not finished. Wait for it first.",
         }
