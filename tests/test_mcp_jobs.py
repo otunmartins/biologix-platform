@@ -180,3 +180,79 @@ def test_a_dropped_connection_leaves_the_job_recoverable(monkeypatch) -> None:
         assert done["psmiles_list"] == "[*]CC[*]"
 
     asyncio.run(scenario())
+
+
+def test_check_back_repeatedly_and_see_what_it_is_doing(monkeypatch) -> None:
+    """Submit, wait, check back, keep waiting: the loop a minutes-long run needs."""
+    from mcp.server.fastmcp import FastMCP
+
+    from biologix_ai.mcp_jobs import note_progress
+
+    monkeypatch.setenv("BIOLOGIX_TOOL_WAIT_S", "0.2")
+    release = threading.Event()
+    mcp = FastMCP("jobs-checkback")
+
+    @mcp.tool()
+    def openmm_evaluate_psmiles(psmiles_list: str = "") -> str:
+        note_progress("packing 8 polymer chains", stage="packmol")
+        release.wait(timeout=10)
+        note_progress("computing interaction energy", stage="energy_eval")
+        return json.dumps({"ok": True, "interaction_energy_kj_mol": -376.7})
+
+    install_job_runner(mcp)
+    tool = mcp._tool_manager._tools["openmm_evaluate_psmiles"]
+
+    async def scenario():
+        first = json.loads(await tool.fn(psmiles_list="[*]CC[*]"))
+        assert first["status"] == "running"
+        assert first["progress"] == "packing 8 polymer chains"
+        assert first["stage"] == "packmol"
+        job_id = first["job_id"]
+
+        for _ in range(3):  # check back repeatedly; still running each time
+            again = json.loads(await await_job(job_id, 0.2))
+            assert again["status"] == "running"
+            assert again["job_id"] == job_id
+            assert "as many times as it takes" in again["protocol"]["rule"]
+        assert again["elapsed_s"] >= first["elapsed_s"]
+
+        release.set()
+        done = json.loads(await await_job(job_id, 5))
+        assert done["interaction_energy_kj_mol"] == -376.7
+
+    asyncio.run(scenario())
+
+
+def test_a_job_is_recoverable_even_before_the_wait_window_elapses(monkeypatch) -> None:
+    """A client with a very short ceiling still leaves a job to check back on."""
+    from mcp.server.fastmcp import FastMCP
+
+    from biologix_ai.mcp_jobs import pending_job
+
+    monkeypatch.setenv("BIOLOGIX_TOOL_WAIT_S", "30")  # far longer than this client waits
+    release = threading.Event()
+    started = threading.Event()
+    mcp = FastMCP("jobs-early-drop")
+
+    @mcp.tool()
+    def slow() -> str:
+        started.set()
+        release.wait(timeout=10)
+        return json.dumps({"ok": True})
+
+    install_job_runner(mcp)
+    tool = mcp._tool_manager._tools["slow"]
+
+    async def scenario():
+        task = asyncio.ensure_future(tool.fn())
+        await asyncio.get_running_loop().run_in_executor(None, started.wait, 5)
+        await asyncio.sleep(0.05)
+        # The client gave up here, long before the 30 s window would hand off.
+        job = pending_job(mcp_client.client_key())
+        assert job is not None and job.tool == "slow"
+        release.set()
+        assert json.loads(await task)["ok"] is True
+
+    from biologix_ai import mcp_client
+
+    asyncio.run(scenario())

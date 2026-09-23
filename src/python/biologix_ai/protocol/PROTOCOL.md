@@ -21,9 +21,14 @@ those results.
 - Speak to the user only when `user_stop_allowed` is true or a tool fails. A
   literature digest, a validation warning, and missing stereochemistry are not
   checkpoints.
-- A long tool returns `status: "running"` with a `job_id`. Call
-  `await_biologix_job(job_id)` until the result arrives. That is not a failure
-  and not a checkpoint; do not summarize or estimate while you wait.
+- Simulations take minutes, so a long tool hands back `status: "running"` with a
+  `job_id` instead of holding the connection open. The work is running on the
+  server. Call `await_biologix_job(job_id)`; if it is still going you get
+  another `running` payload, with `elapsed_s` and `progress` saying what it is
+  doing. Call it again, as many times as it takes — ten check-backs on one
+  simulation is normal and correct. It is neither a failure nor a checkpoint:
+  do not stop, summarize, estimate the result, or move to another candidate
+  while you wait.
 - `biologix_runtime_status` reports the server's dependencies and compute. You
   may call it at any time; it never changes the pipeline.
 

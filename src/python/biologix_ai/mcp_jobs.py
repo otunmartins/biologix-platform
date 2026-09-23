@@ -72,9 +72,32 @@ class Job:
     job_id: str
     client: str
     tool: str
-    future: Future
+    future: Optional[Future] = None
     started: float = field(default_factory=time.time)
     finished: Optional[float] = None
+    progress: str = ""
+    stage: str = ""
+
+    def done(self) -> bool:
+        return self.future is not None and self.future.done()
+
+
+# The job the current tool thread belongs to, so its progress reports can be
+# read back by whoever checks on it.
+CURRENT_JOB: contextvars.ContextVar[Optional[Job]] = contextvars.ContextVar(
+    "biologix_current_job", default=None
+)
+
+
+def note_progress(message: str, stage: str = "") -> None:
+    """Record the latest progress line for the running job (safe to call anywhere)."""
+    job = CURRENT_JOB.get()
+    if job is None:
+        return
+    if message:
+        job.progress = str(message)[:300]
+    if stage:
+        job.stage = str(stage)[:80]
 
 
 _EXECUTOR = ThreadPoolExecutor(
@@ -96,48 +119,56 @@ def pending_job(client: str) -> Optional[Job]:
     """The unfinished job of *client*, if any."""
     with _JOBS_LOCK:
         for job in _JOBS.values():
-            if job.client == client and not job.future.done():
+            if job.client == client and not job.done():
                 return job
     return None
 
 
-def _register(client: str, tool: str, future: Future) -> Job:
-    job = Job(job_id=uuid.uuid4().hex[:16], client=client, tool=tool, future=future)
-
-    def _mark(_f: Future) -> None:
-        job.finished = time.time()
-
-    future.add_done_callback(_mark)
+def _register(client: str, tool: str) -> Job:
+    """Record a job before its work starts; the future is attached next."""
+    job = Job(job_id=uuid.uuid4().hex[:16], client=client, tool=tool)
     with _JOBS_LOCK:
         _JOBS[job.job_id] = job
     _prune()
     return job
 
 
+def _attach_future(job: Job, future: Future) -> None:
+    def _mark(_f: Future) -> None:
+        job.finished = time.time()
+
+    job.future = future
+    future.add_done_callback(_mark)
+
+
 def running_json(job: Job) -> str:
     """Result returned while *job* is still running."""
     elapsed = round(time.time() - job.started, 1)
-    return json.dumps(
-        {
-            "ok": True,
-            "status": "running",
-            "job_id": job.job_id,
-            "tool": job.tool,
-            "elapsed_s": elapsed,
-            "protocol": {
-                "stage": "job",
-                "next_required_tool": AWAIT_TOOL,
-                "next_arguments": {"job_id": job.job_id},
-                "user_stop_allowed": False,
-                "rule": (
-                    f"{job.tool} is still running on the server ({elapsed} s so far). Call "
-                    f"{AWAIT_TOOL} now with this job_id. Do not stop, summarize, estimate the "
-                    "result, or call another Biologix tool first."
-                ),
-            },
+    payload: Dict[str, Any] = {
+        "ok": True,
+        "status": "running",
+        "job_id": job.job_id,
+        "tool": job.tool,
+        "elapsed_s": elapsed,
+        "protocol": {
+            "stage": "job",
+            "next_required_tool": AWAIT_TOOL,
+            "next_arguments": {"job_id": job.job_id},
+            "user_stop_allowed": False,
+            "rule": (
+                f"{job.tool} is still running on the server ({elapsed} s so far"
+                + (f", {job.progress}" if job.progress else "")
+                + f"). Nothing has failed. Call {AWAIT_TOOL} again with this job_id, as many "
+                "times as it takes. Do not stop, summarize, estimate the result, restart the "
+                "session, or call another Biologix tool first."
+            ),
         },
-        indent=2,
-    )
+    }
+    if job.progress:
+        payload["progress"] = job.progress
+    if job.stage:
+        payload["stage"] = job.stage
+    return json.dumps(payload, indent=2)
 
 
 def job_running_refusal(job: Job, tool: str) -> str:
@@ -205,11 +236,16 @@ def _wrap(name: str, fn: Callable[..., Any], server: Any) -> Callable[..., Any]:
                 return job_running_refusal(job, name)
         call = functools.partial(fn, *args, **kwargs)
         EVENT_LOOP.set(asyncio.get_running_loop())
+        # Register before the work starts: if the connection drops at any point,
+        # even before the wait window elapses, the run is still there to check on.
+        job = _register(client, name)
+        CURRENT_JOB.set(job)
         future = _EXECUTOR.submit(contextvars.copy_context().run, call)
+        _attach_future(job, future)
         ctx = _current_context(server)
         if await _wait(future, tool_wait_s(), ctx, name):
             return _result_text(future)
-        return running_json(_register(client, name, future))
+        return running_json(job)
 
     setattr(wrapped, "_biologix_job_runner", True)
     # FastMCP validates arguments from the original signature.
@@ -257,6 +293,8 @@ async def await_job(job_id: str, wait_s: float = 0.0, ctx: Any = None) -> str:
         )
     if job.client != client_key():
         return json.dumps({"ok": False, "error": "JOB_NOT_FOUND", "job_id": job_id, "abort": True})
+    if job.future is None:  # registered but not yet started
+        return running_json(job)
     default = tool_wait_s()
     limit = wait_s if wait_s and wait_s > 0 else default
     if default > 0:
@@ -272,4 +310,4 @@ def job_summary(job_id: str) -> Tuple[str, str]:
         job = _JOBS.get(job_id)
     if job is None:
         return "", "unknown"
-    return job.tool, "done" if job.future.done() else "running"
+    return job.tool, "done" if job.done() else "running"

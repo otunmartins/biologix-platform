@@ -369,6 +369,12 @@ class McpProgressReporter:
             progress = self._counter
         if self._ctx is not None:
             _send_progress(self._ctx, progress, total, message)
+        try:
+            from biologix_ai.mcp_jobs import note_progress
+
+            note_progress(message, stage)
+        except ImportError:
+            pass
         log_tool_event(
             self._session,
             tool=self._tool or "mcp_tool",
