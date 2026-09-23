@@ -112,7 +112,16 @@ def run_openmm_job(
         }
         if status == "completed":
             oc["interaction_energy_kj_mol"] = ep.get("interaction_energy_kj_mol")
-            for key in ("openmm_platform", "box_nm", "box_enlarged", "packmol_retry", "n_protein_chains"):
+            # Conditions the report has to disclose beside the number.
+            for key in (
+                "openmm_platform",
+                "box_nm",
+                "box_enlarged",
+                "packmol_retry",
+                "n_protein_chains",
+                "counterions",
+                "polymer_chain_charge",
+            ):
                 if ep.get(key) is not None:
                     oc[key] = ep[key]
         else:

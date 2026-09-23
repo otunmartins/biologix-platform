@@ -507,6 +507,8 @@ def _evaluate_one_matrix_candidate(
         "box_enlarged": res.get("box_enlarged"),
         "packmol_retry": res.get("packmol_retry"),
         "n_protein_chains": res.get("n_protein_chains"),
+        "counterions": res.get("counterions"),
+        "polymer_chain_charge": res.get("polymer_chain_charge"),
     }
     if pm.get("ok"):
         entry["min_polymer_protein_distance_nm"] = pm.get("min_polymer_protein_distance_nm")
@@ -876,6 +878,8 @@ class MDSimulator:
                     "box_enlarged": res.get("box_enlarged"),
                     "packmol_retry": res.get("packmol_retry"),
                     "n_protein_chains": res.get("n_protein_chains"),
+                    "counterions": res.get("counterions"),
+                    "polymer_chain_charge": res.get("polymer_chain_charge"),
                 }
                 pm = res.get("packing_metrics") or {}
                 if pm.get("ok"):

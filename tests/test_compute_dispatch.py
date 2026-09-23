@@ -76,3 +76,47 @@ def test_worker_artifacts_land_in_the_session_and_paths_are_rewritten(tmp_path) 
 def test_spec_round_trips_as_plain_data() -> None:
     spec = OpenMMJobSpec(psmiles=["[*]CC[*]"], target_chains="H,L", env={"A": "1"})
     assert OpenMMJobSpec.from_dict(spec.to_dict()) == spec
+
+
+def test_run_conditions_reach_the_agent_in_candidate_outcomes(monkeypatch) -> None:
+    """Counterions and the chain charge must be disclosed beside the energy."""
+    import biologix_ai.simulation as simulation_pkg
+    from biologix_ai.compute import openmm_job
+    from biologix_ai.simulation import openmm_compat
+
+    progress = [
+        {
+            "index": 0,
+            "material_name": "Candidate_0",
+            "status": "completed",
+            "interaction_energy_kj_mol": -1645.3,
+            "openmm_platform": {"name": "CUDA"},
+            "counterions": {"residue": "NA", "count": 64, "neutralises": "polymer matrix"},
+            "polymer_chain_charge": -8,
+            "box_nm": 7.5,
+        },
+        {"index": 1, "material_name": "Candidate_1", "status": "failed", "reason": "packmol timeout"},
+    ]
+
+    class FakeSim:
+        def __init__(self, **kwargs):
+            pass
+
+        def evaluate_candidates(self, *args, **kwargs):
+            return {
+                "high_performers": [],
+                "effective_mechanisms": [],
+                "problematic_features": [],
+                "evaluation_progress": progress,
+            }
+
+    monkeypatch.setattr(openmm_compat, "openmm_available", lambda: True)
+    monkeypatch.setattr(simulation_pkg, "MDSimulator", FakeSim)
+    out = openmm_job.run_openmm_job(OpenMMJobSpec(psmiles=["[*]CC([*])C(=O)[O-]"]))
+
+    completed, failed = out["candidate_outcomes"]
+    assert completed["counterions"]["count"] == 64
+    assert completed["polymer_chain_charge"] == -8
+    assert completed["openmm_platform"]["name"] == "CUDA"
+    assert failed["reason"] == "packmol timeout"
+    assert "counterions" not in failed
