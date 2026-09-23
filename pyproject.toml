@@ -13,7 +13,9 @@ authors = [{name = "Biologics AI Team"}]
 keywords = ["biologics", "retrosynthesis", "PSMILES", "openmm", "ADMET", "excipient"]
 dependencies = [
     # MCP server (FastMCP bundled; [cli] adds typer/rich for mcp.run())
-    "mcp[cli]>=1.0.0",
+    "mcp[cli]>=1.30,<2",
+    # Encrypted persistent OAuth state for remote Claude Web connections
+    "cryptography>=44,<47",
     # HTTP / web search
     "requests>=2.28.0",
     "duckduckgo-search>=8.0.0",
@@ -70,22 +72,24 @@ benchmark = [
 ]
 retro = [
     # RetroSynthesisAgent deps (submodule: extern/RetroSynthesisAgent)
-    # Imported via sys.path by mcp_server; no setup.py in the submodule.
-    "networkx>=3.0",
+    # Imported via PYTHONPATH. AiZynthFinder 4.4 requires NetworkX <3.
+    "networkx>=2.8,<3",
     "pubchempy>=1.0",
-    "scholarly>=1.7",
+    "scholarly>=1.7,<1.8",
+    "bibtexparser>=1.4,<2",
     "PyMuPDF>=1.22",
     "graphviz>=0.20",
     "pyvis>=0.3",
     "loguru>=0.7",
     "jsonpickle>=3.0",
     "fake-useragent>=1.4",
-    "selenium>=4.0",
+    "selenium>=4,<4.27",
+    "urllib3>=1.26.19,<2",
     "python-dotenv>=1.0",
     # AiZynthFinder: install from submodule with pip install -e extern/aizynthfinder
 ]
 admet = [
-    # ADMET-AI: install from submodule with pip install -e extern/admet_ai
+    # ADMET-AI 2.x is installed in a separate biologix-admet conda environment.
 ]
 api = [
     "fastapi>=0.115",
@@ -103,6 +107,9 @@ all = [
 [tool.setuptools.packages.find]
 where = ["src/python"]
 include = ["biologix_ai*"]
+
+[tool.setuptools.package-data]
+biologix_ai = ["protocol/*.md"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

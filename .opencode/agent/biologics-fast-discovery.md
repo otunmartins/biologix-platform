@@ -74,8 +74,13 @@ stop on tool failure, then **always** run Step 7 and **wait for the user** befor
 
 ### Step 2 — Session
 
-- `resolve_biologic_target(name_or_pdb_id, fetch_pdb=true, run_dir=<session>)`
-- `start_biologics_session(biologic_target, polymer_target, run_name)`
+- `resolve_biologic_target(name_or_pdb_id, fetch_pdb=true)`. Accepted forms: a name
+  (`semaglutide`), `PDB:chains` (`4ZGM:B`), `uniprot:ACCESSION[:start-end]`, or
+  `sequence:ONE_LETTER` (<=400 residues). If it fails, find a more specific form in the
+  literature yourself and retry (at most twice) before reporting the failure.
+- `start_biologics_session(biologic_target=<resolved_target>, polymer_target, run_name)`
+- Disclose the target's `modifications`, `removed_heterogens`, and `warnings` in the report.
+  When `suggested_compute` is `gpu`, pass `compute="gpu"` to `openmm_evaluate_psmiles`.
 
 Save `run_dir` from the session response for all later tools.
 
@@ -85,8 +90,7 @@ Save `run_dir` from the session response for all later tools.
 - `validate_psmiles(psmiles, material_name, crosscheck_web=false)` for each candidate PSMILES
   Use `crosscheck_web=false` in fast mode to avoid DuckDuckGo latency.
 
-If no polymer target was given, derive up to **6** names from literature and call
-`generate_psmiles_from_name` **sequentially** (one per turn).
+If no polymer target was given, derive up to **6** candidates from literature and **write each PSMILES yourself**, one `validate_psmiles` call per turn. Read `graph_report`; do not use a stored or PubChem repeat unit.
 
 ### Step 4 — Screen
 

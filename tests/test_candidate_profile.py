@@ -46,8 +46,34 @@ class TestGetCandidateProfile:
         parsed = json.loads(result)
         assert parsed["psmiles"] == "[*]OCC[*]"
         assert "validation" in parsed
+        assert parsed["validation"].get("valid") is True
+        assert "missing" not in json.dumps(parsed["validation"]).lower()
         assert "admet" in parsed
+        screened = parsed["admet"].get("smiles") or parsed["admet"].get("screened_smiles")
+        assert screened
+        assert "()" not in screened
+        assert screened != "OCC"
+        from rdkit import Chem
+
+        assert Chem.MolFromSmiles(screened) is not None
         assert "compliance" in parsed
+
+    def test_vinyl_repeats_screen_as_parseable_molecules(self):
+        from rdkit import Chem
+
+        for psmiles in ("[*]CC([*])O", "[*]CC([*])N1CCCC1=O"):
+            result = json.loads(self.server.get_candidate_profile(
+                psmiles=psmiles,
+                biologic_target="insulin",
+                run_retro=False,
+                run_admet=True,
+                run_compliance=False,
+            ))
+            screened = result["admet"].get("smiles") or result["admet"].get("screened_smiles")
+            assert screened
+            assert "()" not in screened
+            assert Chem.MolFromSmiles(screened) is not None
+            assert result["validation"].get("valid") is True
 
     def test_compliance_peg_approved(self):
         result = self.server.get_candidate_profile(

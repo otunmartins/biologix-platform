@@ -129,8 +129,7 @@ def enrich_tool_result(
             "hint",
             hint
             or "Check <session>/tool_events.jsonl and tool_errors.log. "
-            "If MCP timed out, the session latches to CLI-only — do not call MCP again; "
-            "use bash CLI per .opencode/MCP_CLI_FALLBACK.md.",
+            "Report the exact error to the user; do not substitute an estimate.",
         )
     return out
 
@@ -258,8 +257,8 @@ def run_instant_mcp_tool(
     """Run a fast session/audit MCP tool with ``BIOLOGIX_AI_MCP_INSTANT_TIMEOUT_S``."""
     cap = instant_mcp_timeout_s()
     hint = failure_hint or (
-        f"Instant MCP tool exceeded {cap}s — stdio may be blocked by a long-running call. "
-        "After any MCP timeout the session latches to CLI-only per .opencode/MCP_CLI_FALLBACK.md."
+        f"Instant MCP tool exceeded {cap}s; a long-running call may be holding the server. "
+        "Report the exact error to the user."
     )
     return run_guarded_tool(
         tool,
@@ -303,6 +302,36 @@ def log_tool_budget(
     )
 
 
+def _send_progress(ctx: Any, progress: float, total: Optional[float], message: str) -> None:
+    """Send ``notifications/progress`` from a tool thread without blocking it.
+
+    ``Context.report_progress`` is a coroutine; calling it without awaiting (as
+    this module once did) sends nothing. Tool threads started by
+    ``mcp_jobs.install_job_runner`` know the server loop and schedule it there.
+    """
+    import asyncio
+
+    try:
+        pending = ctx.report_progress(progress, total, message)
+    except Exception:
+        return
+    if not asyncio.iscoroutine(pending):
+        return  # a synchronous reporter already did its work
+    try:
+        from biologix_ai.mcp_jobs import EVENT_LOOP
+
+        loop = EVENT_LOOP.get()
+    except ImportError:
+        loop = None
+    if loop is None or loop.is_closed():
+        pending.close()  # no loop to send on; avoid "never awaited" warnings
+        return
+    try:
+        asyncio.run_coroutine_threadsafe(pending, loop)
+    except Exception:
+        pending.close()
+
+
 class McpProgressReporter:
     """Emit MCP ``notifications/progress`` plus stderr / tool_events mirrors."""
 
@@ -339,10 +368,7 @@ class McpProgressReporter:
             self._counter += 1.0
             progress = self._counter
         if self._ctx is not None:
-            try:
-                self._ctx.report_progress(progress, total, message)
-            except Exception:
-                pass
+            _send_progress(self._ctx, progress, total, message)
         log_tool_event(
             self._session,
             tool=self._tool or "mcp_tool",
@@ -423,6 +449,5 @@ def run_guarded_tool(
             stage=stage,
             hint=failure_hint
             or "Unexpected tool exception; inspect tool_errors.log. "
-            "If MCP timed out, session latches to CLI-only — no further MCP; "
-            "use bash CLI per .opencode/MCP_CLI_FALLBACK.md.",
+            "Report the exact error to the user; do not substitute an estimate.",
         )

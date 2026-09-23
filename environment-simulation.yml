@@ -14,8 +14,11 @@ channels:
 dependencies:
   - python=3.11
   # --- Conda-managed: compiled binaries / C extensions ---
-  - rdkit                        # cheminformatics (RDKit)
-  - openmm                       # molecular dynamics engine
+  # AiZynthFinder 4.4 / reaction-utils require the 2023 RDKit ABI.
+  # ADMET-AI uses a separate environment because it requires RDKit >=2025.9.
+  - rdkit>=2023.9.1,<2024       # cheminformatics (RDKit)
+  - openmm                       # molecular dynamics engine (conda-forge builds include the CUDA platform)
+  - cuda-version>=12,<13         # CUDA 12 runtime for OpenMM's CUDA plugin (Modal GPU driver is 13.x, backward compatible)
   - pdbfixer                     # PDB structure repair
   - packmol                      # molecular packing (binary on PATH)
   - openff-toolkit>=0.18.0       # conda-forge only (not on PyPI)
@@ -25,9 +28,9 @@ dependencies:
 
   - pip:
     # --- Core numerics ---
-    - numpy>=1.24
-    - pandas>=2.0
-    - scipy>=1.11
+    - numpy>=1.24,<2
+    - pandas>=2.0,<3
+    - scipy>=1.11,<1.15
     - matplotlib>=3.7
     - Pillow>=10.0
 
@@ -39,8 +42,8 @@ dependencies:
     - psmiles @ git+https://github.com/FermiQ/psmiles.git
     - psp>=0.0.5                   # optional PSP MoleculeBuilder (psp_polymer_build.py)
 
-    # --- MCP server (FastMCP bundled in mcp>=1.0; [cli] adds typer/rich for mcp.run()) ---
-    - mcp[cli]>=1.0.0
+    # --- MCP server (1.30 adds Streamable HTTP; stay on compatible 1.x) ---
+    - mcp[cli]>=1.30,<2
 
     # --- HTTP / web ---
     - requests>=2.28.0
@@ -65,7 +68,8 @@ dependencies:
     # --- RL benchmarks (ibm_insulin_env.py, stable_baselines3) ---
     - gymnasium>=0.29
     - stable-baselines3>=2.0
-    - GPy>=1.10                    # Bayesian optimisation in IBM benchmark
+    - GPy>=1.13,<1.14              # Bayesian optimisation in IBM benchmark
+    - paramz>=0.9,<0.10            # GPy 1.x with NumPy <2
 
     # --- Dev / testing ---
     - pytest>=7.4.0

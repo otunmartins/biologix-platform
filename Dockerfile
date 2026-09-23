@@ -49,12 +49,42 @@ COPY environment-simulation.yml ./
 # -e . requires pyproject.toml, which is not copied until the app stage.
 # install_submodules.sh already runs: pip install -e ".[retro,admet,dev]"
 RUN sed '/^[[:space:]]*- -e \.$/d' environment-simulation.yml > /tmp/environment-docker.yml \
-    && mamba env create -f /tmp/environment-docker.yml \
-    && mamba install -n biologix-ai-sim -y -c conda-forge "git>=2.40" \
+    && MAMBA_MAX_ATTEMPTS=3 \
+    && mamba_retry() { \
+         local attempt; \
+         for attempt in $(seq 1 "$MAMBA_MAX_ATTEMPTS"); do \
+           if "$@"; then return 0; fi; \
+           echo "mamba attempt ${attempt}/${MAMBA_MAX_ATTEMPTS} failed; clearing package cache" >&2; \
+           mamba clean --all --yes || true; \
+         done; \
+         return 1; \
+       } \
+    && create_main_environment() { \
+         local attempt; \
+         for attempt in $(seq 1 "$MAMBA_MAX_ATTEMPTS"); do \
+           rm -rf /opt/conda/envs/biologix-ai-sim; \
+           if mamba env create -f /tmp/environment-docker.yml; then return 0; fi; \
+           echo "main environment attempt ${attempt}/${MAMBA_MAX_ATTEMPTS} failed" >&2; \
+           mamba clean --all --yes || true; \
+         done; \
+         return 1; \
+       } \
+    && create_pymol_environment() { \
+         local attempt; \
+         for attempt in $(seq 1 "$MAMBA_MAX_ATTEMPTS"); do \
+           rm -rf /opt/conda/envs/pymol-viz; \
+           if mamba create -n pymol-viz -y -c conda-forge python=3.11 pymol-open-source; then return 0; fi; \
+           echo "PyMOL environment attempt ${attempt}/${MAMBA_MAX_ATTEMPTS} failed" >&2; \
+           mamba clean --all --yes || true; \
+         done; \
+         return 1; \
+       } \
+    && create_main_environment \
+    && mamba_retry mamba install -n biologix-ai-sim -y -c conda-forge "git>=2.40" \
     && /opt/conda/envs/biologix-ai-sim/bin/git --version \
-    && /opt/conda/envs/biologix-ai-sim/bin/python -m pip install "mcp[cli]>=1.0.0" \
+    && /opt/conda/envs/biologix-ai-sim/bin/python -m pip install "mcp[cli]>=1.30,<2" \
     && /opt/conda/envs/biologix-ai-sim/bin/python -c "from importlib.metadata import version; from mcp.server.fastmcp import FastMCP; print('mcp', version('mcp'))" \
-    && mamba create -n pymol-viz -y -c conda-forge python=3.11 pymol-open-source \
+    && create_pymol_environment \
     && PYMOL_HEADLESS=1 /opt/conda/envs/pymol-viz/bin/pymol -c -d "quit" \
     && mamba clean --all --yes
 
@@ -78,14 +108,20 @@ RUN git submodule update --init --recursive 2>/dev/null || true
 
 # Environment wiring
 ENV CONDA_ENV=biologix-ai-sim
-ENV PYTHONPATH=/app/src/python
+ENV PYTHONPATH=/app:/app/src/python:/app/extern/RetroSynthesisAgent
 ENV RETRO_LLM_BACKEND=skip
 ENV BIOLOGIX_AI_AIZYNTH_CONFIG=/app/data/aizynthfinder/config.yml
-ENV PATH="/opt/conda/envs/biologix-ai-sim/bin:/root/.opencode/bin:${PATH}"
+ENV BIOLOGIX_ADMET_PYTHON=/opt/conda/envs/biologix-admet/bin/python
+# pymol-viz is appended, never prepended: its python lacks mcp/openmm.
+ENV PATH="/opt/conda/envs/biologix-ai-sim/bin:/root/.opencode/bin:${PATH}:/opt/conda/envs/pymol-viz/bin"
 ENV CONDA_DEFAULT_ENV=biologix-ai-sim
 # Conda-forge C++ libs (libLerc, graphviz) require newer libstdc++ than the base image.
 ENV LD_LIBRARY_PATH=/opt/conda/envs/biologix-ai-sim/lib
 ENV BIOLOGIX_AI_IMAGE_VERSION=${IMAGE_VERSION}
+# Runtime settings the entrypoint also exports; set here so Modal functions and
+# `docker run <cmd>` get them even when no entrypoint script runs.
+ENV MPLBACKEND=Agg
+ENV BIOLOGIX_AI_DOCKER=1
 ENV OPENCODE_DISABLE_AUTOUPDATE=true
 # Resumable Molport tier-3 downloads during Docker build (avoid HF CDN 408 on streaming).
 ENV HF_HUB_DOWNLOAD_TIMEOUT=600
@@ -124,5 +160,9 @@ RUN if [ -d /app/data ]; then cp -a /app/data /app/.data-seed; fi
 # then make the entrypoint executable.
 RUN sed -i 's/\r$//' /app/docker/entrypoint.sh /app/docker/restore_terminal.sh /app/docker/cpu_defaults.sh /app/scripts/*.sh 2>/dev/null || true \
     && chmod +x /app/docker/entrypoint.sh /app/docker/restore_terminal.sh /app/scripts/docker_cpu_limit.sh /app/scripts/docker_run.sh /app/scripts/docker_compose_run.sh /app/scripts/host_docker_tty_guard.sh
+
+# Fail the image build if any simulation, retrosynthesis, ADMET, model-data,
+# executable, or structure dependency is absent.
+RUN python scripts/verify_modal_image.py
 
 ENTRYPOINT ["/app/docker/entrypoint.sh"]

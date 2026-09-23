@@ -33,7 +33,7 @@ OpenCode config (`.opencode/opencode.jsonc`): local server **`cwd: "."`**, catal
 |------|---------------|
 | **`mine_literature`** | Asta MCP when `ASTA_API_KEY` is set; otherwise Semantic Scholar (no key). |
 | **`openmm_evaluate_psmiles`**, **`run_autonomous_discovery`** | OpenMM stack (openmm, openmmforcefields, openff-toolkit, rdkit, pdbfixer), Packmol on PATH, insulin PDB (`data/4F1C.pdb` or `ensure_insulin_pdb`). See [OPENMM_SCREENING.md](OPENMM_SCREENING.md). |
-| **`generate_psmiles_from_name`** | Known-polymer table (~60 entries) or PubChem monomer SMILES; auto-detects polymerization mechanism (vinyl, ester condensation, amide condensation) and places `[*]`. Returns `{ok, psmiles, source, confidence, mechanism, md_compatible}`. |
+| **`generate_psmiles_from_name`** | Does not return a structure. Responds `source: "model_required"` so the caller writes the PSMILES and checks it with `validate_psmiles` (`graph_report`). |
 | **`validate_psmiles`** | RDKit, optional PubChem (PUG REST) and DuckDuckGo (`crosscheck_web=true`, needs `duckduckgo-search`). [PSMILES primer](PSMILES_GUIDE.md). |
 | **`render_psmiles_png`** | [psmiles](https://github.com/FermiQ/psmiles) — 2D monomer PNG under `<session>/structures/`. |
 | **`compile_discovery_markdown_to_pdf`** | Agent-authored `SUMMARY_REPORT.md` → PDF (markdown + fpdf2). |

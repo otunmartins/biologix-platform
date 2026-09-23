@@ -114,4 +114,7 @@ mcp_servers/
 # mypy
 .mypy_cache/
 .dmypy.json
-dmypy.json 
+dmypy.json
+
+# Client delivery folder (built locally; do not commit)
+deliverable/ 

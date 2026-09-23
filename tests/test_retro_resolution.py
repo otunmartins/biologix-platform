@@ -14,12 +14,13 @@ class TestResolveRetroTarget:
         assert r["material_name"] == "poly(acrylic acid)"
         assert r["monomer_smiles"]
 
-    def test_name_resolves_to_psmiles(self):
+    def test_name_is_not_converted_to_a_structure(self):
         from biologix_ai.retrosynthesis.psmiles_bridge import resolve_retro_target
 
         r = resolve_retro_target("poly(vinyl alcohol)")
-        assert "[*]" in r["psmiles"]
+        assert "[*]" not in r["psmiles"]
         assert r["material_name"] == "poly(vinyl alcohol)"
+        assert r["monomer_smiles"] == ""
 
 
 class TestRetroAdapter:

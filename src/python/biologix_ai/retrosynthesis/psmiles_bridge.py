@@ -35,20 +35,21 @@ def psmiles_to_smiles_target(psmiles: str) -> str:
     """
     try:
         from psmiles import PolymerSmiles
+        from rdkit import Chem
 
-        ps = PolymerSmiles(psmiles)
-        dimer_fn = ps.dimer
-        dimer = dimer_fn() if callable(dimer_fn) else dimer_fn
-        if dimer and isinstance(dimer, str):
-            smiles_out = dimer.replace("[*]", "[H]")
-            try:
-                from rdkit import Chem
-                mol = Chem.MolFromSmiles(smiles_out)
-                if mol is not None:
-                    return Chem.MolToSmiles(mol)
-            except ImportError:
-                pass
-            return smiles_out
+        # how=1 is head-to-tail. Hydrogen-capping the monomer of [*]OCC[*]
+        # is ethanol (CCO), which is not the PEG fragment.
+        dimer = str(PolymerSmiles(psmiles).dimer(how=1))
+        molecule = Chem.MolFromSmiles(dimer.replace("[*]", "[H]"))
+        if molecule is not None:
+            return Chem.MolToSmiles(molecule)
+    except (ImportError, Exception):
+        pass
+
+    try:
+        from biologix_ai.material_mappings import repeat_unit_screen_smiles
+
+        return repeat_unit_screen_smiles(psmiles)
     except (ImportError, Exception):
         pass
 

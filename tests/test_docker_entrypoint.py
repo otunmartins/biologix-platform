@@ -153,3 +153,83 @@ def test_entrypoint_appends_pymol_viz_to_path() -> None:
     text = ENTRYPOINT.read_text(encoding="utf-8")
     assert 'PATH="${PATH}:/opt/conda/envs/pymol-viz/bin"' in text
     assert 'PATH="/opt/conda/envs/pymol-viz/bin:${PATH}"' not in text
+
+
+def test_docker_context_keeps_required_pdb_structures_and_skips_local_bloat() -> None:
+    dockerignore = (REPO_ROOT / ".dockerignore").read_text(encoding="utf-8")
+    for required_path in (
+        "!src/python/biologix_ai/simulation/data/4F1C.pdb",
+        "!src/python/biologix_ai/simulation/data/insulin_AB.pdb",
+        "!data/biologics/biologic_1BUY.pdb",
+        "!data/biologics/biologic_3WD5.pdb",
+    ):
+        assert required_path in dockerignore
+    for ignored_path in (
+        "insulin-ai/",
+        ".agents/",
+        ".cursor/",
+        "ChatGPT-*.md",
+        "*.png",
+    ):
+        assert ignored_path in dockerignore
+
+
+def test_submodule_installer_has_pinned_clone_fallbacks() -> None:
+    script = (REPO_ROOT / "scripts" / "install_submodules.sh").read_text(encoding="utf-8")
+    expected_pins = {
+        "extern/RetroSynthesisAgent": "59a6e3bb828a6ccbd35e4bba5a443440ca53dfc0",
+        "extern/aizynthfinder": "21ff546d5f22331b078390a2f12dc04defc3f39c",
+        "extern/admet_ai": "c65bf0418e19c65d7228f9e40da5d0152aade756",
+    }
+    assert "ensure_submodule_checkout" in script
+    for path, revision in expected_pins.items():
+        assert path in script
+        assert revision in script
+
+
+def test_streamable_http_mcp_minimum_is_pinned_consistently() -> None:
+    required = "mcp[cli]>=1.30,<2"
+    for relative_path in (
+        "pyproject.toml",
+        "environment-simulation.yml",
+        "Dockerfile",
+        "scripts/install_submodules.sh",
+    ):
+        text = (REPO_ROOT / relative_path).read_text(encoding="utf-8")
+        assert required in text, f"{relative_path} must require Streamable HTTP support"
+
+
+def test_conda_environment_builds_retry_corrupt_modal_mirror_downloads() -> None:
+    dockerfile = (REPO_ROOT / "Dockerfile").read_text(encoding="utf-8")
+    submodule_installer = (REPO_ROOT / "scripts" / "install_submodules.sh").read_text(
+        encoding="utf-8"
+    )
+
+    assert "MAMBA_MAX_ATTEMPTS=3" in dockerfile
+    assert "create_main_environment" in dockerfile
+    assert "create_pymol_environment" in dockerfile
+    assert "MAMBA_MAX_ATTEMPTS=3" in submodule_installer
+    assert "create_admet_environment" in submodule_installer
+    for text in (dockerfile, submodule_installer):
+        assert "mamba clean --all --yes" in text
+
+
+def test_retrosynthesis_database_layers_cannot_be_silently_skipped() -> None:
+    dockerfile = (REPO_ROOT / "Dockerfile").read_text(encoding="utf-8")
+    submodule_installer = (REPO_ROOT / "scripts" / "install_submodules.sh").read_text(
+        encoding="utf-8"
+    )
+    aizynth_setup = (REPO_ROOT / "scripts" / "setup_aizynthfinder.sh").read_text(
+        encoding="utf-8"
+    )
+    image_verifier = (REPO_ROOT / "scripts" / "verify_modal_image.py").read_text(
+        encoding="utf-8"
+    )
+
+    assert "build_precursor_db.py --tiers 1,2,3" in submodule_installer
+    assert "build_precursor_db.py --tiers 1,2,3,4" not in submodule_installer
+    assert "build_precursor_db.py --tiers 4" in dockerfile
+    assert "aizynth_data_complete" in aizynth_setup
+    assert "python scripts/verify_modal_image.py" in dockerfile
+    assert "verify_scientific_assets.py" in image_verifier
+    assert "verify_retrosynthesis_stack.py" in image_verifier

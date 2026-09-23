@@ -1,36 +1,16 @@
-"""Tests for name → PSMILES pipeline (known lookup + PubChem + auto-conversion)."""
+"""Tests for name handling (model-authored PSMILES) and monomer auto-conversion helpers."""
+
+import json
 
 import pytest
 
 from biologix_ai.material_mappings import (
     name_to_psmiles,
     monomer_smiles_to_psmiles,
-    _try_known_polymer_lookup,
     _vinyl_smiles_to_psmiles,
     _hydroxy_acid_smiles_to_psmiles,
     _amino_acid_smiles_to_psmiles,
 )
-
-
-class TestKnownPolymerLookup:
-
-    @pytest.mark.parametrize("name,expected", [
-        ("PEG", "[*]OCC[*]"),
-        ("peg", "[*]OCC[*]"),
-        ("polyethylene glycol", "[*]OCC[*]"),
-        ("PLA", "[*]OC(=O)C(C)[*]"),
-        ("poly(lactic acid)", "[*]OC(=O)C(C)[*]"),
-        ("PMMA", "[*]CC([*])(C)C(=O)OC"),
-        ("polystyrene", "[*]CC([*])c1ccccc1"),
-        ("PDMS", "[*]O[Si](C)(C)[*]"),
-        ("chitosan", "[*]OC1C(N)C(O)C(CO)OC1[*]"),
-    ])
-    def test_known_polymers(self, name, expected):
-        result = _try_known_polymer_lookup(name)
-        assert result == expected
-
-    def test_unknown_returns_none(self):
-        assert _try_known_polymer_lookup("unobtainium_polymer") is None
 
 
 class TestVinylConversion:
@@ -122,44 +102,22 @@ class TestMonomerSmilesToPSMILES:
 
 class TestNameToPSMILES:
 
-    def test_known_polymer(self):
-        r = name_to_psmiles("PEG")
-        assert r["ok"] is True
-        assert r["psmiles"] == "[*]OCC[*]"
-        assert r["source"] == "known_polymer_table"
-        assert r["confidence"] == "high"
+    @pytest.mark.parametrize("name", [
+        "PEG", "chitosan", "Polylactic Acid", "PLGA", "styrene", "lactic acid",
+    ])
+    def test_names_never_yield_a_structure(self, name):
+        r = name_to_psmiles(name)
+        assert r["ok"] is False
+        assert r["source"] == "model_required"
+        assert "psmiles" not in r
+        assert r["material_name"] == name
+        assert "validate_psmiles" in " ".join(r["hints"])
 
-    def test_known_polymer_case_insensitive(self):
-        r = name_to_psmiles("Polylactic Acid")
-        assert r["ok"] is True
-        assert r["source"] == "known_polymer_table"
+    def test_hints_carry_no_canned_repeat_unit(self):
+        serialized = json.dumps(name_to_psmiles("chitosan"))
+        for canned in ("[*]OCC[*]", "OC1C(N)", "pubchem_smiles"):
+            assert canned not in serialized
 
     def test_empty_name(self):
         r = name_to_psmiles("")
         assert r["ok"] is False
-
-    @pytest.mark.parametrize("name", [
-        "poly(lactic acid)", "PLA", "PCL", "PLGA", "PVA",
-        "PMMA", "PS", "PE", "PP", "PVC", "PTFE", "PVDF",
-    ])
-    def test_common_abbreviations_all_resolve(self, name):
-        r = name_to_psmiles(name)
-        assert r["ok"] is True, f"{name} should resolve but got: {r}"
-        assert r["psmiles"].count("[*]") == 2
-
-    def test_pubchem_lactic_acid(self):
-        """Lactic acid → hydroxy-acid condensation PSMILES via PubChem."""
-        r = name_to_psmiles("lactic acid")
-        if r.get("source") == "known_polymer_table":
-            pytest.skip("Resolved via known table")
-        if not r["ok"]:
-            pytest.skip(f"PubChem unavailable: {r.get('error')}")
-        assert r["psmiles"].count("[*]") == 2
-        assert r["source"] == "pubchem_auto"
-
-    def test_pubchem_styrene(self):
-        """Styrene → vinyl PSMILES via PubChem."""
-        r = name_to_psmiles("styrene")
-        if not r["ok"]:
-            pytest.skip(f"PubChem unavailable: {r.get('error')}")
-        assert r["psmiles"].count("[*]") == 2

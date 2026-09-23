@@ -82,6 +82,24 @@ _FG_SMARTS: List[Tuple[str, str]] = [
 ]
 
 
+def repeat_unit_screen_smiles(psmiles: str) -> str:
+    """Return a parseable SMILES for the methyl-capped polymer repeat unit.
+
+    Connection points are replaced with methyl, then canonicalized. Deleting
+    ``[*]`` is not valid: ``[*]CC([*])O`` would become the unparseable ``CC()O``.
+    The result is a small-molecule proxy for ADMET, not the polymer chain.
+    """
+    from rdkit import Chem
+
+    capped = _cap_psmiles(psmiles)
+    molecule = Chem.MolFromSmiles(capped)
+    if molecule is None:
+        raise ValueError(
+            f"PSMILES did not parse after methyl-capping connection points: {capped}"
+        )
+    return Chem.MolToSmiles(molecule)
+
+
 def _cap_psmiles(psmiles: str, cap: str = "[CH3]") -> str:
     """Replace ``[*]`` connection points for RDKit parsing.
 
@@ -128,17 +146,226 @@ def annotate_functional_groups(psmiles: str) -> Dict[str, Any]:
     return {"ok": True, "groups": groups}
 
 
+_GRAPH_REPORT_NOTE = (
+    "Describes the graph exactly as written. Compare it with the intended repeat unit; "
+    "rewrite the PSMILES or drop the candidate if they differ."
+)
+
+
+def _sugar_ring_positions(mol: Any, ring: Tuple[int, ...]) -> Optional[Dict[int, str]]:
+    """Number a pyranose or furanose ring C1..Cn starting at the anomeric carbon.
+
+    The anomeric carbon is the ring-oxygen neighbour without an exocyclic carbon
+    (C5 of an aldopyranose carries C6). Returns None for other rings or when the
+    anomeric carbon is ambiguous (e.g. ketoses), so no numbering is guessed.
+    """
+    ring_set = set(ring)
+    ring_oxygens = [i for i in ring if mol.GetAtomWithIdx(i).GetSymbol() == "O"]
+    carbons = [i for i in ring if mol.GetAtomWithIdx(i).GetSymbol() == "C"]
+    if len(ring) not in (5, 6) or len(ring_oxygens) != 1 or len(carbons) != len(ring) - 1:
+        return None
+    ring_oxygen = ring_oxygens[0]
+
+    def has_exocyclic_carbon(index: int) -> bool:
+        return any(
+            neighbor.GetSymbol() == "C" and neighbor.GetIdx() not in ring_set
+            for neighbor in mol.GetAtomWithIdx(index).GetNeighbors()
+        )
+
+    flanking = [
+        n.GetIdx() for n in mol.GetAtomWithIdx(ring_oxygen).GetNeighbors() if n.GetIdx() in ring_set
+    ]
+    anomeric = [index for index in flanking if not has_exocyclic_carbon(index)]
+    if len(anomeric) != 1:
+        return None
+    order = [anomeric[0]]
+    previous, current = ring_oxygen, anomeric[0]
+    while len(order) < len(carbons):
+        following = next(
+            n.GetIdx()
+            for n in mol.GetAtomWithIdx(current).GetNeighbors()
+            if n.GetIdx() in ring_set and n.GetIdx() not in (previous, ring_oxygen)
+        )
+        previous, current = current, following
+        order.append(current)
+    return {index: f"C{position}" for position, index in enumerate(order, start=1)}
+
+
+def _branch_smiles(mol: Any, root: int, excluded: set) -> str:
+    """SMILES of the substituent reached from *root* without entering *excluded* atoms."""
+    from rdkit import Chem
+
+    seen = {root}
+    frontier = [root]
+    while frontier:
+        atom = mol.GetAtomWithIdx(frontier.pop())
+        for neighbor in atom.GetNeighbors():
+            index = neighbor.GetIdx()
+            if index not in seen and index not in excluded:
+                seen.add(index)
+                frontier.append(index)
+    smiles = Chem.MolFragmentToSmiles(mol, atomsToUse=sorted(seen), rootedAtAtom=root)
+    return smiles.replace("[*]", "*").replace("*", "[*]")
+
+
+def _substituent_label(mol: Any, ring_atom: Any, neighbor: Any, ring_set: set) -> str:
+    """Short label for one exocyclic substituent of a ring atom (OH, NH2, O-[*], CH2OH, ...)."""
+    if neighbor.GetAtomicNum() == 0:
+        return "[*]"
+    symbol = neighbor.GetSymbol()
+    others = [n for n in neighbor.GetNeighbors() if n.GetIdx() != ring_atom.GetIdx()]
+    hydrogens = neighbor.GetTotalNumHs()
+    if len(others) == 1 and others[0].GetAtomicNum() == 0:
+        return f"{symbol}-[*]"
+    if not others:
+        bond = mol.GetBondBetweenAtoms(ring_atom.GetIdx(), neighbor.GetIdx())
+        if hydrogens == 0:
+            return f"={symbol}" if bond.GetBondTypeAsDouble() == 2.0 else symbol
+        return f"{symbol}H{hydrogens if hydrogens > 1 else ''}"
+    if (
+        symbol == "C"
+        and hydrogens == 2
+        and len(others) == 1
+        and others[0].GetSymbol() == "O"
+        and others[0].GetTotalNumHs() == 1
+    ):
+        return "CH2OH"
+    return _branch_smiles(mol, neighbor.GetIdx(), ring_set | {ring_atom.GetIdx()})
+
+
+def psmiles_graph_report(psmiles: str) -> Dict[str, Any]:
+    """Report the graph a PSMILES encodes, for comparison with the intended polymer.
+
+    Parameters
+    ----------
+    psmiles:
+        Repeat unit with ``[*]`` connection points, written by the model.
+
+    Returns
+    -------
+    dict
+        ``attachments`` (the atom each ``[*]`` bonds to; sugar rings are numbered
+        C1..Cn from the anomeric carbon, so a glycosidic oxygen reads ``"O on C4"``),
+        ``rings`` with per-position substituents, ``unspecified_stereocenters``,
+        ``backbone_atoms`` (atoms on the shortest path between two stars) and
+        ``warnings``. ``ok`` is False with ``error`` when RDKit cannot parse the
+        string. The report never proposes a replacement structure.
+    """
+    try:
+        from rdkit import Chem
+    except ImportError:
+        return {"ok": False, "error": "rdkit required for the graph report"}
+
+    mol = Chem.MolFromSmiles((psmiles or "").strip())
+    if mol is None:
+        return {"ok": False, "error": "RDKit could not parse the PSMILES"}
+
+    positions: Dict[int, str] = {}
+    rings: List[Dict[str, Any]] = []
+    for ring in mol.GetRingInfo().AtomRings():
+        numbering = _sugar_ring_positions(mol, ring)
+        if numbering is None:
+            rings.append(
+                {
+                    "type": "ring",
+                    "size": len(ring),
+                    "aromatic": all(mol.GetAtomWithIdx(i).GetIsAromatic() for i in ring),
+                }
+            )
+            continue
+        positions.update(numbering)
+        ring_set = set(ring)
+        substituents: Dict[str, List[str]] = {}
+        for index, label in sorted(numbering.items(), key=lambda item: int(item[1][1:])):
+            atom = mol.GetAtomWithIdx(index)
+            substituents[label] = [
+                _substituent_label(mol, atom, neighbor, ring_set)
+                for neighbor in atom.GetNeighbors()
+                if neighbor.GetIdx() not in ring_set
+            ]
+        rings.append(
+            {
+                "type": "pyranose" if len(ring) == 6 else "furanose",
+                "size": len(ring),
+                "substituents": substituents,
+            }
+        )
+
+    def describe(atom: Any) -> str:
+        label = positions.get(atom.GetIdx())
+        if label:
+            return label
+        numbered = [positions[n.GetIdx()] for n in atom.GetNeighbors() if n.GetIdx() in positions]
+        return f"{atom.GetSymbol()} on {numbered[0]}" if numbered else atom.GetSymbol()
+
+    warnings: List[str] = []
+    stars = [atom for atom in mol.GetAtoms() if atom.GetAtomicNum() == 0]
+    attachments: List[Dict[str, Any]] = []
+    for number, star in enumerate(stars, start=1):
+        neighbors = list(star.GetNeighbors())
+        if len(neighbors) != 1:
+            warnings.append(f"[*] number {number} has {len(neighbors)} bonds; it needs exactly one.")
+            continue
+        anchor = neighbors[0]
+        attachments.append(
+            {
+                "star": number,
+                "element": anchor.GetSymbol(),
+                "atom_index": anchor.GetIdx(),
+                "in_ring": anchor.IsInRing(),
+                "position": describe(anchor),
+                "neighbors": [
+                    describe(n) for n in anchor.GetNeighbors() if n.GetIdx() != star.GetIdx()
+                ],
+            }
+        )
+    if len(stars) != 2:
+        warnings.append(f"Found {len(stars)} [*] connection points; a linear repeat unit has two.")
+
+    backbone_atoms: Optional[int] = None
+    if len(stars) == 2:
+        backbone_atoms = len(Chem.GetShortestPath(mol, stars[0].GetIdx(), stars[1].GetIdx())) - 2
+
+    centers = Chem.FindMolChiralCenters(mol, includeUnassigned=True, useLegacyImplementation=False)
+    unspecified = [
+        positions.get(index, f"{mol.GetAtomWithIdx(index).GetSymbol()} (atom {index})")
+        for index, tag in centers
+        if tag == "?"
+    ]
+    unspecified.sort(key=lambda label: (not label[1:].isdigit(), label))
+
+    return {
+        "ok": True,
+        "star_count": len(stars),
+        "attachments": attachments,
+        "rings": rings,
+        "backbone_atoms": backbone_atoms,
+        "stereocenters": len(centers),
+        "unspecified_stereocenters": unspecified,
+        "warnings": warnings,
+        "note": _GRAPH_REPORT_NOTE,
+    }
+
+
 def validate_psmiles(psmiles: str) -> dict:
     """
-    Validate PSMILES. Returns {valid: bool, canonical?: str, error?: str}.
-    Uses psmiles.canonicalize when available, else RDKit.
+    Validate PSMILES. Returns {valid: bool, canonical?: str, graph_report: dict, error?: str}.
+
+    Uses psmiles.canonicalize when available, else RDKit. ``graph_report`` describes
+    the connection atoms, ring substituents, and unspecified stereocenters of the
+    string as written. It does not propose a replacement.
     """
     if not psmiles or not isinstance(psmiles, str):
         return {"valid": False, "error": "Empty or invalid input"}
 
     psm = psmiles.strip()
+    report = psmiles_graph_report(psm)
     if "[*]" not in psm:
-        return {"valid": False, "error": "PSMILES must contain [*] connection points"}
+        return {
+            "valid": False,
+            "error": "PSMILES must contain [*] connection points",
+            "graph_report": report,
+        }
 
     # Try Ramprasad psmiles package (canonicalize)
     try:
@@ -150,11 +377,11 @@ def validate_psmiles(psmiles: str) -> dict:
         if callable(c):
             c = c()
         canonical = str(c)
-        return {"valid": True, "canonical": canonical}
+        return {"valid": True, "canonical": canonical, "graph_report": report}
     except ImportError:
         pass
     except Exception as e:
-        return {"valid": False, "error": str(e)}
+        return {"valid": False, "error": str(e), "graph_report": report}
 
     # Fallback: RDKit validation (cap [*] to [H])
     try:
@@ -162,12 +389,12 @@ def validate_psmiles(psmiles: str) -> dict:
         capped = psm.replace("[*]", "[H]")
         mol = Chem.MolFromSmiles(capped)
         if mol is None:
-            return {"valid": False, "error": "Invalid SMILES structure"}
-        return {"valid": True, "canonical": psm}
+            return {"valid": False, "error": "Invalid SMILES structure", "graph_report": report}
+        return {"valid": True, "canonical": psm, "graph_report": report}
     except ImportError:
-        return {"valid": False, "error": "rdkit or psmiles required for validation"}
+        return {"valid": False, "error": "rdkit or psmiles required for validation", "graph_report": report}
     except Exception as e:
-        return {"valid": False, "error": str(e)}
+        return {"valid": False, "error": str(e), "graph_report": report}
 
 
 # ---------------------------------------------------------------------------
@@ -438,8 +665,9 @@ def _tanimoto_similarity(smiles_a: str, smiles_b: str) -> Optional[float]:
 # Layer 4: Name → PSMILES generation (PubChem SMILES → polymer repeat unit)
 # ---------------------------------------------------------------------------
 
-# Curated lookup: normalised polymer name → known-good PSMILES.
-# Highest confidence; bypasses automated conversion entirely.
+# Reference repeat units, used only to put a name on a PSMILES the model already
+# wrote (retrosynthesis/psmiles_bridge). Never returned for a name: the model
+# authors every structure and validate_psmiles reports what it encodes.
 _KNOWN_POLYMER_PSMILES: Dict[str, str] = {
     # --- polyethers ---
     "polyethylene glycol": "[*]OCC[*]",
@@ -517,14 +745,7 @@ _KNOWN_POLYMER_PSMILES: Dict[str, str] = {
     # --- other ---
     "polyvinylpyrrolidone": "[*]CC([*])N1CCCC1=O",
     "pvp": "[*]CC([*])N1CCCC1=O",
-    "chitosan": "[*]OC1C(N)C(O)C(CO)OC1[*]",
 }
-
-
-def _try_known_polymer_lookup(name: str) -> Optional[str]:
-    """Check curated table.  Returns PSMILES or None."""
-    key = name.strip().lower()
-    return _KNOWN_POLYMER_PSMILES.get(key)
 
 
 def _vinyl_smiles_to_psmiles(smiles: str) -> Optional[str]:
@@ -770,70 +991,25 @@ def monomer_smiles_to_psmiles(
 
 
 def name_to_psmiles(material_name: str) -> Dict[str, Any]:
-    """
-    Full pipeline: polymer name → PSMILES repeat unit.
+    """Ask the caller to write the repeat unit. A name never yields a PSMILES.
 
-    Resolution order:
-
-    1. **Known polymer lookup** (curated table, high confidence).
-    2. **PubChem** monomer SMILES → automated conversion (vinyl / condensation /
-       amide detection).
-
-    Returns ``{"ok": True, "psmiles": ..., "source": ..., ...}`` or
-    ``{"ok": False, "error": ...}``.
+    Stored repeat units and PubChem monomer conversions are not returned: both
+    have assigned chemically wrong connection points. The caller writes the
+    PSMILES and ``validate_psmiles`` reports the graph that string encodes.
     """
     name = (material_name or "").strip()
     if not name:
         return {"ok": False, "error": "Empty material_name"}
-
-    known = _try_known_polymer_lookup(name)
-    if known:
-        pre = prescreen_psmiles_for_md(known)
-        return {
-            "ok": True,
-            "psmiles": known,
-            "source": "known_polymer_table",
-            "confidence": "high",
-            "material_name": name,
-            "md_compatible": pre.get("ok", False),
-        }
-
-    pub = lookup_monomer_pubchem(name, timeout=pubchem_timeout_s())
-    if not pub.get("ok"):
-        return {
-            "ok": False,
-            "error": f"PubChem lookup failed: {pub.get('error')}",
-            "material_name": name,
-        }
-
-    monomer_smiles = pub.get("pubchem_smiles", "")
-    if not monomer_smiles:
-        return {
-            "ok": False,
-            "error": "PubChem returned empty SMILES",
-            "material_name": name,
-            "pubchem": pub,
-        }
-
-    conv = monomer_smiles_to_psmiles(monomer_smiles)
-    if conv.get("ok"):
-        conv["source"] = "pubchem_auto"
-        conv["material_name"] = name
-        conv["monomer_name"] = pub.get("monomer_name")
-        conv["pubchem_smiles"] = monomer_smiles
-        conv["pubchem_cid"] = pub.get("pubchem_cid")
-        return conv
-
     return {
         "ok": False,
-        "error": conv.get("error", "Conversion failed"),
+        "source": "model_required",
         "material_name": name,
-        "monomer_name": pub.get("monomer_name"),
-        "pubchem_smiles": monomer_smiles,
-        "hint": (
-            "PubChem SMILES retrieved but automatic polymerization-site detection failed. "
-            "Manually identify the repeat unit and add [*] at the two backbone connection points."
-        ),
+        "error": f"No stored structure is returned for {name}. Write the PSMILES yourself.",
+        "hints": [
+            "Write the repeat unit with exactly two [*] backbone connection points.",
+            "Put [*] on the atoms that form the polymer bond, and keep defined stereochemistry.",
+            "Call validate_psmiles and read graph_report. Rewrite the PSMILES or drop the candidate if the reported attachments, substituents, or stereocenters differ from the intended polymer.",
+        ],
     }
 
 

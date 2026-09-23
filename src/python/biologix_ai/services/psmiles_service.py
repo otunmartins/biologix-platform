@@ -123,40 +123,45 @@ def canonicalize_psmiles(psmiles: str) -> str:
     return str(c)
 
 
-def dimerize_psmiles(psmiles: str, star_index: int = 0) -> str:
-    """Dimerize PSMILES at connection point."""
+def dimerize_psmiles(psmiles: str, star_index: int = 1) -> str:
+    """Dimerize a repeat unit head-to-tail.
+
+    ``star_index`` is the psmiles ``how`` argument. ``1`` (default) joins the
+    second connection point and is the propagation dimer. ``0`` joins the first
+    star; for PEG that creates an O–O peroxide, which is not the repeat unit.
+    """
     err = _psmiles_check()
     if err:
         raise RuntimeError(err)
     from psmiles import PolymerSmiles
 
-    ps = PolymerSmiles(psmiles)
-    if hasattr(ps, "dimer"):
-        return str(ps.dimer(star_index))
-    return str(ps.dimerize(star_index=star_index))
+    # Do not canonicalize: the library reduces a PEG dimer back to the repeat unit.
+    return str(PolymerSmiles(psmiles).dimer(how=int(star_index)))
 
 
 def fingerprint_psmiles(psmiles: str, fingerprint_type: str = "rdkit") -> Any:
-    """Compute PSMILES fingerprint."""
+    """Compute a PSMILES fingerprint with the installed Ramprasad API."""
     err = _psmiles_check()
     if err:
         raise RuntimeError(err)
     from psmiles import PolymerSmiles
 
-    fp = PolymerSmiles(psmiles).descriptor(fingerprint_type)
+    aliases = {"morgan": "ci", "circular": "ci"}
+    fp_type = aliases.get(fingerprint_type.strip().lower(), fingerprint_type.strip().lower())
+    fp = PolymerSmiles(psmiles).fingerprint(fp_type)
     if hasattr(fp, "tolist"):
         return fp.tolist()
     return str(fp)
 
 
 def similarity_psmiles(psmiles1: str, psmiles2: str) -> float:
-    """Compute similarity between two PSMILES."""
+    """Cosine similarity of two PSMILES fingerprints."""
     err = _psmiles_check()
     if err:
         raise RuntimeError(err)
     from psmiles import PolymerSmiles
 
-    return float(PolymerSmiles(psmiles1).similarity(PolymerSmiles(psmiles2)))
+    return float(PolymerSmiles(psmiles1).is_similar(psmiles2))
 
 
 def render_psmiles_png(

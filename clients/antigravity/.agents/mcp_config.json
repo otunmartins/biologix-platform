@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "biologix": {
+      "serverUrl": "https://muhammadhasyim--biologix-mcp-serve.modal.run/mcp",
+      "headers": {
+        "Authorization": "Bearer <BIOLOGIX_MCP_TOKEN>"
+      }
+    }
+  }
+}

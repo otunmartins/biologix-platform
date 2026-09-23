@@ -284,6 +284,64 @@ def _candidate_timeout_s() -> Optional[float]:
     return val
 
 
+def _gpu_platform_requested(matrix_kw: Dict[str, Any]) -> bool:
+    requested = str(
+        matrix_kw.get("openmm_platform") or os.environ.get("BIOLOGIX_AI_OPENMM_PLATFORM", "CPU")
+    ).strip().lower()
+    return requested in ("cuda", "opencl", "auto")
+
+
+def _run_matrix_in_subprocess(
+    psmiles: str,
+    matrix_kw: Dict[str, Any],
+    timeout_s: Optional[float],
+) -> Dict[str, Any]:
+    """Run one matrix evaluation in a fresh ``python -m`` process (GPU platforms).
+
+    A child forked from a process that has loaded the CUDA driver fails with
+    ``CUDA_ERROR_NOT_INITIALIZED``; ``spawn``/``forkserver`` children re-import
+    the caller's ``__main__`` (the MCP server, or Modal's container runtime). A
+    new interpreter running :mod:`matrix_subprocess` avoids both.
+    """
+    import subprocess
+    import tempfile
+
+    package_parent = str(Path(__file__).resolve().parents[2])
+    env = dict(os.environ)
+    env["PYTHONPATH"] = os.pathsep.join(
+        [package_parent] + [p for p in env.get("PYTHONPATH", "").split(os.pathsep) if p]
+    )
+    with tempfile.TemporaryDirectory(prefix="biologix_matrix_") as work:
+        request = Path(work) / "request.json"
+        response = Path(work) / "response.json"
+        request.write_text(json.dumps({"psmiles": psmiles, "kwargs": matrix_kw}, default=list))
+        try:
+            proc = subprocess.run(
+                [sys.executable, "-m", "biologix_ai.simulation.matrix_subprocess",
+                 str(request), str(response)],
+                env=env,
+                stdout=sys.stderr,
+                stderr=sys.stderr,
+                timeout=timeout_s,
+                check=False,
+            )
+        except subprocess.TimeoutExpired:
+            return {
+                "ok": False,
+                "error": f"candidate exceeded BIOLOGIX_AI_OPENMM_CANDIDATE_TIMEOUT_S={timeout_s}s",
+                "stage": "timeout",
+                "psmiles": psmiles,
+            }
+        if not response.is_file():
+            return {
+                "ok": False,
+                "error": f"OpenMM subprocess exited with code {proc.returncode} and no result",
+                "stage": "openmm",
+                "psmiles": psmiles,
+            }
+        return json.loads(response.read_text())
+
+
 def _run_matrix_eval_with_timeout(
     psmiles: str,
     matrix_kw: Dict[str, Any],
@@ -292,6 +350,8 @@ def _run_matrix_eval_with_timeout(
     """Run matrix evaluation in a subprocess so wall-clock limits can be enforced."""
     from .openmm_complex import run_openmm_matrix_relax_and_energy
 
+    if _gpu_platform_requested(matrix_kw):
+        return _run_matrix_in_subprocess(psmiles, matrix_kw, timeout_s)
     if timeout_s is None:
         res = run_openmm_matrix_relax_and_energy(psmiles, **matrix_kw)
         if res is None:
@@ -442,6 +502,11 @@ def _evaluate_one_matrix_candidate(
         "complex_preview_png_path": res.get("complex_preview_png_path"),
         "complex_chemviz_png_path": res.get("complex_chemviz_png_path"),
         "complex_chemviz_backend": res.get("complex_chemviz_backend"),
+        "openmm_platform": res.get("openmm_platform"),
+        "box_nm": res.get("box_nm"),
+        "box_enlarged": res.get("box_enlarged"),
+        "packmol_retry": res.get("packmol_retry"),
+        "n_protein_chains": res.get("n_protein_chains"),
     }
     if pm.get("ok"):
         entry["min_polymer_protein_distance_nm"] = pm.get("min_polymer_protein_distance_nm")
@@ -456,7 +521,13 @@ class MDSimulator:
         n_steps: int = 50000,
         temperature: float = 298.0,
         random_seed: int = 42,
+        target_pdb_path: str = "",
+        target_chains: str = "",
+        openmm_platform: str = "",
     ):
+        """*target_pdb_path* / *target_chains* override ``BIOLOGIX_AI_TARGET_PROTEIN_PDB`` /
+        ``BIOLOGIX_AI_TARGET_PROTEIN_CHAINS`` so concurrent sessions do not share a target;
+        *openmm_platform* overrides ``BIOLOGIX_AI_OPENMM_PLATFORM`` for these runs."""
         if not openmm_available():
             raise RuntimeError(
                 "OpenMM screening stack not importable. Install with: "
@@ -465,6 +536,9 @@ class MDSimulator:
         self.extractor = PropertyExtractor()
         self.n_steps = n_steps
         self.random_seed = random_seed
+        self.target_pdb_path = target_pdb_path or ""
+        self.target_chains = target_chains or ""
+        self.openmm_platform = openmm_platform or ""
 
     def _get_psmiles(self, candidate: Dict[str, Any]) -> Optional[str]:
         if isinstance(candidate, str):
@@ -614,11 +688,21 @@ class MDSimulator:
             wall_clock_limit_s=wall_s,
             packing_mode=packing_mode,
         )
-        _bio_pdb = os.environ.get("BIOLOGIX_AI_TARGET_PROTEIN_PDB", "").strip()
+        _bio_pdb = (self.target_pdb_path or os.environ.get("BIOLOGIX_AI_TARGET_PROTEIN_PDB", "")).strip()
         if _bio_pdb:
             p = Path(_bio_pdb).expanduser().resolve()
             if p.is_file():
                 matrix_kw_template["insulin_pdb_path"] = str(p)
+        _bio_chains = (
+            self.target_chains
+            or os.environ.get("BIOLOGIX_AI_TARGET_PROTEIN_CHAINS", "")
+        ).strip()
+        if self.openmm_platform:
+            matrix_kw_template["openmm_platform"] = self.openmm_platform
+        if _bio_chains and matrix_kw_template.get("insulin_pdb_path"):
+            matrix_kw_template["protein_chains"] = tuple(
+                c.strip() for c in _bio_chains.split(",") if c.strip()
+            )
         if progressive_pack:
             matrix_kw_template["progressive_pack"] = True
             matrix_kw_template["progressive_per_attempt_timeout_s"] = (
@@ -787,6 +871,11 @@ class MDSimulator:
                     "complex_preview_png_path": res.get("complex_preview_png_path"),
                     "complex_chemviz_png_path": res.get("complex_chemviz_png_path"),
                     "complex_chemviz_backend": res.get("complex_chemviz_backend"),
+                    "openmm_platform": res.get("openmm_platform"),
+                    "box_nm": res.get("box_nm"),
+                    "box_enlarged": res.get("box_enlarged"),
+                    "packmol_retry": res.get("packmol_retry"),
+                    "n_protein_chains": res.get("n_protein_chains"),
                 }
                 pm = res.get("packing_metrics") or {}
                 if pm.get("ok"):

@@ -10,11 +10,6 @@ source "$SCRIPT_DIR/install_lib.sh"
 DEST="$REPO_ROOT/data/aizynthfinder"
 mkdir -p "$DEST"
 
-if [[ -f "$DEST/config.yml" ]]; then
-  echo "AiZynthFinder config already present at $DEST/config.yml"
-  exit 0
-fi
-
 if ! conda_run python -c "import aizynthfinder" 2>/dev/null; then
   echo "Installing AiZynthFinder package into ${ENV_NAME}..."
   pip_in_env install paretoset
@@ -32,6 +27,21 @@ AIZYNTH_FILES=(
   "zinc_stock.hdf5|https://ndownloader.figshare.com/files/23086469"
   "uspto_filter_model.onnx|https://zenodo.org/record/7797465/files/uspto_filter_model.onnx"
 )
+
+aizynth_data_complete() {
+  local entry
+  local name
+  [[ -s "$DEST/config.yml" ]] || return 1
+  for entry in "${AIZYNTH_FILES[@]}"; do
+    name="${entry%%|*}"
+    [[ -s "$DEST/$name" ]] || return 1
+  done
+}
+
+if aizynth_data_complete; then
+  echo "Complete AiZynthFinder data already present at $DEST"
+  exit 0
+fi
 
 download_file() {
   local url="$1"

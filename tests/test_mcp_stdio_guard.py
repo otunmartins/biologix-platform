@@ -72,3 +72,19 @@ def test_install_stdio_guards_serializes_sequential_calls() -> None:
     fn = mcp._tool_manager._tools["add_one"].fn
     assert json.loads(fn(x=1))["x"] == 1
     assert json.loads(fn(x=2))["x"] == 2
+
+
+def test_install_stdio_guards_is_idempotent() -> None:
+    from mcp.server.fastmcp import FastMCP
+
+    mcp = FastMCP("test-stdio-guard-idempotent")
+
+    @mcp.tool()
+    def echo(value: str) -> str:
+        return json.dumps({"value": value})
+
+    install_stdio_guards(mcp)
+    install_stdio_guards(mcp)
+
+    fn = mcp._tool_manager._tools["echo"].fn
+    assert json.loads(fn(value="ready")) == {"value": "ready"}

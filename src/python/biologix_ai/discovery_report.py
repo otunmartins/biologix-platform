@@ -161,6 +161,63 @@ def _markdown_images_for_viz_group(base: str, kinds: Dict[str, str]) -> List[str
     return lines
 
 
+def target_structure_lines(session_dir: Path) -> List[str]:
+    """"Target structure" section from ``structures/biologic_target.json``.
+
+    Lists where the simulated protein came from and every change made to it
+    (substituted residues, removed ligands/glycans/waters, rebuilt gaps,
+    unobserved termini), so no reader mistakes the model for the drug product.
+    """
+    meta_path = Path(session_dir) / "structures" / "biologic_target.json"
+    if not meta_path.is_file():
+        return []
+    try:
+        meta = json.loads(meta_path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return []
+    lines = ["## Target structure", ""]
+    lines.append(
+        f"- **Biologic:** {_ascii_safe(str(meta.get('canonical_name') or meta.get('query') or ''))}"
+    )
+    lines.append(f"- **Resolved target:** `{meta.get('resolved_target', '')}`")
+    source = str(meta.get("source") or "")
+    source_id = str(meta.get("source_id") or "")
+    lines.append(f"- **Source:** {source} {source_id}".rstrip())
+    chains = meta.get("chains") or []
+    lines.append(f"- **Chains simulated:** {', '.join(chains) if chains else 'all'}")
+    if meta.get("n_residues"):
+        lines.append(f"- **Residues:** {meta['n_residues']}")
+    if meta.get("n_atoms"):
+        lines.append(f"- **Atoms with hydrogens (AMBER14):** {meta['n_atoms']}")
+    if meta.get("max_extent_nm"):
+        lines.append(f"- **Largest extent:** {meta['max_extent_nm']} nm")
+    mods = meta.get("modifications") or []
+    if mods:
+        lines.append("- **Substituted residues:** " + "; ".join(
+            f"{m.get('residue')} {m.get('chain')}{m.get('residue_id')} -> {m.get('replaced_by')}"
+            for m in mods
+        ))
+    removed = meta.get("removed_heterogens") or []
+    if removed:
+        lines.append("- **Removed heterogens:** " + "; ".join(
+            f"{h.get('residue')} x{h.get('count')} (chain {h.get('chain')})" for h in removed
+        ))
+    gaps = meta.get("rebuilt_gaps") or []
+    if gaps:
+        lines.append("- **Rebuilt internal gaps:** " + "; ".join(
+            f"chain {g.get('chain')}: {g.get('n_residues')} residues" for g in gaps
+        ))
+    for warning in meta.get("warnings") or []:
+        lines.append(f"- **Note:** {_ascii_safe(str(warning))}")
+    lines.append("")
+    lines.append(
+        "Energies in this report are for this prepared model. Removed ligands, glycans, "
+        "lipid side chains, and unobserved residues are absent from the simulation."
+    )
+    lines.append("")
+    return lines
+
+
 def write_markdown_summary(
     session_dir: Path,
     entries: List[Tuple[str, str]],
@@ -181,9 +238,9 @@ def write_markdown_summary(
         f"**Generated:** {datetime.now().strftime('%Y-%m-%d %H:%M')}  ",
         f"**Session:** `{session_dir.name}`  ",
         "",
-        f"## Structures ({len(entries)} unique PSMILES)",
-        "",
     ]
+    lines.extend(target_structure_lines(session_dir))
+    lines.extend([f"## Structures ({len(entries)} unique PSMILES)", ""])
     for label, psm in entries:
         slug = safe_filename_basename(label)
         rel = png_paths.get(psm)

@@ -18,6 +18,8 @@
       // Server setup / catalog fetch timeout (ms); tool calls use experimental.mcp_timeout above.
       "timeout": 60000,
       "environment": {
+        // Every tool, ungated: this agent's own prompt drives the pipeline.
+        "BIOLOGIX_MCP_PROFILE": "full",
         "PAPER_DIRECTORY": "./papers",
         "RETRO_LLM_BACKEND": "skip",
         "BIOLOGIX_AI_AIZYNTH_CONFIG": "./data/aizynthfinder/config.yml",

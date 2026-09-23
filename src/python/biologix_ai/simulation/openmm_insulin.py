@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Dict, List, Set, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 # OpenMM imported lazily or at use; load_insulin_modeller needs it
 
@@ -49,16 +49,31 @@ def filter_ssbond_for_chains(
     ]
 
 
+def chains_in_pdb(pdb_path: str) -> Set[str]:
+    """Chain identifiers of the ATOM/HETATM records in *pdb_path*."""
+    found: Set[str] = set()
+    with open(pdb_path) as f:
+        for line in f:
+            if line.startswith(("ATOM", "HETATM")):
+                found.add(line[21:22].strip())
+    return found
+
+
 def prepare_insulin_ab_pdb(
     pdb_in: str,
     pdb_out: str,
-    chains: Tuple[str, ...] = ("A", "B"),
+    chains: Optional[Tuple[str, ...]] = ("A", "B"),
 ) -> str:
     """
     Write a cleaned PDB with only ATOM lines for specified chains.
     Keeps SSBOND lines that reference only those chains.
     Drops HETATM, ANISOU, other records. Resolves altloc by taking first.
+
+    ``chains=None`` keeps every chain in *pdb_in* (a target already prepared by
+    ``biologic_resolver``); the default keeps insulin chains A and B.
     """
+    if chains is None:
+        chains = tuple(sorted(chains_in_pdb(pdb_in)))
     keep = set(chains)
     ssbonds = filter_ssbond_for_chains(
         parse_ssbond_from_pdb(pdb_in),

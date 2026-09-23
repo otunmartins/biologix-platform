@@ -1,20 +1,35 @@
 #!/usr/bin/env python3
 """
-Biologics AI MCP Server – Materials Discovery & Retrosynthesis Tools for OpenCode
+Biologix MCP server: polymer excipient discovery for any biologic.
 
-Consolidated: literature mining, PaperQA2 RAG, PSMILES, MD, PubMed, arXiv,
-Semantic Scholar, web search, retrosynthesis planning, ADMET screening.
-Single MCP server for biologics stabilisation platform.
+Consolidated: literature mining, PaperQA2 RAG, PSMILES, OpenMM screening,
+PubMed, arXiv, Semantic Scholar, web search, retrosynthesis planning, ADMET.
+
+Profiles (``BIOLOGIX_MCP_PROFILE``):
+
+* ``protocol`` (default; always used over HTTP): only the discovery-protocol
+  tools, the protocol gate, per-client serialization, and long calls handed
+  back as jobs. Any MCP client (Claude, ChatGPT, Cursor, Antigravity, Grok)
+  then behaves as the Biologix discovery agent.
+* ``full``: every tool, ungated, for the OpenCode agent's own prompt.
 """
 
-import os
-import sys
+import contextlib
+import html
+import hmac
 import json
-import time
+import os
 import shutil
 import subprocess
+import sys
+import time
 import traceback
 import xml.etree.ElementTree as ET
+from collections.abc import Mapping
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Union
+
+import uvicorn
 
 try:
     import requests
@@ -27,10 +42,15 @@ sys.path.insert(0, ROOT)
 sys.path.insert(0, os.path.join(ROOT, "src", "python"))
 sys.path.insert(0, os.path.join(ROOT, "extern", "RetroSynthesisAgent"))
 
-from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
-
+from mcp.server.auth.settings import (
+    AuthSettings,
+    ClientRegistrationOptions,
+    RevocationOptions,
+)
 from mcp.server.fastmcp import Context, FastMCP
+from mcp.server.transport_security import TransportSecuritySettings
+from starlette.requests import Request
+from starlette.responses import HTMLResponse, JSONResponse, PlainTextResponse, RedirectResponse
 
 from biologix_ai.run_paths import ENV_SESSION, new_session_dir, session_dir_from_env
 from biologix_ai.discovery_world import (
@@ -42,7 +62,9 @@ from biologix_ai.discovery_world import (
     touch_meta_after_iteration,
     world_path_for_session,
 )
+from biologix_ai.mcp_jobs import AWAIT_TOOL, await_job, install_job_runner
 from biologix_ai.mcp_stdio_guard import install_stdio_guards
+from biologix_ai.protocol import load_protocol
 from biologix_ai.mcp_tool_guard import (
     McpProgressReporter,
     log_tool_budget,
@@ -55,6 +77,18 @@ from biologix_ai.mcp_tool_guard import (
     run_guarded_tool,
     run_instant_mcp_tool,
     truncate_mcp_json,
+)
+from biologix_ai.oauth_provider import (
+    OAUTH_SCOPE,
+    BiologixOAuthProvider,
+    OAuthApprovalError,
+)
+from biologix_ai.protocol_gate import (
+    FIRST_CONTACT_DIRECTIVE,
+    REMOTE_PROTOCOL_TOOLS,
+    REMOTE_TOOL_STEPS,
+    ProtocolGate,
+    install_protocol_gate,
 )
 
 
@@ -148,20 +182,518 @@ def _abort_install_json(error: str, *, extra: Optional[dict] = None) -> str:
     return json.dumps(payload, indent=2)
 
 
+LOCAL_MCP_INSTRUCTIONS = (
+    "Biologics stabilisation: resolve_biologic_target, start_biologics_session, "
+    "run_biologics_discovery; prepare_retrosynthesis, submit_retro_extractions, "
+    "plan_retrosynthesis, assemble_retrosynthesis_report, check_monomer_admet, "
+    "check_monomers_batch, compile_results; ADMET and literature; PSMILES tools; "
+    "OpenMM; discovery world; transcripts. Call tools one at a time. If any MCP "
+    "tool times out, follow .opencode/MCP_CLI_FALLBACK.md for the rest of the session."
+)
+
+HEALTH_PATH = "/healthz"
+
+TOOL_FAILURE_HINT = (
+    "Report this exact error and the last completed stage to the user. Do not substitute "
+    "an estimate or a local command for the failed result."
+)
+
+def load_remote_mcp_instructions(root: Optional[Path] = None) -> str:
+    """Return the discovery protocol (``biologix_ai/protocol/PROTOCOL.md``).
+
+    The repo-root CLAUDE.md is the developer guide; the protocol ships inside the
+    package so every client and every install gets the same text. *root* is
+    accepted for backward compatibility and ignored.
+    """
+    return load_protocol()
+
+
+def mcp_profile(environment: Mapping[str, str] = os.environ) -> str:
+    """``protocol`` (gated discovery surface) or ``full`` (every tool, ungated)."""
+    value = environment.get("BIOLOGIX_MCP_PROFILE", "protocol").strip().lower() or "protocol"
+    if value not in ("protocol", "full"):
+        raise ValueError("BIOLOGIX_MCP_PROFILE must be 'protocol' or 'full'")
+    return value
+
+
+class BearerTokenAuth:
+    """ASGI middleware enforcing a single server-side bearer token."""
+
+    def __init__(self, app: Any, token: str) -> None:
+        clean_token = token.strip()
+        if not clean_token:
+            raise RuntimeError("BIOLOGIX_MCP_TOKEN must be configured for HTTP transport")
+        self._app = app
+        self._expected_header = f"Bearer {clean_token}".encode("utf-8")
+
+    async def __call__(self, scope: dict, receive: Any, send: Any) -> None:
+        if scope.get("type") == "http" and scope.get("path") != HEALTH_PATH:
+            headers = dict(scope.get("headers", []))
+            supplied_header = headers.get(b"authorization", b"")
+            if not hmac.compare_digest(supplied_header, self._expected_header):
+                response = PlainTextResponse(
+                    "Unauthorized",
+                    status_code=401,
+                    headers={"WWW-Authenticate": "Bearer"},
+                )
+                await response(scope, receive, send)
+                return
+        await self._app(scope, receive, send)
+
+
+def selected_transport(environment: Mapping[str, str]) -> str:
+    """Return the configured MCP transport, defaulting to local stdio."""
+    raw_transport = environment.get("BIOLOGIX_MCP_TRANSPORT", "stdio")
+    transport = raw_transport.strip().lower()
+    if transport == "stdio":
+        return "stdio"
+    if transport in {"http", "streamable-http"}:
+        return "http"
+    raise ValueError(
+        "BIOLOGIX_MCP_TRANSPORT must be 'stdio', 'http', or 'streamable-http'"
+    )
+
+
+def http_bind_address(environment: Mapping[str, str]) -> tuple[str, int]:
+    """Return the HTTP bind host and validated TCP port."""
+    host = environment.get("BIOLOGIX_MCP_HOST", "0.0.0.0").strip() or "0.0.0.0"
+    raw_port = environment.get("BIOLOGIX_MCP_PORT", "8000").strip()
+    try:
+        port = int(raw_port)
+    except ValueError as error:
+        raise ValueError("BIOLOGIX_MCP_PORT must be an integer") from error
+    if not 1 <= port <= 65535:
+        raise ValueError("BIOLOGIX_MCP_PORT must be between 1 and 65535")
+    return host, port
+
+
+def oauth_runtime_from_environment(
+    environment: Mapping[str, str],
+) -> tuple[BiologixOAuthProvider | None, AuthSettings | None]:
+    """Build the production OAuth provider and MCP auth settings when configured."""
+    if selected_transport(environment) != "http":
+        return None, None
+    issuer_url = environment.get("BIOLOGIX_OAUTH_ISSUER_URL", "").strip().rstrip("/")
+    resource_url = environment.get("BIOLOGIX_MCP_RESOURCE_URL", "").strip()
+    if not issuer_url and not resource_url:
+        return None, None
+    required = {
+        "BIOLOGIX_OAUTH_ISSUER_URL": issuer_url,
+        "BIOLOGIX_MCP_RESOURCE_URL": resource_url,
+        "BIOLOGIX_OAUTH_APPROVAL_TOKEN": environment.get(
+            "BIOLOGIX_OAUTH_APPROVAL_TOKEN", ""
+        ).strip(),
+        "BIOLOGIX_OAUTH_STORAGE_KEY": environment.get(
+            "BIOLOGIX_OAUTH_STORAGE_KEY", ""
+        ).strip(),
+        "BIOLOGIX_MCP_TOKEN": environment.get("BIOLOGIX_MCP_TOKEN", "").strip(),
+    }
+    missing = [name for name, value in required.items() if not value]
+    if missing:
+        raise RuntimeError(
+            "OAuth HTTP transport is missing required settings: "
+            + ", ".join(sorted(missing))
+        )
+    store_path = Path(
+        environment.get(
+            "BIOLOGIX_OAUTH_STORE_PATH",
+            "/app/runs/.oauth/state.enc",
+        )
+    )
+    provider = BiologixOAuthProvider(
+        issuer_url=issuer_url,
+        resource_url=resource_url,
+        storage_path=store_path,
+        approval_token=required["BIOLOGIX_OAUTH_APPROVAL_TOKEN"],
+        storage_key=required["BIOLOGIX_OAUTH_STORAGE_KEY"],
+        legacy_bearer_token=required["BIOLOGIX_MCP_TOKEN"],
+    )
+    settings = AuthSettings(
+        issuer_url=issuer_url,
+        resource_server_url=resource_url,
+        client_registration_options=ClientRegistrationOptions(
+            enabled=True,
+            client_secret_expiry_seconds=30 * 24 * 3_600,
+            valid_scopes=[OAUTH_SCOPE],
+            default_scopes=[OAUTH_SCOPE],
+        ),
+        revocation_options=RevocationOptions(enabled=True),
+        required_scopes=[OAUTH_SCOPE],
+        validate_token_resource=True,
+    )
+    return provider, settings
+
+
+oauth_provider, oauth_settings = oauth_runtime_from_environment(os.environ)
+
 mcp = FastMCP(
     "biologics-ai",
-    instructions=(
-        "Biologics stabilisation: resolve_biologic_target, start_biologics_session, run_biologics_discovery; "
-        "prepare_retrosynthesis, submit_retro_extractions, plan_retrosynthesis, assemble_retrosynthesis_report, "
-        "check_monomer_admet, check_monomers_batch, compile_results (optional run_dir for session); "
-        "ADMET and literature; PSMILES tools; OpenMM openmm_evaluate_psmiles; discovery world; transcripts. "
-        "Arbitrary biologics via biologic_target and BIOLOGIX_AI_TARGET_PROTEIN_PDB after start_biologics_session. "
-        "MCP TIMEOUT RULE: If any biologix-ai MCP tool call times out for any reason (host limit, hang, no JSON, "
-        "transport error), the session LATCHES to CLI-only mode for ALL remaining steps — do NOT call any "
-        "biologix-ai MCP tool again in that session. Use bash CLI only, per .opencode/MCP_CLI_FALLBACK.md "
-        "(one CLI job at a time, append 2>&1)."
+    instructions=LOCAL_MCP_INSTRUCTIONS,
+    auth=oauth_settings,
+    auth_server_provider=oauth_provider,
+    # A secret bearer token protects the public endpoint. Host validation is
+    # disabled because Modal assigns the HTTPS hostname only at deployment.
+    transport_security=TransportSecuritySettings(
+        enable_dns_rebinding_protection=False,
     ),
 )
+
+
+APPROVAL_HEADERS = {
+    "Cache-Control": "no-store",
+    "Pragma": "no-cache",
+    "Content-Security-Policy": (
+        "default-src 'none'; style-src 'unsafe-inline'; "
+        "form-action 'self' https:; frame-ancestors 'none'; base-uri 'none'"
+    ),
+    "Referrer-Policy": "no-referrer",
+    "X-Content-Type-Options": "nosniff",
+    "X-Frame-Options": "DENY",
+}
+
+
+def _approval_html(
+    request_id: str,
+    context: Mapping[str, str],
+    error: str = "",
+) -> str:
+    """Render the local OAuth approval form without embedding any credential."""
+    error_markup = (
+        f'<p class="error">{html.escape(error)}</p>' if error else ""
+    )
+    return f"""<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Authorize Biologix</title>
+  <style>
+    body {{ font: 16px system-ui, sans-serif; max-width: 38rem; margin: 4rem auto;
+            padding: 0 1.5rem; background: #fff; color: #17212b;
+            color-scheme: light; }}
+    form {{ display: grid; gap: 1rem; }}
+    input, button {{ font: inherit; padding: .75rem; background: #fff; color: #17212b; }}
+    .actions {{ display: flex; gap: .75rem; }}
+    .error {{ color: #a11; }}
+    code {{ overflow-wrap: anywhere; }}
+  </style>
+</head>
+<body>
+  <h1>Authorize Biologix</h1>
+  <p><strong>{html.escape(context["client_name"])}</strong> requests
+     <code>{html.escape(context["scope"])}</code> access.</p>
+  <p>After approval, you will return to
+     <code>{html.escape(context["redirect_uri"])}</code>.</p>
+  {error_markup}
+  <form method="post" action="/oauth/approve">
+    <input type="hidden" name="request_id" value="{html.escape(request_id)}">
+    <label>Biologix access token
+      <input type="password" name="access_token" required autocomplete="current-password">
+    </label>
+    <div class="actions">
+      <button type="submit" name="action" value="approve">Approve</button>
+      <button type="submit" name="action" value="deny">Deny</button>
+    </div>
+  </form>
+</body>
+</html>"""
+
+
+def _continuation_html(redirect_url: str, approved: bool) -> str:
+    """Show the OAuth result and continue with a normal browser navigation."""
+    safe_url = html.escape(redirect_url, quote=True)
+    heading = "Approved" if approved else "Access denied"
+    detail = (
+        "Returning to Claude."
+        if approved
+        else "Returning to Claude without granting access."
+    )
+    return f"""<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="refresh" content="0;url={safe_url}">
+  <title>{heading}</title>
+  <style>
+    body {{ font: 16px system-ui, sans-serif; max-width: 38rem; margin: 4rem auto;
+            padding: 0 1.5rem; background: #fff; color: #17212b;
+            color-scheme: light; }}
+    a {{ color: #17212b; }}
+  </style>
+</head>
+<body>
+  <h1>{heading}</h1>
+  <p>{detail}</p>
+  <p><a href="{safe_url}">Continue</a></p>
+</body>
+</html>"""
+
+
+def _advertise_public_oauth_clients() -> None:
+    """Tell ChatGPT that PKCE public clients are accepted.
+
+    The MCP SDK metadata lists only confidential clients. ChatGPT refuses to
+    finish connector setup unless ``none`` is advertised.
+    """
+    import mcp.server.auth.routes as auth_routes
+
+    if getattr(auth_routes.build_metadata, "_biologix_public_clients", False):
+        return
+    original_build_metadata = auth_routes.build_metadata
+
+    def build_metadata(*args: Any, **kwargs: Any) -> Any:
+        metadata = original_build_metadata(*args, **kwargs)
+        methods = list(metadata.token_endpoint_auth_methods_supported or [])
+        if "none" not in methods:
+            methods.insert(0, "none")
+        metadata.token_endpoint_auth_methods_supported = methods
+        revocation_methods = list(metadata.revocation_endpoint_auth_methods_supported or [])
+        if revocation_methods and "none" not in revocation_methods:
+            revocation_methods.insert(0, "none")
+            metadata.revocation_endpoint_auth_methods_supported = revocation_methods
+        return metadata
+
+    build_metadata._biologix_public_clients = True  # type: ignore[attr-defined]
+    auth_routes.build_metadata = build_metadata
+
+
+if oauth_provider is not None:
+    _advertise_public_oauth_clients()
+
+    @mcp.custom_route("/.well-known/oauth-protected-resource", methods=["GET", "OPTIONS"])
+    async def chatgpt_protected_resource_metadata(_request: Request) -> JSONResponse:
+        """Serve the root metadata document ChatGPT requests during connector setup."""
+        issuer = str(oauth_settings.issuer_url) if oauth_settings is not None else ""
+        resource = str(oauth_settings.resource_server_url) if oauth_settings is not None else ""
+        return JSONResponse(
+            {
+                "resource": resource,
+                "authorization_servers": [issuer],
+                "scopes_supported": [OAUTH_SCOPE],
+                "bearer_methods_supported": ["header"],
+            }
+        )
+
+    @mcp.custom_route("/oauth/approve", methods=["GET", "POST"])
+    async def oauth_approval(request: Request) -> HTMLResponse | RedirectResponse:
+        """Display and complete the Biologix owner approval step."""
+        if request.method == "GET":
+            request_id = request.query_params.get("request_id", "")
+            context = await oauth_provider.get_pending_approval(request_id)
+            if context is None:
+                return HTMLResponse(
+                    "Approval request not found or expired. Return to Claude and choose Connect again.",
+                    status_code=404,
+                    headers=APPROVAL_HEADERS,
+                )
+            return HTMLResponse(
+                _approval_html(request_id, context),
+                headers=APPROVAL_HEADERS,
+            )
+
+        form = await request.form()
+        request_id = str(form.get("request_id", ""))
+        supplied_token = str(form.get("access_token", ""))
+        approved = form.get("action") == "approve"
+        context = await oauth_provider.get_pending_approval(request_id)
+        if context is None:
+            return HTMLResponse(
+                "Approval request not found or expired. Return to Claude and choose Connect again.",
+                status_code=404,
+                headers=APPROVAL_HEADERS,
+            )
+        try:
+            redirect_url = await oauth_provider.approve_authorization(
+                request_id=request_id,
+                supplied_token=supplied_token,
+                approved=approved,
+            )
+        except OAuthApprovalError as error:
+            return HTMLResponse(
+                _approval_html(request_id, context, str(error)),
+                status_code=401,
+                headers=APPROVAL_HEADERS,
+            )
+        return HTMLResponse(
+            _continuation_html(redirect_url, approved),
+            status_code=200,
+            headers=APPROVAL_HEADERS,
+        )
+
+
+protocol_gate = ProtocolGate()
+
+
+@mcp.custom_route(HEALTH_PATH, methods=["GET"])
+async def healthz(_request: Request) -> JSONResponse:
+    """Unauthenticated liveness probe. Reports no session data."""
+    from biologix_ai.simulation.openmm_compat import openmm_available, packmol_available
+
+    return JSONResponse(
+        {
+            "ok": True,
+            "service": "biologix-mcp",
+            "openmm": openmm_available(),
+            "packmol": packmol_available(),
+        }
+    )
+
+
+# MCP tool annotations for the protocol surface. ChatGPT and Claude use
+# readOnlyHint to decide whether a call needs user approval; nothing here
+# deletes user data, and literature/structure tools reach the open web.
+_READ_ONLY_TOOLS = {
+    "resolve_biologic_target",
+    "validate_psmiles",
+    "check_monomers_batch",
+    "check_excipient_compliance",
+    AWAIT_TOOL,
+    "biologix_runtime_status",
+}
+_OPEN_WORLD_TOOLS = {
+    "resolve_biologic_target",
+    "start_biologics_session",
+    "mine_literature",
+    "validate_psmiles",
+    "prepare_retrosynthesis",
+    "screen_candidate_library",
+}
+_TOOL_TITLES = {
+    "begin_biologix_discovery": "Start Biologix discovery",
+    "resolve_biologic_target": "Resolve biologic structure",
+    "start_biologics_session": "Start discovery session",
+    "mine_literature": "Mine literature",
+    "validate_psmiles": "Validate PSMILES",
+    "screen_candidate_library": "Screen candidates (ADMET, compliance, MD readiness)",
+    "openmm_evaluate_psmiles": "OpenMM encapsulation screen",
+    "save_pipeline_stage": "Save pipeline stage",
+    "prepare_retrosynthesis": "Prepare retrosynthesis",
+    "submit_retro_extractions": "Submit reaction extractions",
+    "diagnose_retro_extractions": "Diagnose reaction extractions",
+    "register_retro_precursors": "Register precursors",
+    "plan_retrosynthesis": "Plan retrosynthesis",
+    "check_monomers_batch": "Check route monomers",
+    "check_excipient_compliance": "Check excipient compliance",
+    "assemble_retrosynthesis_report": "Assemble retrosynthesis report",
+    "save_discovery_state": "Save discovery state",
+    "write_discovery_summary_report": "Write summary report",
+    "compile_discovery_markdown_to_pdf": "Compile report PDF",
+    "save_funnel_context": "Save funnel context",
+    "save_session_transcript": "Save session transcript",
+    "mutate_psmiles": "Mutate PSMILES",
+    AWAIT_TOOL: "Wait for a running Biologix job",
+    "biologix_runtime_status": "Biologix runtime status",
+}
+
+
+def portable_schema(schema: Any) -> Any:
+    """Rewrite a tool input schema into the subset every client accepts.
+
+    Gemini-based clients (Antigravity) and some Grok paths reject ``anyOf``,
+    ``oneOf``, ``$ref`` and ``$defs``. Only the advertised schema changes:
+    FastMCP still validates with the original model, so a client that sends a
+    JSON array where a comma-separated string is advertised is still accepted.
+    """
+    defs = schema.get("$defs", {}) if isinstance(schema, dict) else {}
+
+    def simplify(node: Any) -> Any:
+        if isinstance(node, list):
+            return [simplify(item) for item in node]
+        if not isinstance(node, dict):
+            return node
+        if "$ref" in node:
+            target = defs.get(str(node["$ref"]).rsplit("/", 1)[-1], {})
+            merged = {**target, **{k: v for k, v in node.items() if k != "$ref"}}
+            return simplify(merged)
+        variants = node.get("anyOf") or node.get("oneOf")
+        if variants:
+            options = [v for v in variants if not (isinstance(v, dict) and v.get("type") == "null")]
+            types = {v.get("type") for v in options if isinstance(v, dict)}
+            # "string or list of strings" is advertised as the comma-separated string.
+            prefer = "string" if {"string", "array"} <= types else None
+            chosen = next(
+                (v for v in options if isinstance(v, dict) and prefer and v.get("type") == prefer),
+                options[0] if options else {"type": "string"},
+            )
+            rest = {k: v for k, v in node.items() if k not in ("anyOf", "oneOf")}
+            if rest.get("default") is None:
+                rest.pop("default", None)
+            return simplify({**chosen, **rest})
+        return {k: simplify(v) for k, v in node.items() if k != "$defs"}
+
+    return simplify(schema)
+
+
+def _configure_protocol_surface(server: FastMCP) -> None:
+    """Titles, annotations, and portable schemas for every exposed tool."""
+    from mcp.types import ToolAnnotations
+
+    for name, tool in server._tool_manager._tools.items():
+        tool.title = _TOOL_TITLES.get(name, tool.title)
+        tool.annotations = ToolAnnotations(
+            title=_TOOL_TITLES.get(name),
+            readOnlyHint=name in _READ_ONLY_TOOLS,
+            destructiveHint=False,
+            idempotentHint=name in _READ_ONLY_TOOLS,
+            openWorldHint=name in _OPEN_WORLD_TOOLS,
+        )
+        tool.parameters = portable_schema(tool.parameters)
+
+
+def install_protocol_profile(server: FastMCP) -> None:
+    """The discovery surface used over HTTP and by default over stdio.
+
+    Order matters: the gate runs innermost, then the per-client lock, then the
+    job runner that moves the call off the event loop.
+    """
+    load_remote_mcp_instructions()
+    server._mcp_server.instructions = FIRST_CONTACT_DIRECTIVE
+    _restrict_to_protocol_tools(server)
+    _configure_protocol_surface(server)
+    install_protocol_gate(server, protocol_gate)
+    install_stdio_guards(server)
+    install_job_runner(server)
+
+
+def _restrict_to_protocol_tools(server: FastMCP) -> None:
+    """Expose only the CLAUDE.md protocol tools, bootstrap first, each labelled with its step.
+
+    Remote clients pick tools from names and descriptions alone, so side
+    searches and autonomous runners are removed rather than left to compete.
+    """
+    tools = server._tool_manager._tools
+    missing = [name for name in REMOTE_PROTOCOL_TOOLS if name not in tools]
+    if missing:
+        raise RuntimeError("Remote protocol tools are not registered: " + ", ".join(missing))
+    for name in list(tools):
+        if name not in REMOTE_PROTOCOL_TOOLS:
+            server.remove_tool(name)
+    ordered = {name: tools[name] for name in REMOTE_PROTOCOL_TOOLS}
+    tools.clear()
+    tools.update(ordered)
+    for name, tool in tools.items():
+        prefix = REMOTE_TOOL_STEPS[name]
+        description = tool.description or ""
+        if not description.startswith(prefix):
+            tool.description = f"{prefix}\n\n{description}".strip()
+
+
+def create_http_app(token: Optional[str] = None) -> Any:
+    """Create the authenticated Streamable HTTP ASGI application.
+
+    Remote clients get a 512-character first-contact directive, only the
+    protocol tools, and the protocol gate. The gate is installed before the
+    serialization guard so the guard's lock also covers stage updates.
+    """
+    configured_token = token if token is not None else os.environ.get("BIOLOGIX_MCP_TOKEN", "")
+    if not configured_token.strip():
+        raise RuntimeError("BIOLOGIX_MCP_TOKEN must be configured for HTTP transport")
+    install_protocol_profile(mcp)
+    if oauth_provider is not None:
+        oauth_provider.cleanup_expired()
+        return mcp.streamable_http_app()
+    return BearerTokenAuth(mcp.streamable_http_app(), configured_token)
 
 
 # --- PaperQA2 helpers (optional; paper-qa may not be installed) ---
@@ -219,25 +751,34 @@ def _paper_qa_index_status():
 
 @mcp.tool()
 def mine_literature(
-    query: str = "hydrogels insulin stabilization transdermal",
+    query: str = "",
     max_candidates: int = 15,
     iteration: int = 1,
     top_candidates: str = "",
     stability_mechanisms: str = "",
     limitations: str = "",
     use_paper_qa: bool = True,
+    run_dir: str = "",
 ) -> str:
     """
     Literature: **Asta MCP** when ASTA_API_KEY is set (server-side); else Semantic Scholar REST.
-    Optional PaperQA2 if indexed. You read abstracts and propose materials + PSMILES; then validate_psmiles / openmm_evaluate_psmiles.
+    Optional PaperQA2 if indexed. The digest is evidence for the candidates, not the iteration
+    result: write a PSMILES for each literature-supported candidate and continue with
+    validate_psmiles, screening, OpenMM, and retrosynthesis in the same iteration.
 
     For iteration 2+, pass feedback from the previous iteration:
       top_candidates: comma-separated high performers (e.g. "chitosan,PEG")
       stability_mechanisms: comma-separated mechanisms (e.g. "hydrogen bonding,hydrophobic")
       limitations: comma-separated problems to avoid (e.g. "high_crystallinity")
     use_paper_qa: if True and papers are indexed, appends PaperQA2 synthesis to results.
+    query: defaults to polymer excipient stabilization of the session's biologic.
+    run_dir: the session; the digest and candidates are saved there.
     """
-    session = session_dir_from_env(Path(ROOT))
+    session = _optional_session_dir(run_dir) or session_dir_from_env(Path(ROOT))
+    biologic = _session_biologic_name(session) or "biologic"
+    query = (query or "").strip() or (
+        f"{biologic} polymer excipient stabilization formulation delivery"
+    )
 
     def _run() -> Dict[str, Any]:
         out: List[str] = []
@@ -250,7 +791,7 @@ def mine_literature(
 
                     pqa_query = (
                         f"What polymer materials and stabilization mechanisms are effective for "
-                        f"insulin delivery or transdermal patches? Query focus: {query}"
+                        f"{biologic} formulation and delivery? Query focus: {query}"
                     )
                     if top_candidates or stability_mechanisms:
                         pqa_query += (
@@ -275,7 +816,7 @@ def mine_literature(
             run_scholar_mine,
         )
 
-        run_dir = session_dir_from_env(Path(ROOT))
+        mine_dir = session
         top = [s.strip() for s in top_candidates.split(",") if s.strip()] or None
         mechs = [s.strip() for s in stability_mechanisms.split(",") if s.strip()] or None
         lims = [s.strip() for s in limitations.split(",") if s.strip()] or None
@@ -290,7 +831,7 @@ def mine_literature(
                 top_candidates=top,
                 stability_mechanisms=mechs,
                 limitations=lims,
-                run_dir=run_dir,
+                run_dir=mine_dir,
                 num_candidates=max_candidates,
             )
         else:
@@ -301,7 +842,7 @@ def mine_literature(
                 top_candidates=top,
                 stability_mechanisms=mechs,
                 limitations=lims,
-                run_dir=run_dir,
+                run_dir=mine_dir,
                 num_candidates=max_candidates,
             )
         out.append(format_mine_literature_text(results))
@@ -313,10 +854,7 @@ def mine_literature(
         _run,
         stage="mine_literature",
         timeout_s=mcp_mine_timeout_s(),
-        failure_hint=(
-            "If MCP timed out, session latches to CLI-only — use bash CLI per "
-            ".opencode/MCP_CLI_FALLBACK.md."
-        ),
+        failure_hint=TOOL_FAILURE_HINT,
     )
     if payload.get("ok") and "text" in payload:
         return str(payload["text"])
@@ -371,10 +909,7 @@ def index_papers() -> str:
         _run,
         stage="index_papers",
         timeout_s=mcp_index_timeout_s(),
-        failure_hint=(
-            "If MCP timed out, session latches to CLI-only — use bash CLI per "
-            ".opencode/MCP_CLI_FALLBACK.md."
-        ),
+        failure_hint=TOOL_FAILURE_HINT,
     )
     if payload.get("ok") and "text" in payload:
         return str(payload["text"])
@@ -569,57 +1104,40 @@ def openmm_evaluate_psmiles(
     verbose: Union[bool, str, int] = False,
     run_dir: str = "",
     artifacts_dir: str = "",
-    max_workers: Optional[int] = None,
+    max_workers: int = 0,
     response_format: str = "concise",
+    compute: str = "",
 ) -> str:
     """
-    Evaluate PSMILES via OpenMM **Packmol matrix**: insulin AMBER14SB + multiple polymer
-    chains (GAFF, Gasteiger) packed **bulk-in-cell** by default (or annulus **shell** via env), energy minimization, optional short NPT,
-    then interaction energy (screening — not a multi-ns production MD).
+    OpenMM encapsulation screen: the session's biologic (AMBER14SB, prepared by
+    resolve_biologic_target) plus polymer oligomer chains (GAFF, Gasteiger charges)
+    packed by Packmol, energy-minimized, optional short NPT, then the protein-polymer
+    interaction energy. A screening calculation, not production MD.
 
-    **psmiles_list:** comma-separated string (preferred in docs) **or** a JSON array of strings,
-    e.g. ``"[*]CC[*],[*]O[*]"`` or ``["[*]CC[*]", "[*]O[*]"]``. OpenCode and other hosts vary;
-    both shapes are accepted.
+    **psmiles_list:** one PSMILES per call in the discovery protocol (a comma-separated
+    string or a JSON array is accepted).
 
-    **Requires the ``packmol`` binary on PATH** (conda-forge or ``pip install packmol``). If Packmol is
-    missing, the tool fails immediately. See ``docs/OPENMM_SCREENING.md`` for matrix parameters
-    (``BIOLOGIX_AI_OPENMM_MATRIX_*``, etc.). For a fast **single-oligomer** vacuum test without Packmol,
-    use ``scripts/diagnose_openmm_complex.py`` — that path is **not** used here.
+    **compute:** ``"cpu"`` or ``"gpu"``; empty uses the deployment default
+    (``BIOLOGIX_DEFAULT_COMPUTE``). On the Modal deployment each choice runs on its own
+    worker (GPU: CUDA, mixed precision). A GPU request never falls back to CPU silently.
+    Large targets (a full IgG) should use ``gpu``; next_arguments says so.
 
-    By default (verbose=true) the JSON includes per-candidate timing and energies (evaluation_progress)
-    and the MCP server logs detailed progress to stderr. Pass verbose=false for a smaller JSON payload;
-    unless BIOLOGIX_AI_EVAL_QUIET=1 or BIOLOGIX_AI_EVAL_VERBOSE=0 is set, stderr still emits a short
-    **heartbeat** line when each candidate starts and finishes (see docs/OPENMM_SCREENING.md). Set
-    BIOLOGIX_AI_EVAL_QUIET=1 (or BIOLOGIX_AI_EVAL_VERBOSE=0) to silence stderr entirely.
+    **Target:** read from ``<run_dir>/structures/biologic_target.json``; without a
+    session the bundled insulin (4F1C chains A+B) is used. The Packmol box is enlarged
+    to fit the protein when needed (``box_enlarged`` in the outcome).
 
-    **response_format:** Controls the verbosity of the JSON returned to the caller.
+    **response_format:** ``"concise"`` (default) returns energies and per-candidate
+    ``candidate_outcomes``; ``"full"`` adds ``evaluation_progress`` and the structure
+    artifact paths (PDB, PNG) under ``<run_dir>/structures/``.
 
-    - ``"full"`` (default): full output including ``evaluation_progress``, ``evaluation_note``,
-      and ``structure_artifact_paths`` (PNG paths for embedding in SUMMARY_REPORT). Use this
-      when writing a SUMMARY_REPORT or when you need structure artifact paths.
-    - ``"concise"``: strips ``evaluation_progress``, ``evaluation_note``, and
-      ``structure_artifact_paths`` from the response, reducing token usage ~3x. Use this
-      for discovery iterations where the LLM only needs energies and mechanisms.
+    **candidate_outcomes** always lists status, interaction energy or the verbatim failure
+    reason (Packmol, force field, timeout), and the ``openmm_platform`` that ran it.
 
-    **candidate_outcomes** is always present regardless of ``response_format`` or ``verbose``.
-    It is a compact per-candidate list with status and verbatim failure reason (Packmol timeout,
-    wall-clock limit, OpenMM force-field error, prescreen rejection, etc.) suitable for saving
-    in ``save_discovery_state`` for cross-iteration diagnostics.
-
-    **Structure artifacts for SUMMARY_REPORT:** When ``run_dir`` is set (or ``BIOLOGIX_AI_SESSION_DIR``
-    points at the session folder), minimized matrix complex PDB plus monomer 2D PNG (psmiles ``savefig``),
-    preview PNG, and ribbon/chemviz PNG are written under ``<session>/structures/`` unless
-    disabled with ``BIOLOGIX_AI_EVAL_NO_STRUCTURE_ARTIFACTS=1``. Override the directory with
-    non-empty ``artifacts_dir`` or env ``BIOLOGIX_AI_EVAL_ARTIFACTS_DIR``.
-
-    **Parallel evaluation:** Pass ``max_workers`` (e.g. 2–4) to run candidates concurrently
-    via ``ProcessPoolExecutor``. Default (``None``) reads ``BIOLOGIX_AI_EVAL_MAX_WORKERS`` from
-    the environment, falling back to 1 (sequential). Each worker holds a full OpenMM matrix
-    system in RAM — start conservatively. Parallel runs may differ slightly from sequential
-    unless per-candidate seeds are fixed (they are: seed = base + candidate index).
+    **max_workers:** parallel candidates in one call; 0 reads ``BIOLOGIX_AI_EVAL_MAX_WORKERS``.
     """
     session = _optional_session_dir(run_dir) or session_dir_from_env(Path(ROOT))
-    from biologix_ai.simulation.md_simulator import _candidate_timeout_s
+    from biologix_ai import compute as compute_backend
+    from biologix_ai.simulation.md_simulator import _candidate_timeout_s, _env_max_workers
 
     log_tool_budget(
         session,
@@ -656,105 +1174,62 @@ def openmm_evaluate_psmiles(
                 "ok": False,
                 "error": "psmiles_list is empty or was not provided",
                 "hint": (
-                    "You must pass psmiles_list as a comma-separated string or JSON array, e.g. "
-                    "psmiles_list=\"[*]OCC[*],[*]CC(O)[*]\". "
-                    "Build this list from the 'psmiles' field of screen_candidate_library results "
-                    "where library_disposition='pass'. "
-                    "Do NOT retry with only max_workers or response_format — psmiles_list is required."
+                    "Pass psmiles_list as one PSMILES from a screen_candidate_library row "
+                    "with library_disposition='pass'."
                 ),
                 "received_type": type(psmiles_list).__name__,
                 "received_value": repr(psmiles_list)[:120],
             }
-        from biologix_ai.simulation.openmm_compat import openmm_available
+        try:
+            target_compute = compute_backend.resolve_compute(compute)
+        except compute_backend.ComputeError as exc:
+            return {"ok": False, "error": str(exc)}
+        if compute_backend.backend() == "local":
+            from biologix_ai.simulation.openmm_compat import openmm_available
 
-        if not openmm_available():
-            return {
-                "ok": False,
-                "error": (
-                    "OpenMM screening stack incomplete (openmm, openmmforcefields, openff.toolkit, "
-                    "and AmberTools antechamber/parmchk2 on PATH). Run ./install."
-                ),
-            }
-        from biologix_ai.simulation import MDSimulator
-
-        candidates = [
-            {"material_name": f"Candidate_{i}", "chemical_structure": p}
-            for i, p in enumerate(parts)
-        ]
-        sim = MDSimulator(n_steps=5000)
+            if not openmm_available():
+                return {
+                    "ok": False,
+                    "abort": True,
+                    "error": (
+                        "OpenMM screening stack incomplete (openmm, openmmforcefields, "
+                        "openff.toolkit, and AmberTools antechamber/parmchk2 on PATH)."
+                    ),
+                }
+        target = _session_target(session)
+        target_pdb = ""
+        target_chains = ""
+        if target is not None and target.fetch_ok and target.pdb_path:
+            target_pdb = target.pdb_path
+            target_chains = ",".join(target.chains)
+        elif session is None:
+            target_pdb = os.environ.get("BIOLOGIX_AI_TARGET_PROTEIN_PDB", "")
+            target_chains = os.environ.get("BIOLOGIX_AI_TARGET_PROTEIN_CHAINS", "")
         ad = (artifacts_dir or "").strip()
-        if not ad and (run_dir or "").strip():
-            ad = str(_session_dir_for_mcp(run_dir) / "structures")
-        vb = _coerce_bool_flag(verbose, default=False)
-        concise = str(response_format).strip().lower() == "concise"
-        result = sim.evaluate_candidates(
-            candidates,
-            max_candidates=len(candidates),
-            verbose=vb,
+        if not ad and session is not None:
+            ad = str(Path(session) / "structures")
+        spec = compute_backend.OpenMMJobSpec(
+            psmiles=parts,
+            verbose=_coerce_bool_flag(verbose, default=False),
+            concise=str(response_format).strip().lower() == "concise",
+            max_workers=int(max_workers) if max_workers else _env_max_workers(),
+            target_chains=target_chains,
+        )
+        out = compute_backend.run_openmm(
+            spec,
+            compute=target_compute,
+            target_pdb_path=target_pdb,
+            run_dir=session,
             artifacts_dir=ad or None,
-            max_workers=max_workers if max_workers is not None else 1,
             progress_callback=_progress_callback,
         )
-        try:
-            from biologix_ai.simulation.scoring import discovery_score
-
-            _score = discovery_score(result)
-        except Exception:
-            _score = None
-
-        candidate_outcomes = []
-        for ep in result.get("evaluation_progress") or []:
-            status = ep.get("status", "unknown")
-            oc: Dict[str, Any] = {
-                "index": ep.get("index"),
-                "material_name": ep.get("material_name"),
-                "status": status,
+        if target is not None:
+            out["target"] = {
+                "resolved_target": target.resolved_target,
+                "source": target.source,
+                "chains": target.chains,
+                "n_atoms": target.n_atoms,
             }
-            if status == "completed":
-                oc["interaction_energy_kj_mol"] = ep.get("interaction_energy_kj_mol")
-            else:
-                if ep.get("stage"):
-                    oc["stage"] = ep["stage"]
-                if ep.get("reason"):
-                    oc["reason"] = ep["reason"]
-            candidate_outcomes.append(oc)
-
-        out: Dict[str, Any] = {
-            "ok": True,
-            "high_performers": result["high_performers"],
-            "effective_mechanisms": result["effective_mechanisms"],
-            "problematic_features": result["problematic_features"],
-        }
-        if result.get("property_analysis"):
-            out["property_analysis"] = result["property_analysis"]
-        if _score is not None:
-            out["discovery_score"] = round(_score, 4)
-        out["candidate_outcomes"] = candidate_outcomes
-        if not concise:
-            if vb and result.get("evaluation_progress") is not None:
-                out["evaluation_progress"] = result["evaluation_progress"]
-            if result.get("evaluation_note"):
-                out["evaluation_note"] = result["evaluation_note"]
-        if result.get("structure_artifacts_dir"):
-            out["structure_artifacts_dir"] = result["structure_artifacts_dir"]
-        if not concise:
-            raw = result.get("md_results_raw") or []
-            paths = []
-            for r in raw:
-                if not isinstance(r, dict):
-                    continue
-                paths.append(
-                    {
-                        "psmiles": r.get("psmiles"),
-                        "complex_pdb_path": r.get("complex_pdb_path"),
-                        "monomer_png_path": r.get("monomer_png_path"),
-                        "complex_preview_png_path": r.get("complex_preview_png_path"),
-                        "complex_chemviz_png_path": r.get("complex_chemviz_png_path"),
-                        "packing_metrics": r.get("packing_metrics"),
-                    }
-                )
-            if paths:
-                out["structure_artifact_paths"] = paths
         return out
 
     payload = run_guarded_tool(
@@ -763,11 +1238,7 @@ def openmm_evaluate_psmiles(
         _run,
         stage="openmm_matrix_eval",
         timeout_s=mcp_openmm_timeout_s(),
-        failure_hint=(
-            "If MCP timed out for any reason, the session latches to CLI-only — do not call any "
-            "biologix-ai MCP tool again; run scripts/run_openmm_matrix.py via bash for OpenMM and "
-            "see .opencode/MCP_CLI_FALLBACK.md for all other steps."
-        ),
+        failure_hint=TOOL_FAILURE_HINT,
     )
     return json.dumps(truncate_mcp_json(payload), indent=2, default=str)
 
@@ -775,26 +1246,11 @@ def openmm_evaluate_psmiles(
 @mcp.tool()
 def generate_psmiles_from_name(ctx: Context, material_name: str) -> str:
     """
-    Convert a polymer or monomer **name** to a PSMILES repeat-unit string.
+    Record that a polymer name needs a model-written PSMILES.
 
-    Resolution order:
-
-    1. **Known polymer table** (~60 common polymers: PEG, PLA, PLGA, PCL, PS,
-       PMMA, PVDF, chitosan, ...).  High confidence — no network call.
-    2. **PubChem lookup** → monomer SMILES → automated polymerisation-site
-       detection (vinyl C=C opening, hydroxy-acid condensation, amino-acid
-       amide condensation).  Medium confidence.
-
-    Examples::
-
-        generate_psmiles_from_name("PEG")           → "[*]OCC[*]"
-        generate_psmiles_from_name("polystyrene")    → "[*]CC([*])c1ccccc1"
-        generate_psmiles_from_name("lactic acid")    → "[*]OC(=O)C(C)[*]"
-
-    Returns JSON with ``ok``, ``psmiles``, ``source``, ``confidence``,
-    ``mechanism`` (for PubChem auto), and ``md_compatible`` (prescreen result).
-    If conversion fails, ``ok`` is false with ``error`` and the raw PubChem
-    SMILES so the caller can attempt manual conversion.
+    This tool does not look up or invent a repeat unit. It returns
+    ``ok: false``, ``source: "model_required"``, and authoring hints. Write the
+    PSMILES, then call ``validate_psmiles`` and read ``graph_report``.
     """
     session = session_dir_from_env(Path(ROOT))
 
@@ -817,20 +1273,18 @@ def generate_psmiles_from_name(ctx: Context, material_name: str) -> str:
         session,
         _run,
         stage="name_to_psmiles",
-        failure_hint=(
-            "If MCP timed out, session latches to CLI-only — no further MCP; use bash CLI per "
-            ".opencode/MCP_CLI_FALLBACK.md (generate_psmiles_from_name python -c snippet)."
-        ),
+        failure_hint=TOOL_FAILURE_HINT,
     )
     return json.dumps(truncate_mcp_json(payload), indent=2, default=str)
 
 
 @mcp.tool()
-def mutate_psmiles(library_size: int = 10, feedback_json: str = "") -> str:
+def mutate_psmiles(library_size: int = 10, feedback_json: str = "", run_dir: str = "") -> str:
     """
     Generate mutated PSMILES candidates via cheminformatics.
     Optionally pass feedback JSON with high_performer_psmiles, problematic_psmiles for feedback-guided mutation.
-    Returns JSON list of candidates with material_name, chemical_structure.
+    Returns JSON list of candidates with material_name, chemical_structure. Validate each
+    one with validate_psmiles before screening. ``run_dir`` names the session.
     """
     try:
         import json as _json
@@ -884,18 +1338,155 @@ def start_discovery_session(run_name: str = "") -> str:
         return json.dumps({"error": str(e)})
 
 
+ONBOARDING_QUESTIONS = {
+    "biologic_target": (
+        "Which biologic should the formulation stabilize? Give a name (e.g. semaglutide), "
+        "a PDB ID with optional chains (4ZGM:B), a UniProt accession (uniprot:P01308), "
+        "or a sequence (sequence:HAEGTFTSDV...)."
+    ),
+    "polymer_target": (
+        "Which polymer should I evaluate? Name one, or say \"suggest\" to derive candidates "
+        "from the literature."
+    ),
+}
+
+
+@mcp.tool()
+def begin_biologix_discovery(biologic_target: str = "", polymer_target: str = "") -> str:
+    """Call this first in every Biologix chat, before any other Biologix tool.
+
+    Returns the discovery protocol you must follow (``discovery_protocol``). Pass the
+    user's biologic (name, PDB:chains, uniprot:ACCESSION, or sequence:...) and polymer
+    target (or "suggest"). When either is
+    missing, ``questions`` lists what to ask the user; ask only those and wait. When
+    both are present, any previous session in this server process is cleared so the
+    new run starts clean.
+    """
+    answers = {
+        "biologic_target": biologic_target.strip(),
+        "polymer_target": polymer_target.strip(),
+    }
+    questions = [ONBOARDING_QUESTIONS[key] for key, value in answers.items() if not value]
+    if not questions:
+        os.environ.pop(ENV_SESSION, None)
+        os.environ.pop("BIOLOGIX_AI_TARGET_PROTEIN_PDB", None)
+    return json.dumps(
+        {
+            "ok": True,
+            "needs_user_input": bool(questions),
+            "questions": questions,
+            **answers,
+            "discovery_protocol": load_remote_mcp_instructions(),
+        },
+        indent=2,
+    )
+
+
+@mcp.prompt(
+    name="biologix_discovery",
+    description="The Biologix discovery protocol: onboarding, pipeline order, and the iteration checkpoint.",
+)
+def biologix_discovery_prompt() -> str:
+    """Return the discovery protocol as a prompt for clients that list MCP prompts."""
+    return load_remote_mcp_instructions()
+
+
+@mcp.resource(
+    "biologix://protocol",
+    name="biologix_protocol",
+    description="The Biologix discovery protocol followed by every discovery session.",
+    mime_type="text/markdown",
+)
+def biologix_protocol_resource() -> str:
+    """Return the discovery protocol as a resource for clients that read MCP resources."""
+    return load_remote_mcp_instructions()
+
+
+@mcp.tool()
+async def await_biologix_job(ctx: Context, job_id: str, wait_s: int = 0) -> str:
+    """Wait for a Biologix job and return its result.
+
+    Long tools (OpenMM, retrosynthesis, literature) return ``status: "running"`` and a
+    ``job_id`` when they outlast the client's patience. Call this with that job_id: it
+    waits up to ``wait_s`` seconds (0 = the server default) and returns the finished
+    tool result, with its protocol envelope, or another ``running`` payload.
+    """
+    return await await_job(job_id, float(wait_s or 0), ctx)
+
+
+@mcp.tool()
+def biologix_runtime_status() -> str:
+    """Report what this server can run: Packmol, OpenMM platforms, AiZynthFinder, ADMET, compute.
+
+    Safe at any step; it never changes the pipeline. Use it to explain a dependency
+    failure precisely instead of guessing.
+    """
+    from biologix_ai import compute as compute_backend
+    from biologix_ai.simulation.openmm_compat import openmm_available
+
+    report: Dict[str, Any] = {"ok": True, "compute": compute_backend.describe()}
+    try:
+        from biologix_ai.simulation.packmol_packer import packmol_executable
+
+        exe = packmol_executable()
+        report["packmol"] = {"path": exe or "", "available": bool(exe)}
+    except Exception as exc:
+        report["packmol"] = {"available": False, "error": str(exc)}
+    report["openmm_stack"] = openmm_available()
+    try:
+        import openmm
+
+        report["openmm"] = {
+            "version": openmm.__version__,
+            "platforms_loaded": [
+                openmm.Platform.getPlatform(i).getName()
+                for i in range(openmm.Platform.getNumPlatforms())
+            ],
+            "platform_setting": os.environ.get("BIOLOGIX_AI_OPENMM_PLATFORM", "CPU"),
+        }
+    except Exception as exc:
+        report["openmm"] = {"error": str(exc)}
+    try:
+        from biologix_ai.retrosynthesis.aizynth_config import get_configfile
+
+        cfg = get_configfile()
+        report["aizynthfinder"] = {"config": cfg or "", "available": bool(cfg)}
+    except Exception as exc:
+        report["aizynthfinder"] = {"available": False, "error": str(exc)}
+    try:
+        from biologix_ai.services.toxicity_service import _is_admet_available
+
+        report["admet"] = {"available": bool(_is_admet_available())}
+    except Exception as exc:
+        report["admet"] = {"available": False, "error": str(exc)}
+    report["paperqa"] = _paper_qa_index_status()
+    return json.dumps(report, indent=2, default=str)
+
+
 @mcp.tool()
 def resolve_biologic_target(
     name_or_pdb_id: str,
     fetch_pdb: bool = True,
     run_dir: str = "",
 ) -> str:
-    """Resolve a biologic name or 4-letter PDB ID to a local PDB path (bundled data or RCSB download).
+    """Resolve any biologic to a prepared, AMBER14-checked structure for OpenMM.
 
-    When ``run_dir`` is set (or ``BIOLOGIX_AI_SESSION_DIR`` is active and you omit ``run_dir`` after
-    ``start_biologics_session``), the structure is cached under ``<session>/structures/biologic_<PDB>.pdb``.
+    ``name_or_pdb_id`` forms:
 
-    Returns JSON: ``pdb_id``, ``pdb_path``, ``fetch_ok``, ``errors``, etc.
+    - a name: ``semaglutide``, ``adalimumab``, ``human growth hormone`` (curated table,
+      then RCSB search for the entity that names it)
+    - ``PDB`` or ``PDB:chains``: ``4ZGM:B``, ``1N8Z:A,B``, ``1HZH`` (assembly 1)
+    - ``uniprot:ACCESSION`` or ``uniprot:ACCESSION:start-end`` (AlphaFold DB model)
+    - ``sequence:ONE_LETTER``: one chain of at most 400 residues (ESMFold)
+
+    The structure is prepared with PDBFixer (chains selected, non-standard residues
+    substituted, ligands/glycans/waters removed, missing atoms added) and built with
+    AMBER14 exactly as OpenMM will build it. The result lists every change
+    (``modifications``, ``removed_heterogens``, ``warnings``) for the report.
+
+    Returns JSON with ``fetch_ok``, ``resolved_target`` (pass it to
+    start_biologics_session), ``chains``, ``n_atoms``, ``suggested_compute``, and
+    ``errors``. On failure, retry with a more specific form; do not ask the user.
     """
     from biologix_ai.services import biologic_resolver as bio_res
 
@@ -916,11 +1507,13 @@ def start_biologics_session(
     run_name: str = "",
     fetch_pdb: bool = True,
 ) -> str:
-    """Start a session for the biologics retrosynthesis workflow: new ``runs/<id>/``, world file, protein PDB.
+    """Start a discovery session: new ``runs/<id>/``, world file, and the prepared target.
 
-    Sets ``BIOLOGIX_AI_SESSION_DIR`` and, when resolution succeeds, ``BIOLOGIX_AI_TARGET_PROTEIN_PDB`` so
-    ``openmm_evaluate_psmiles`` uses the resolved structure (OpenMM matrix). Snapshots ``.opencode/agent/biologics-retrosynthesis.md``
-    when present.
+    Pass ``biologic_target=resolved_target`` from resolve_biologic_target (any form it
+    accepts works). The prepared structure and its metadata are written to
+    ``<session>/structures/biologic_target.{pdb,json}``; openmm_evaluate_psmiles reads
+    the target from there. Returns ``session_dir``: pass it as ``run_dir`` to every
+    later tool.
     """
     try:
         from biologix_ai.services import biologic_resolver as bio_res
@@ -935,8 +1528,10 @@ def start_biologics_session(
         )
         if bio.pdb_path and bio.fetch_ok:
             os.environ["BIOLOGIX_AI_TARGET_PROTEIN_PDB"] = bio.pdb_path
+            os.environ["BIOLOGIX_AI_TARGET_PROTEIN_CHAINS"] = ",".join(bio.chains)
         else:
             os.environ.pop("BIOLOGIX_AI_TARGET_PROTEIN_PDB", None)
+            os.environ.pop("BIOLOGIX_AI_TARGET_PROTEIN_CHAINS", None)
 
         obj = (
             f"Biologics stabilisation: {biologic_target}"
@@ -950,6 +1545,7 @@ def start_biologics_session(
             "polymer_target": (polymer_target or "").strip(),
             "biologic_pdb_id": bio.pdb_id,
             "biologic_pdb_path": bio.pdb_path,
+            "biologic_resolved_target": bio.resolved_target,
         }
         world = apply_patch(world, {"meta": {"links": meta_links}})
         save_world(wpath, world)
@@ -1146,9 +1742,15 @@ def get_materials_status() -> str:
     """Get status of materials discovery system (MD, literature, PaperQA2, mutation)."""
     lines = ["Insulin AI Materials Discovery Status"]
     try:
-        from biologix_ai.simulation import MDSimulator
-        sim = MDSimulator()
-        lines.append(f"MD Simulation: {'insulin + polymer (implicit solvent)' if sim.runner else 'unavailable'} (CPU)")
+        from biologix_ai.simulation.openmm_compat import describe_md_backend
+
+        from biologix_ai import compute as _compute
+
+        lines.append(
+            f"MD Simulation: {describe_md_backend()} "
+            f"(OpenMM platform {os.environ.get('BIOLOGIX_AI_OPENMM_PLATFORM', 'CPU')}; "
+            f"compute {_compute.describe()})"
+        )
     except Exception:
         lines.append("MD Simulation: unavailable")
     try:
@@ -1177,6 +1779,29 @@ def _optional_session_dir(run_dir: str) -> Optional[Path]:
     if not (run_dir or "").strip():
         return None
     return Path(run_dir.strip()).resolve()
+
+
+def _session_target(session: Optional[Path]) -> Any:
+    """The ``BiologicTarget`` resolved into *session*, or None."""
+    if session is None:
+        return None
+    from biologix_ai.services.biologic_resolver import load_session_target
+
+    return load_session_target(Path(session))
+
+
+def _session_biologic_name(session: Optional[Path]) -> str:
+    """Display name of the session's biologic (for literature queries and screening)."""
+    target = _session_target(session)
+    if target is not None:
+        return target.canonical_name or target.query or target.resolved_target
+    if session is not None:
+        try:
+            world = load_world(world_path_for_session(Path(session)))
+            return str(world.get("meta", {}).get("links", {}).get("biologic_target", ""))
+        except Exception:
+            return ""
+    return ""
 
 
 def _persist_retrosynthesis_plan(
@@ -1271,14 +1896,11 @@ def save_session_transcript(
     run_dir: str = "",
 ) -> str:
     """
-    Save **text you provide** into the active discovery session. **Default biologics-delivery-discovery protocol:**
-    call this **every iteration** if ``import_chat_transcript_file`` cannot be used (unknown JSONL path
-    or copy failure), with a **complete** Markdown recap (tool calls, decisions, results). OpenCode
-    does not mirror chat into ``runs/`` automatically.
+    Step 7: save a complete Markdown recap of this iteration (tool calls, decisions,
+    results, and failures) into the session. Call it once per iteration, after
+    save_funnel_context; its result allows the iteration checkpoint.
 
-    Writes UTF-8 to ``<session>/<filename>`` (default ``SESSION_TRANSCRIPT.md``) under the iteration
-    output folder only — **not** under ``.cursor/``. For JSONL originals from disk, prefer
-    ``import_chat_transcript_file``.
+    Writes UTF-8 to ``<session>/<filename>`` (default ``SESSION_TRANSCRIPT.md``).
     """
     session = _session_dir_for_mcp(run_dir)
     session.mkdir(parents=True, exist_ok=True)
@@ -1713,17 +2335,19 @@ def psmiles_canonicalize(psmiles: str) -> str:
 
 
 @mcp.tool()
-def psmiles_dimerize(psmiles: str, star_index: int = 0) -> str:
-    """Dimerize PSMILES at connection point. star_index: 0 or 1 for which [*]."""
+def psmiles_dimerize(psmiles: str, star_index: int = 1) -> str:
+    """Dimerize a PSMILES repeat unit head-to-tail.
+
+    ``star_index`` is the library ``how`` flag. ``1`` (default) is the
+    propagation dimer. ``0`` joins the first star and, for PEG, builds a peroxide.
+    """
     err = _psmiles_check()
     if err:
         return err
     try:
-        from psmiles import PolymerSmiles
-        ps = PolymerSmiles(psmiles)
-        if hasattr(ps, "dimer"):
-            return str(ps.dimer(star_index))
-        return str(ps.dimerize(star_index=star_index))
+        from biologix_ai.services.psmiles_service import dimerize_psmiles
+
+        return dimerize_psmiles(psmiles, star_index=star_index)
     except Exception as e:
         return f"Error: {e}"
 
@@ -1735,10 +2359,11 @@ def psmiles_fingerprint(psmiles: str, fingerprint_type: str = "rdkit") -> str:
     if err:
         return err
     try:
-        from psmiles import PolymerSmiles
-        fp = PolymerSmiles(psmiles).descriptor(fingerprint_type)
-        if hasattr(fp, "tolist"):
-            return json.dumps(fp.tolist()[:20])
+        from biologix_ai.services.psmiles_service import fingerprint_psmiles
+
+        fp = fingerprint_psmiles(psmiles, fingerprint_type)
+        if isinstance(fp, list):
+            return json.dumps(fp[:20])
         return str(fp)[:500]
     except Exception as e:
         return f"Error: {e}"
@@ -1751,9 +2376,9 @@ def psmiles_similarity(psmiles1: str, psmiles2: str) -> str:
     if err:
         return err
     try:
-        from psmiles import PolymerSmiles
-        sim = PolymerSmiles(psmiles1).similarity(PolymerSmiles(psmiles2))
-        return f"Similarity: {sim}"
+        from biologix_ai.services.psmiles_service import similarity_psmiles
+
+        return f"Similarity: {similarity_psmiles(psmiles1, psmiles2)}"
     except Exception as e:
         return f"Error: {e}"
 
@@ -1931,10 +2556,7 @@ def prepare_retrosynthesis(
         _run,
         stage="prepare_retrosynthesis",
         timeout_s=mcp_retro_timeout_s(),
-        failure_hint=(
-            "If MCP timed out, session latches to CLI-only — use bash CLI per "
-            ".opencode/MCP_CLI_FALLBACK.md."
-        ),
+        failure_hint=TOOL_FAILURE_HINT,
     )
     if payload.get("ok") and "result" in payload:
         return json.dumps(payload["result"], indent=2, default=str)
@@ -2089,10 +2711,7 @@ def plan_retrosynthesis(
         _run,
         stage="plan_retrosynthesis",
         timeout_s=mcp_retro_timeout_s(),
-        failure_hint=(
-            "If MCP timed out, session latches to CLI-only — use bash CLI per "
-            ".opencode/MCP_CLI_FALLBACK.md."
-        ),
+        failure_hint=TOOL_FAILURE_HINT,
     )
     if payload.get("ok") and "result" in payload:
         return json.dumps(payload["result"], indent=2, default=str)
@@ -2348,10 +2967,7 @@ def check_monomer_admet(
         _run,
         stage="check_monomer_admet",
         timeout_s=mcp_admet_timeout_s(),
-        failure_hint=(
-            "If MCP timed out, session latches to CLI-only — use bash CLI per "
-            ".opencode/MCP_CLI_FALLBACK.md."
-        ),
+        failure_hint=TOOL_FAILURE_HINT,
     )
     if payload.get("ok") and "result" in payload:
         return json.dumps(payload["result"], indent=2, default=str)
@@ -2398,10 +3014,7 @@ def check_monomers_batch(
         _run,
         stage="check_monomers_batch",
         timeout_s=mcp_admet_batch_timeout_s(),
-        failure_hint=(
-            "If MCP timed out, session latches to CLI-only — use bash CLI per "
-            ".opencode/MCP_CLI_FALLBACK.md."
-        ),
+        failure_hint=TOOL_FAILURE_HINT,
     )
     if payload.get("ok") and "result" in payload:
         return json.dumps(payload["result"], indent=2, default=str)
@@ -2489,10 +3102,7 @@ def compile_results(
         _run,
         stage="compile_results",
         timeout_s=mcp_retro_timeout_s(),
-        failure_hint=(
-            "If MCP timed out, session latches to CLI-only — use bash CLI per "
-            ".opencode/MCP_CLI_FALLBACK.md."
-        ),
+        failure_hint=TOOL_FAILURE_HINT,
     )
     if payload.get("ok") and "result" in payload:
         return json.dumps(payload["result"], indent=2, default=str)
@@ -2595,9 +3205,12 @@ def get_candidate_profile(
     profile: dict = {"psmiles": psmiles, "biologic_target": biologic_target}
     session = _optional_session_dir(run_dir)
 
-    # 1. Validate
+    # 1. Validate. Call the service, not the MCP tool: the tool requires a
+    # request Context that this in-process dossier does not have.
     try:
-        val_result = json.loads(validate_psmiles(psmiles))
+        from biologix_ai.services.psmiles_service import validate_psmiles as _validate_record
+
+        val_result = _validate_record(psmiles)
         profile["validation"] = val_result
         if session:
             disp = "pass" if val_result.get("valid") else "fail"
@@ -2607,11 +3220,20 @@ def get_candidate_profile(
     except Exception as exc:
         profile["validation"] = {"error": str(exc)}
 
-    # 2. ADMET on the PSMILES itself (treating it as a monomer-like SMILES)
+    # 2. ADMET on the methyl-capped repeat unit. Deleting [*] leaves empty
+    # parentheses in branched vinyl repeats and screens PEG as ethanol.
     if run_admet:
         try:
-            smiles_bare = psmiles.replace("[*]", "").strip()
-            admet_result = json.loads(check_monomer_admet(smiles=smiles_bare, run_dir=run_dir))
+            from biologix_ai.material_mappings import repeat_unit_screen_smiles
+
+            screened_smiles = repeat_unit_screen_smiles(psmiles)
+            admet_result = json.loads(check_monomer_admet(smiles=screened_smiles, run_dir=run_dir))
+            admet_result["screened_smiles"] = screened_smiles
+            admet_result["source_psmiles"] = psmiles
+            admet_result["note"] = (
+                "ADMET-AI ran on the methyl-capped repeat unit, not the polymer. "
+                "Endpoint values are a small-molecule proxy."
+            )
             profile["admet"] = admet_result
             if session:
                 from biologix_ai.services.pipeline_audit import save_pipeline_stage as _audit
@@ -2668,10 +3290,29 @@ def get_candidate_profile(
     return json.dumps(profile, indent=2, default=str)
 
 
+def _md_preflight_enabled() -> bool:
+    if os.environ.get("BIOLOGIX_AI_SCREEN_MD_PREFLIGHT", "1").strip().lower() in ("0", "false", "no"):
+        return False
+    from biologix_ai.simulation.openmm_compat import openmm_available
+
+    return openmm_available()
+
+
+def _md_preflight(psmiles: str) -> Dict[str, Any]:
+    """GAFF parameterization of the capped oligomer (seconds, no Packmol or MD)."""
+    try:
+        from biologix_ai.simulation.openmm_complex import polymer_md_preflight
+
+        with contextlib.redirect_stdout(sys.stderr):
+            return polymer_md_preflight(psmiles)
+    except Exception as exc:
+        return {"md_ready": False, "stage": "preflight", "error": f"{type(exc).__name__}: {exc}"}
+
+
 @mcp.tool()
 def screen_candidate_library(
     psmiles_list: Union[str, List[Any]],
-    biologic_target: str = "insulin",
+    biologic_target: str = "",
     run_retro: bool = False,
     run_admet: bool = True,
     run_compliance: bool = True,
@@ -2684,11 +3325,16 @@ def screen_candidate_library(
     Equivalent to NovoMCP ``screen_library``. Returns a ranked JSON array with
     per-candidate profile and a composite pass/fail/warning disposition.
 
+    Each row also has ``md_ready``: the capped oligomer builds, embeds, and gets
+    GAFF parameters exactly as the OpenMM run will build it (``md_preflight`` holds
+    the failing stage and error). It does not change the disposition; prefer
+    ``md_ready`` rows for OpenMM. Set ``BIOLOGIX_AI_SCREEN_MD_PREFLIGHT=0`` to skip it.
+
     With ``run_dir``, persists ADMET artifacts and audit records per candidate.
 
     Args:
         psmiles_list: Comma-separated string or JSON array of PSMILES strings.
-        biologic_target: Biologic being stabilised.
+        biologic_target: Biologic being stabilised (default: the session's target).
         run_retro: Include retrosynthesis routes (slower; set True for top candidates).
         run_admet: Screen residual monomers with ADMET-AI.
         run_compliance: Check excipient compliance.
@@ -2705,6 +3351,10 @@ def screen_candidate_library(
             )
 
     candidates = _normalize_psmiles_list_for_eval(psmiles_list)[:max_candidates]
+    biologic_target = (biologic_target or "").strip() or _session_biologic_name(
+        _optional_session_dir(run_dir)
+    ) or "insulin"
+    preflight = _md_preflight_enabled()
     results = []
     for psmiles in candidates:
         try:
@@ -2722,14 +3372,22 @@ def screen_candidate_library(
 
         # Derive overall disposition
         disposition = "pass"
+        admet = profile.get("admet") or {}
+        admet_warnings = " ".join(str(item) for item in admet.get("warnings") or [])
         if profile.get("validation", {}).get("valid") is False:
             disposition = "fail"
-        elif profile.get("admet", {}).get("safe") is False:
+        elif "did not parse" in admet_warnings:
+            disposition = "warning"
+        elif admet.get("safe") is False:
             disposition = "fail"
         elif profile.get("compliance", {}).get("overall_status") == "flagged":
             disposition = "warning"
 
         profile["library_disposition"] = disposition
+        if preflight:
+            check = _md_preflight(psmiles)
+            profile["md_ready"] = check.get("md_ready")
+            profile["md_preflight"] = check
         results.append(profile)
 
     # Sort: pass first, then warning, then fail
@@ -2896,9 +3554,7 @@ def save_pipeline_stage(
             scores, exclusion reason, route count, etc.).
         run_dir: Session directory.
 
-    Note: This append is instant via MCP **before latch** (capped by ``BIOLOGIX_AI_MCP_INSTANT_TIMEOUT_S``,
-    default 30 s). After **any MCP timeout**, the session latches to CLI-only — use the
-    save_pipeline_stage CLI one-liner in .opencode/MCP_CLI_FALLBACK.md instead of calling this MCP tool again.
+    The append is capped by ``BIOLOGIX_AI_MCP_INSTANT_TIMEOUT_S`` (default 30 s).
     """
     from biologix_ai.services.pipeline_audit import save_pipeline_stage as _save
 
@@ -3036,6 +3692,21 @@ def get_persona(persona_id: str) -> str:
     return json.dumps(payload, indent=2, default=str)
 
 
+def run_server(environment: Mapping[str, str] = os.environ) -> None:
+    """Run stdio locally or authenticated Streamable HTTP when requested."""
+    transport = selected_transport(environment)
+    if transport == "stdio":
+        if mcp_profile(environment) == "protocol":
+            install_protocol_profile(mcp)
+        else:
+            mcp._mcp_server.instructions = LOCAL_MCP_INSTRUCTIONS
+            install_stdio_guards(mcp)
+        mcp.run()
+        return
+
+    host, port = http_bind_address(environment)
+    uvicorn.run(create_http_app(environment.get("BIOLOGIX_MCP_TOKEN")), host=host, port=port)
+
+
 if __name__ == "__main__":
-    install_stdio_guards(mcp)
-    mcp.run()
+    run_server()

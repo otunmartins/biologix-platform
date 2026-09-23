@@ -69,6 +69,91 @@ def _cpu_platform():
     return platform
 
 
+PLATFORM_ENV = "BIOLOGIX_AI_OPENMM_PLATFORM"
+_GPU_PLATFORMS = ("CUDA", "OpenCL")
+_PLATFORM_CACHE: Dict[str, Tuple[Any, Dict[str, str]]] = {}
+
+
+class OpenMMPlatformError(RuntimeError):
+    """An explicitly requested OpenMM platform cannot create a Context."""
+
+
+def _probe_platform(name: str) -> Tuple[Optional[Any], str]:
+    """Return (platform, "") when *name* can create a Context here, else (None, reason).
+
+    Loading the CUDA plugin succeeds on machines without a GPU; only creating a
+    Context proves the device and driver work.
+    """
+    import openmm  # noqa: PLC0415
+
+    try:
+        platform = openmm.Platform.getPlatformByName(name)
+    except Exception as exc:  # OpenMMException when the plugin is not loaded
+        return None, f"{name} plugin not loaded: {exc}"
+    if name in _GPU_PLATFORMS:
+        platform.setPropertyDefaultValue("Precision", "mixed")
+    try:
+        system = openmm.System()
+        system.addParticle(1.0)
+        openmm.Context(system, openmm.VerletIntegrator(0.001), platform)
+    except Exception as exc:
+        return None, f"{name} cannot create a Context: {exc}"
+    return platform, ""
+
+
+def select_openmm_platform(requested: Optional[str] = None) -> Tuple[Any, Dict[str, str]]:
+    """Return the OpenMM platform for this process and a description for results.
+
+    ``BIOLOGIX_AI_OPENMM_PLATFORM`` is ``CPU`` (default), ``CUDA``, ``OpenCL`` or
+    ``auto`` (*requested* overrides the variable for one run). ``auto`` tries CUDA,
+    then OpenCL, then CPU. An explicit GPU platform
+    that cannot create a Context raises :class:`OpenMMPlatformError`; it never
+    falls back silently, so a GPU run is never reported as one that ran on CPU.
+    """
+    requested = (requested or os.environ.get(PLATFORM_ENV, "CPU")).strip() or "CPU"
+    key = requested.lower()
+    if key in _PLATFORM_CACHE:
+        return _PLATFORM_CACHE[key]
+    if key == "cpu":
+        chosen: Tuple[Any, Dict[str, str]] = (
+            _cpu_platform(),
+            {"requested": "CPU", "name": "CPU", "precision": "mixed",
+             "threads": os.environ.get("OPENMM_CPU_THREADS", "1")},
+        )
+    elif key == "auto":
+        chosen = (
+            _cpu_platform(),
+            {"requested": "auto", "name": "CPU", "precision": "mixed",
+             "threads": os.environ.get("OPENMM_CPU_THREADS", "1")},
+        )
+        reasons: List[str] = []
+        for name in _GPU_PLATFORMS:
+            platform, reason = _probe_platform(name)
+            if platform is not None:
+                chosen = (platform, {"requested": "auto", "name": name, "precision": "mixed"})
+                break
+            reasons.append(reason)
+        if chosen[1]["name"] == "CPU" and reasons:
+            chosen[1]["fallback_reason"] = "; ".join(reasons)
+    else:
+        name = {"cuda": "CUDA", "opencl": "OpenCL"}.get(key)
+        if name is None:
+            raise OpenMMPlatformError(
+                f"{PLATFORM_ENV}={requested!r} is not one of CPU, CUDA, OpenCL, auto"
+            )
+        platform, reason = _probe_platform(name)
+        if platform is None:
+            raise OpenMMPlatformError(reason)
+        chosen = (platform, {"requested": name, "name": name, "precision": "mixed"})
+    _PLATFORM_CACHE[key] = chosen
+    return chosen
+
+
+def _openmm_platform():
+    """Platform used for every Context in this module (see :func:`select_openmm_platform`)."""
+    return select_openmm_platform()[0]
+
+
 def clear_stage_heartbeat_hook() -> None:
     """Remove any registered stage heartbeat hook."""
     register_stage_heartbeat_hook(None)
@@ -126,6 +211,33 @@ def parse_ssbond_pairs(text_or_path: str) -> List[Tuple[str, int, str, int]]:
 
 # prepare_insulin_ab_pdb imported from openmm_insulin
 
+DEFAULT_INSULIN_CHAINS: Tuple[str, ...] = ("A", "B")
+
+
+def target_protein_chains(
+    pdb_path: Optional[str],
+    protein_chains: Optional[Tuple[str, ...]] = None,
+) -> Optional[Tuple[str, ...]]:
+    """Chains of the target protein to keep before building the OpenMM system.
+
+    The bundled insulin file (4F1C, chains A-D) keeps its A+B heterodimer as it
+    always has. Any other target was prepared by ``biologic_resolver`` and already
+    holds exactly the chains to simulate, so every chain is kept (``None``).
+    """
+    if protein_chains:
+        return tuple(protein_chains)
+    if pdb_path is None:
+        return DEFAULT_INSULIN_CHAINS
+    from .polymer_build import INSULIN_PDB_PATH
+
+    try:
+        if Path(pdb_path).resolve() == Path(INSULIN_PDB_PATH).resolve():
+            return DEFAULT_INSULIN_CHAINS
+    except OSError:
+        pass
+    return None
+
+
 
 def ensure_disulfide_bonds(modeller, pdb_path: str) -> None:
     """Add disulfide bonds from SSBOND in PDB to modeller topology."""
@@ -168,7 +280,7 @@ def run_protein_minimization(
         constraints=app.HBonds,
     )
     integ = openmm.LangevinIntegrator(300 * unit.kelvin, 1 / unit.picosecond, 0.002 * unit.picoseconds)
-    platform = _cpu_platform()
+    platform = _openmm_platform()
     ctx = openmm.Context(system, integ, platform)
     ctx.setPositions(positions)
     openmm.LocalEnergyMinimizer.minimize(ctx, maxIterations=max_steps)
@@ -247,7 +359,7 @@ def interaction_energy_three_systems(
 
     def _e_sys(system, positions):
         integ = openmm.LangevinIntegrator(300 * unit.kelvin, 1 / unit.picosecond, 0.002 * unit.picoseconds)
-        ctx = openmm.Context(system, integ, _cpu_platform())
+        ctx = openmm.Context(system, integ, _openmm_platform())
         ctx.setPositions(positions)
         e = ctx.getState(getEnergy=True).getPotentialEnergy().value_in_unit(unit.kilojoules_per_mole)
         return e
@@ -291,6 +403,7 @@ def run_openmm_relax_and_energy(
     ligand_offset_nm: Tuple[float, float, float] = (2.0, 0.0, 0.0),
     max_minimize_steps: int = 5000,
     save_complex_pdb: Optional[str] = None,
+    protein_chains: Optional[Tuple[str, ...]] = None,
 ) -> Optional[Dict[str, Any]]:
     """
     Insulin (AMBER14SB, SSBOND) + oligomer (GAFF, RDKit Gasteiger) → minimize → interaction energy.
@@ -300,12 +413,13 @@ def run_openmm_relax_and_energy(
     """
     from .polymer_build import ensure_insulin_pdb
 
+    chains = target_protein_chains(insulin_pdb_path, protein_chains)
     pdb_path = insulin_pdb_path or ensure_insulin_pdb()
 
     with tempfile.NamedTemporaryFile(suffix=".pdb", delete=False) as f:
         work_pdb = f.name
     try:
-        prepare_insulin_ab_pdb(pdb_path, work_pdb)
+        prepare_insulin_ab_pdb(pdb_path, work_pdb, chains=chains)
         modeller = load_insulin_modeller(work_pdb, add_ssbond=True)
     finally:
         Path(work_pdb).unlink(missing_ok=True)
@@ -369,7 +483,7 @@ def run_openmm_relax_and_energy(
     )
 
     integ = openmm.LangevinIntegrator(300 * unit.kelvin, 1 / unit.picosecond, 0.002 * unit.picoseconds)
-    platform = _cpu_platform()
+    platform = _openmm_platform()
     ctx = openmm.Context(combined_sys, integ, platform)
     ctx.setPositions(combined_pos)
     openmm.LocalEnergyMinimizer.minimize(ctx, maxIterations=max_minimize_steps)
@@ -389,6 +503,7 @@ def run_openmm_relax_and_energy(
         "n_insulin_atoms": n_protein,
         "n_polymer_atoms": n_lig,
         "gromacs_only": False,
+        "openmm_platform": dict(select_openmm_platform()[1]),
     }
     if save_complex_pdb:
         outp = Path(save_complex_pdb).expanduser().resolve()
@@ -532,6 +647,8 @@ def run_openmm_matrix_relax_and_energy(
     progressive_n_max: Optional[int] = None,
     density_polymer_n_min: int = 4,
     density_polymer_n_max: int = 100,
+    protein_chains: Optional[Tuple[str, ...]] = None,
+    openmm_platform: Optional[str] = None,
 ) -> Optional[Dict[str, Any]]:
     """
     Insulin + polymer matrix from Packmol, then OpenMM minimize and interaction energy.
@@ -579,12 +696,17 @@ def run_openmm_matrix_relax_and_energy(
     if not _packmol_available():
         return _fail("packmol not found on PATH", "packmol")
 
+    chains = target_protein_chains(insulin_pdb_path, protein_chains)
     pdb_path = insulin_pdb_path or ensure_insulin_pdb()
+    try:
+        platform, platform_info = select_openmm_platform(openmm_platform)
+    except OpenMMPlatformError as exc:
+        return _fail(f"OpenMM platform unavailable: {exc}", "openmm_platform")
 
     with tempfile.TemporaryDirectory(prefix="openmm_matrix_") as work:
         work = Path(work)
         prep_pdb = work / "insulin_ab.pdb"
-        prepare_insulin_ab_pdb(str(pdb_path), str(prep_pdb))
+        prepare_insulin_ab_pdb(str(pdb_path), str(prep_pdb), chains=chains)
         modeller = load_insulin_modeller(str(prep_pdb), add_ssbond=True)
         protein_ff = app.ForceField("amber14-all.xml")
         modeller.addHydrogens(protein_ff)
@@ -595,7 +717,18 @@ def run_openmm_matrix_relax_and_energy(
         ins_packmol = work / "insulin_packmol.pdb"
         app.PDBFile.writeFile(modeller.topology, modeller.positions, open(ins_packmol, "w"))
 
-        volume_box_nm = float(box_size_nm) if box_size_nm is not None else 7.5
+        from .packmol_packer import protein_box_floor_nm
+
+        box_floor_nm = protein_box_floor_nm(str(ins_packmol))
+        box_requested_nm = box_size_nm
+        if box_size_nm is not None and float(box_size_nm) < box_floor_nm:
+            _stage_heartbeat(
+                "packmol",
+                f"box {float(box_size_nm):.2f} nm is smaller than the protein extent; "
+                f"using {box_floor_nm:.2f} nm",
+            )
+            box_size_nm = box_floor_nm
+        volume_box_nm = float(box_size_nm) if box_size_nm is not None else max(7.5, box_floor_nm)
 
         if target_density_g_cm3 is not None:
             from .matrix_density import suggest_n_polymers_from_density
@@ -644,6 +777,7 @@ def run_openmm_matrix_relax_and_energy(
             _log(f"[matrix] Packmol: insulin + {n_polymers} chains, shell R={shell_only_angstrom} Å")
         else:
             _log(f"[matrix] Packmol: insulin + {n_polymers} chains, bulk (full cell)")
+        packmol_retry: Optional[Dict[str, Any]] = None
         pack_common_kw = dict(
             box_size_nm=pack_box_nm,
             tolerance_angstrom=2.0,
@@ -678,6 +812,26 @@ def run_openmm_matrix_relax_and_energy(
                 timeout_s=300,
                 **pack_common_kw,
             )
+            first_edge_nm = pack_result.get("box_edge_nm") or pack_box_nm
+            if not pack_result.get("success") and first_edge_nm:
+                retry_box_nm = round(float(first_edge_nm) * 1.15, 3)
+                _stage_heartbeat(
+                    "packmol",
+                    f"Packmol did not converge; retrying once with a 15% larger box ({retry_box_nm} nm)",
+                )
+                packmol_retry = {
+                    "first_box_nm": float(first_edge_nm),
+                    "retry_box_nm": retry_box_nm,
+                    "first_error": str(pack_result.get("stderr", ""))[:300],
+                }
+                pack_result = pack_insulin_polymers(
+                    str(ins_packmol),
+                    str(poly_pdb),
+                    n_polymers,
+                    str(packed_pdb),
+                    timeout_s=300,
+                    **{**pack_common_kw, "box_size_nm": retry_box_nm},
+                )
         if not pack_result.get("success"):
             pack_err = pack_result.get("stderr", "unknown reason")
             return _fail(f"Packmol packing failed: {str(pack_err)[:300]}", "packmol")
@@ -772,7 +926,6 @@ def run_openmm_matrix_relax_and_energy(
         )
 
         integ = openmm.LangevinIntegrator(300 * unit.kelvin, 1 / unit.picosecond, 0.002 * unit.picoseconds)
-        platform = _cpu_platform()
         ctx = openmm.Context(combined_sys, integ, platform)
         ctx.setPeriodicBoxVectors(box_vec_omm[0], box_vec_omm[1], box_vec_omm[2])
         ctx.setPositions(combined_pos)
@@ -903,7 +1056,17 @@ def run_openmm_matrix_relax_and_energy(
             "shell_angstrom": shell_only_angstrom,
             "box_nm": effective_box_nm,
             "gromacs_only": False,
+            "openmm_platform": dict(platform_info),
+            "n_protein_chains": len(list(protein_top.chains())),
         }
+        if box_requested_nm is not None and float(box_requested_nm) < box_floor_nm:
+            out["box_enlarged"] = {
+                "requested_nm": float(box_requested_nm),
+                "used_nm": float(box_floor_nm),
+                "reason": "protein extent plus padding exceeds the requested box edge",
+            }
+        if packmol_retry is not None:
+            out["packmol_retry"] = packmol_retry
         if progressive_pack:
             out["packmol_progressive"] = {
                 "enabled": True,
@@ -922,3 +1085,45 @@ def run_openmm_matrix_relax_and_energy(
         if n_frames_averaged is not None:
             out["n_frames_averaged"] = n_frames_averaged
         return out
+
+
+def polymer_md_preflight(
+    psmiles: str,
+    n_repeats: Optional[int] = None,
+    random_seed: int = 42,
+) -> Dict[str, Any]:
+    """Build and parameterize the capped oligomer exactly as the matrix run does.
+
+    Runs only :func:`build_polymer_oligomer_smiles`, 3D embedding and the GAFF
+    template (:func:`create_ligand_system`): no Packmol, no protein, no MD. A
+    chemistry GAFF/Gasteiger cannot type fails here in seconds instead of inside
+    a 20-minute OpenMM job. Returns ``{"md_ready": bool, "stage", "error", ...}``.
+    """
+    if n_repeats is None:
+        n_repeats = int(os.environ.get("BIOLOGIX_AI_OPENMM_N_REPEATS", "") or
+                        os.environ.get("BIOLOGIX_AI_GMX_N_REPEATS", "") or 4)
+    capped, actual = build_polymer_oligomer_smiles(psmiles, n_repeats)
+    if not capped:
+        return {"md_ready": False, "stage": "oligomer_build",
+                "error": "build_polymer_oligomer_smiles returned empty (bad PSMILES or n_repeats)"}
+    mol = Chem.MolFromSmiles(capped)
+    if mol is None:
+        return {"md_ready": False, "stage": "oligomer_build",
+                "error": f"RDKit MolFromSmiles failed for capped SMILES: {capped[:120]}"}
+    mol = Chem.AddHs(mol)
+    ok, err = embed_mol_3d(mol, random_seed)
+    if not ok:
+        return {"md_ready": False, "stage": "embed", "error": f"3D embedding failed: {err}"}
+    try:
+        _top, system = create_ligand_system(mol, box_vectors=None)
+    except Exception as exc:
+        return {"md_ready": False, "stage": "gaff_parameterization",
+                "error": f"{type(exc).__name__}: {str(exc)[:400]}"}
+    return {
+        "md_ready": True,
+        "stage": "gaff_parameterization",
+        "error": "",
+        "n_repeats": actual,
+        "n_atoms_per_chain": system.getNumParticles(),
+        "net_charge": Chem.GetFormalCharge(mol),
+    }

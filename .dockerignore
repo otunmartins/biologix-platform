@@ -36,6 +36,15 @@ SUMMARY_REPORT_fixed.md
 plan.md
 insulin_AB_debug.pdb
 *.pdb
+!src/python/biologix_ai/simulation/data/4F1C.pdb
+!src/python/biologix_ai/simulation/data/insulin_AB.pdb
+!data/biologics/biologic_1BUY.pdb
+!data/biologics/biologic_3WD5.pdb
+*.png
+ChatGPT-*.md
+insulin-ai/
+.agents/
+.cursor/
 *.log
 
 # ---- Git objects (keep .git itself for submodule resolve; exclude objects blob) ----

@@ -1,0 +1,147 @@
+"""Tests for running MCP tools off the event loop and returning long calls as jobs."""
+
+from __future__ import annotations
+
+import asyncio
+import json
+import sys
+import threading
+from pathlib import Path
+
+import pytest
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "src" / "python"))
+
+from biologix_ai import mcp_jobs  # noqa: E402
+from biologix_ai.mcp_jobs import AWAIT_TOOL, JOB_RUNNING, await_job, install_job_runner  # noqa: E402
+
+
+def _server(release: threading.Event):
+    from mcp.server.fastmcp import FastMCP
+
+    mcp = FastMCP("jobs-test")
+
+    @mcp.tool()
+    def slow(value: str = "x") -> str:
+        release.wait(timeout=10)
+        return json.dumps({"ok": True, "value": value, "thread": threading.current_thread().name})
+
+    @mcp.tool()
+    def quick() -> str:
+        return json.dumps({"ok": True, "quick": True})
+
+    install_job_runner(mcp)
+    return mcp
+
+
+def test_tools_run_in_worker_threads_and_finish_inline_when_fast(monkeypatch) -> None:
+    monkeypatch.setenv("BIOLOGIX_TOOL_WAIT_S", "5")
+    release = threading.Event()
+    release.set()
+    mcp = _server(release)
+    tool = mcp._tool_manager._tools["slow"]
+    assert tool.is_async is True
+    result = json.loads(asyncio.run(tool.fn(value="a")))
+    assert result["value"] == "a"
+    assert result["thread"].startswith("biologix-tool")
+
+
+def test_slow_call_becomes_a_job_that_await_returns(monkeypatch) -> None:
+    monkeypatch.setenv("BIOLOGIX_TOOL_WAIT_S", "0.2")
+    release = threading.Event()
+    mcp = _server(release)
+
+    async def scenario():
+        running = json.loads(await mcp._tool_manager._tools["slow"].fn(value="b"))
+        assert running["status"] == "running"
+        assert running["protocol"]["next_required_tool"] == AWAIT_TOOL
+        job_id = running["job_id"]
+        refused = json.loads(await mcp._tool_manager._tools["quick"].fn())
+        assert refused["error"] == JOB_RUNNING
+        still = json.loads(await await_job(job_id, 0.2))
+        assert still["status"] == "running"
+        release.set()
+        done = json.loads(await await_job(job_id, 5))
+        assert done["value"] == "b"
+        after = json.loads(await mcp._tool_manager._tools["quick"].fn())
+        assert after["quick"] is True
+
+    asyncio.run(scenario())
+
+
+def test_unknown_job_asks_for_a_rerun() -> None:
+    missing = json.loads(asyncio.run(await_job("nope")))
+    assert missing["error"] == "JOB_NOT_FOUND" and missing["abort"] is True
+
+
+def test_default_wait_is_unlimited_on_stdio_and_bounded_over_http(monkeypatch) -> None:
+    monkeypatch.delenv("BIOLOGIX_TOOL_WAIT_S", raising=False)
+    monkeypatch.setenv("BIOLOGIX_MCP_TRANSPORT", "stdio")
+    assert mcp_jobs.tool_wait_s() == 0.0
+    monkeypatch.setenv("BIOLOGIX_MCP_TRANSPORT", "http")
+    assert mcp_jobs.tool_wait_s() == 240.0
+
+
+def test_progress_from_tool_threads_reaches_the_event_loop() -> None:
+    from biologix_ai.mcp_tool_guard import McpProgressReporter
+
+    sent = []
+
+    class FakeContext:
+        async def report_progress(self, progress, total, message):
+            sent.append((progress, message))
+
+    async def scenario():
+        mcp_jobs.EVENT_LOOP.set(asyncio.get_running_loop())
+        import contextvars
+
+        reporter = McpProgressReporter(FakeContext(), tool="t", interval_s=0)
+        ctx = contextvars.copy_context()
+        await asyncio.get_running_loop().run_in_executor(
+            None, lambda: ctx.run(reporter.heartbeat, "packing", progress=1.0)
+        )
+        await asyncio.sleep(0.05)
+
+    asyncio.run(scenario())
+    assert sent == [(1.0, "packing")]
+
+
+def test_full_stack_await_is_not_blocked_by_the_jobs_own_lock(monkeypatch) -> None:
+    """Gate-free stack as installed on the server: lock, then job runner."""
+    from mcp.server.fastmcp import FastMCP
+
+    from biologix_ai.mcp_stdio_guard import install_stdio_guards
+
+    monkeypatch.setenv("BIOLOGIX_TOOL_WAIT_S", "0.2")
+    release = threading.Event()
+    mcp = FastMCP("jobs-stack")
+
+    @mcp.tool()
+    def slow() -> str:
+        release.wait(timeout=10)
+        return json.dumps({"ok": True, "slow": True})
+
+    @mcp.tool()
+    def biologix_runtime_status() -> str:
+        return json.dumps({"ok": True, "status": True})
+
+    @mcp.tool()
+    async def await_biologix_job(job_id: str, wait_s: int = 0) -> str:
+        return await await_job(job_id, float(wait_s or 0))
+
+    install_stdio_guards(mcp)
+    install_job_runner(mcp)
+    tools = mcp._tool_manager._tools
+
+    async def scenario():
+        running = json.loads(await tools["slow"].fn())
+        status = json.loads(await tools["biologix_runtime_status"].fn())
+        assert status["status"] is True
+        pending = json.loads(await tools["await_biologix_job"].fn(job_id=running["job_id"], wait_s=0))
+        assert pending["status"] == "running"
+        release.set()
+        done = json.loads(await tools["await_biologix_job"].fn(job_id=running["job_id"], wait_s=5))
+        assert done["slow"] is True
+
+    asyncio.run(scenario())

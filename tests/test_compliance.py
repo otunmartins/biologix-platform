@@ -52,3 +52,25 @@ def test_jurisdiction_filter():
     # PLGA in EMA only
     result = check_excipient_compliance("[*]OC(=O)C(C)OC(=O)C[*]", jurisdiction="EMA")
     assert isinstance(result, ComplianceResult)
+
+
+def test_pva_branched_repeat_matches_approved_excipient():
+    result = check_excipient_compliance("[*]CC([*])O", jurisdiction="FDA,EMA")
+    assert result.approved_name is not None
+    assert "alcohol" in result.approved_name.lower()
+    assert result.jurisdictions_matched
+
+
+def test_unparsed_smiles_is_not_reported_as_safe():
+    from biologix_ai.services.toxicity_service import screen_monomer
+
+    result = screen_monomer("CC()O")
+    assert result.safe is False
+    assert any("did not parse" in warning for warning in result.warnings)
+
+
+def test_pvp_lactam_repeat_matches_approved_excipient():
+    result = check_excipient_compliance("[*]CC([*])N1CCCC1=O", jurisdiction="FDA,EMA")
+    assert result.approved_name is not None
+    assert "pvp" in result.approved_name.lower() or "pyrrolidone" in result.approved_name.lower()
+    assert result.jurisdictions_matched

@@ -27,7 +27,7 @@ class PSMILESStringRequest(BaseModel):
 
 class DimerizeRequest(BaseModel):
     psmiles: str
-    star_index: int = Field(default=0, ge=0, le=1)
+    star_index: int = Field(default=1, ge=0, le=1)
 
 
 class FingerprintRequest(BaseModel):

@@ -112,11 +112,10 @@ def candidate_profile(req: CandidateProfileRequest):
     # 2. ADMET
     if req.run_admet:
         try:
+            from biologix_ai.material_mappings import repeat_unit_screen_smiles
             from biologix_ai.services.toxicity_service import screen_monomer
 
-            smiles_bare = req.psmiles.replace("[*]", "").strip()
-            tox = screen_monomer(smiles_bare)
-            profile.admet = tox
+            profile.admet = screen_monomer(repeat_unit_screen_smiles(req.psmiles))
         except Exception as exc:
             profile.admet = ToxicityResult(
                 smiles=req.psmiles,

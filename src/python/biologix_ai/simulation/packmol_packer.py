@@ -37,8 +37,31 @@ PackingMode = Literal["shell", "bulk"]
 
 
 def _packmol_available() -> bool:
-    """Check if the packmol binary is on PATH."""
-    return shutil.which("packmol") is not None
+    """Check if the packmol binary is available (see :func:`packmol_executable`)."""
+    return packmol_executable() is not None
+
+
+def packmol_executable() -> Optional[str]:
+    """Path to Packmol: ``BIOLOGIX_AI_PACKMOL_BIN`` when set and executable, else PATH."""
+    override = os.environ.get("BIOLOGIX_AI_PACKMOL_BIN", "").strip()
+    if override:
+        return override if os.access(override, os.X_OK) else None
+    return shutil.which("packmol")
+
+
+def protein_box_floor_nm(
+    protein_pdb_path: str,
+    padding_angstrom: float = 6.0,
+    tolerance_angstrom: float = 2.0,
+) -> float:
+    """Smallest cubic box edge (nm) that holds the protein with padding on each side.
+
+    Same bound as the protein-extent term of :func:`estimate_box_edge_angstrom`, so an
+    explicit ``box_size_nm`` never places a large target (a Fab or IgG) across its own
+    periodic image.
+    """
+    _, spans = _parse_pdb_extents(protein_pdb_path)
+    return (max(spans) + 2.0 * padding_angstrom + tolerance_angstrom) / 10.0
 
 
 def _parse_pdb_extents(pdb_path: str) -> Tuple[int, Tuple[float, float, float]]:
@@ -276,8 +299,15 @@ def pack_insulin_polymers(
     Path(output_path).parent.mkdir(parents=True, exist_ok=True)
 
     # --- Determine box size ---------------------------------------------------
+    box_enlarged_from_nm: Optional[float] = None
     if box_size_nm is not None:
         box_edge_A = box_size_nm * 10.0
+        floor_A = protein_box_floor_nm(
+            insulin_pdb_path, padding_angstrom, tolerance_angstrom
+        ) * 10.0
+        if box_edge_A < floor_A:
+            box_enlarged_from_nm = float(box_size_nm)
+            box_edge_A = floor_A
     else:
         box_edge_A = estimate_box_edge_angstrom(
             insulin_pdb_path,
@@ -322,7 +352,7 @@ def pack_insulin_polymers(
             f.write(inp_content)
             inp_path = f.name
 
-        packmol_exe = shutil.which("packmol")
+        packmol_exe = packmol_executable()
         with open(inp_path, encoding="utf-8") as inp_file:
             result = subprocess.run(
                 [packmol_exe],
@@ -340,13 +370,16 @@ def pack_insulin_polymers(
                 f"{result.stderr or result.stdout}"
             )
 
-        return {
+        out = {
             "success": success,
             "box_edge_angstrom": box_edge_A,
             "box_edge_nm": box_edge_A / 10.0,
             "stdout": result.stdout,
             "stderr": result.stderr,
         }
+        if box_enlarged_from_nm is not None:
+            out["box_enlarged_from_nm"] = box_enlarged_from_nm
+        return out
 
     except subprocess.TimeoutExpired:
         warnings.warn(f"Packmol timed out after {timeout_s} s")

@@ -54,19 +54,19 @@ _APPROVED_EXCIPIENTS: Dict[str, Dict[str, Any]] = {
         "precedent_count": 18,
         "notes": "Approved as biodegradable controlled-release matrix.",
     },
-    "[*]N1CCOCC1[*]": {
+    "[*]CC([*])N1CCCC1=O": {
         "name": "Polyvinylpyrrolidone / PVP",
         "gras": True,
         "jurisdictions": ["FDA", "EMA"],
         "precedent_count": 55,
         "notes": "FDA IIG listed. Widely used binder and stabiliser.",
     },
-    "[*]CC(O)[*]": {
+    "[*]CC([*])O": {
         "name": "Polyvinyl alcohol (PVA)",
         "gras": False,
         "jurisdictions": ["FDA", "EMA"],
         "precedent_count": 20,
-        "notes": "EMA excipient monograph. Ophthalmic and parenteral use.",
+        "notes": "FDA IIG listed. EMA excipient monograph. Ophthalmic and parenteral use.",
     },
     "[*]OC(=O)CCCCC(=O)O[*]": {
         "name": "Polycaprolactone (PCL)",
@@ -199,6 +199,32 @@ def _psmiles_to_smiles(psmiles: str) -> str:
     return psmiles.replace("[*]", "C").strip()
 
 
+def _canonical_repeat(psmiles: str) -> str:
+    """Return a canonical repeat-unit key so equivalent [*] writings match."""
+    try:
+        from psmiles import PolymerSmiles
+
+        polymer = PolymerSmiles(psmiles.strip())
+        canonical = polymer.canonicalize
+        if callable(canonical):
+            canonical = canonical()
+        return str(canonical)
+    except Exception:
+        return psmiles.strip()
+
+
+def _approved_index() -> Dict[str, Dict[str, Any]]:
+    """Map canonical repeat units onto the approved-excipient records."""
+    index: Dict[str, Dict[str, Any]] = {}
+    for key, entry in _APPROVED_EXCIPIENTS.items():
+        index[_canonical_repeat(key)] = entry
+        index[key] = entry
+    return index
+
+
+_APPROVED_BY_CANONICAL = _approved_index()
+
+
 def check_excipient_compliance(
     psmiles: str,
     jurisdiction: str = "FDA,EMA",
@@ -225,11 +251,13 @@ def check_excipient_compliance(
     jurisdictions = [j.strip().upper() for j in jurisdiction.split(",") if j.strip()]
     result = ComplianceResult(psmiles=psmiles)
 
-    # 1. Direct PSMILES lookup
+    # 1. Canonical repeat-unit lookup, then the raw string, then capped SMILES.
     canonical = psmiles.strip()
-    match_entry = _APPROVED_EXCIPIENTS.get(canonical)
+    match_entry = _APPROVED_BY_CANONICAL.get(_canonical_repeat(canonical))
+    if match_entry is None:
+        match_entry = _APPROVED_EXCIPIENTS.get(canonical)
 
-    # 2. Fragment SMILES match (strip stars)
+    # 2. Fragment SMILES match (methyl-capped stars)
     if match_entry is None:
         frag = _psmiles_to_smiles(canonical)
         for key, entry in _APPROVED_EXCIPIENTS.items():

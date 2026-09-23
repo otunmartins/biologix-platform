@@ -454,10 +454,11 @@ def main() -> None:
     if 4 in tiers:
         ok = verify_zinc_bridge()
         if not ok:
-            logger.warning(
+            logger.error(
                 "Tier 4: ZINC bridge not operational — "
                 "install h5py and/or run scripts/setup_aizynthfinder.sh"
             )
+            sys.exit(1)
 
     logger.info("Done.")
 

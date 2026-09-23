@@ -237,3 +237,32 @@ def test_save_psmiles_png_integration():
     finally:
         if p.is_file():
             p.unlink()
+
+
+def test_summary_report_discloses_target_structure(tmp_path) -> None:
+    import json as _json
+
+    from biologix_ai.discovery_report import target_structure_lines
+
+    structures = tmp_path / "structures"
+    structures.mkdir()
+    (structures / "biologic_target.json").write_text(
+        _json.dumps(
+            {
+                "canonical_name": "Semaglutide",
+                "resolved_target": "4ZGM:B",
+                "source": "rcsb",
+                "source_id": "4ZGM",
+                "chains": ["B"],
+                "n_residues": 28,
+                "removed_heterogens": [{"chain": "B", "residue": "32M", "count": 1}],
+                "modifications": [{"chain": "B", "residue": "AIB", "residue_id": "8", "replaced_by": "ALA"}],
+                "warnings": ["chain B: 3 N-terminal residue(s) are not observed (HIS-AIB-GLU)"],
+            }
+        )
+    )
+    text = "\n".join(target_structure_lines(tmp_path))
+    assert "## Target structure" in text
+    assert "`4ZGM:B`" in text and "32M x1" in text and "AIB B8 -> ALA" in text
+    assert "HIS-AIB-GLU" in text
+    assert target_structure_lines(tmp_path / "missing") == []

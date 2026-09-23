@@ -8,7 +8,13 @@ informative but not a substitute for regulatory studies.
 
 from __future__ import annotations
 
+import importlib
+import importlib.util
+import json
 import logging
+import os
+import subprocess
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field
@@ -34,8 +40,13 @@ ADMET_THRESHOLDS = {
     "hERG": {"key": "hERG", "threshold": 0.5, "direction": "above_is_bad"},
     "hepatotoxicity": {"key": "HepTox", "threshold": 0.5, "direction": "above_is_bad"},
     "AMES": {"key": "AMES", "threshold": 0.5, "direction": "above_is_bad"},
-    "LD50_Zhu": {"key": "LD50_Zhu", "threshold": 500, "direction": "lower_is_bad"},
 }
+# TDC LD50_Zhu is -log10(LD50 [mol/kg]), not mg/kg. 500 mg/kg is the flag after conversion.
+LD50_ZHU_MG_PER_KG_THRESHOLD = 500.0
+
+_DEFAULT_ADMET_PYTHON = Path("/opt/conda/envs/biologix-admet/bin/python")
+_REPO_ROOT = Path(__file__).resolve().parents[4]
+_DEFAULT_ADMET_RUNNER = _REPO_ROOT / "scripts" / "run_admet_isolated.py"
 
 
 class SMARTSHit(BaseModel):
@@ -60,11 +71,131 @@ class ToxicityResult(BaseModel):
 
 
 def _is_admet_available() -> bool:
+    return _admet_python() is not None or importlib.util.find_spec("admet_ai") is not None
+
+
+def _admet_python() -> Optional[Path]:
+    raw_path = os.environ.get("BIOLOGIX_ADMET_PYTHON", "").strip()
+    candidate = Path(raw_path) if raw_path else _DEFAULT_ADMET_PYTHON
+    if candidate.is_file() and os.access(candidate, os.X_OK):
+        return candidate
+    return None
+
+
+def _ld50_zhu_mg_per_kg(log_inv_mol_per_kg: float, smiles: str) -> Optional[float]:
+    """Convert TDC LD50_Zhu, -log10(mol/kg), into mg/kg using the molecule's mass."""
     try:
-        from admet_ai import ADMETModel  # noqa: F401
-        return True
+        from rdkit import Chem
+        from rdkit.Chem import Descriptors
     except ImportError:
-        return False
+        return None
+    molecule = Chem.MolFromSmiles(smiles)
+    if molecule is None:
+        return None
+    mol_per_kg = 10 ** (-float(log_inv_mol_per_kg))
+    return mol_per_kg * float(Descriptors.MolWt(molecule)) * 1000.0
+
+
+def _profile_from_predictions(smiles: str, predictions: Dict[str, Any]) -> ADMETProfile:
+    pred_dict = {
+        key: float(value)
+        for key, value in predictions.items()
+        if isinstance(value, (int, float))
+    }
+    flags: List[str] = []
+    for label, cfg in ADMET_THRESHOLDS.items():
+        value = pred_dict.get(cfg["key"])
+        if value is None or cfg["threshold"] is None:
+            continue
+        if cfg["direction"] == "above_is_bad" and value > cfg["threshold"]:
+            flags.append(f"{label}={value:.3f} (threshold {cfg['threshold']})")
+        elif cfg["direction"] == "lower_is_bad" and value < cfg["threshold"]:
+            flags.append(f"{label}={value:.3f} (threshold {cfg['threshold']})")
+    ld50_log = pred_dict.get("LD50_Zhu")
+    if ld50_log is not None:
+        ld50_mg = _ld50_zhu_mg_per_kg(ld50_log, smiles)
+        if ld50_mg is not None and ld50_mg < LD50_ZHU_MG_PER_KG_THRESHOLD:
+            flags.append(
+                f"LD50_Zhu={ld50_log:.3f} -log10(mol/kg) = {ld50_mg:.1f} mg/kg "
+                f"(threshold {LD50_ZHU_MG_PER_KG_THRESHOLD:.0f} mg/kg)"
+            )
+    return ADMETProfile(smiles=smiles, predictions=pred_dict, flags=flags)
+
+
+def _direct_admet_predictions(smiles_list: List[str]) -> List[ADMETProfile]:
+    admet_module = importlib.import_module("admet_ai")
+    model = admet_module.ADMETModel()
+    raw_predictions = model.predict(
+        smiles=smiles_list[0] if len(smiles_list) == 1 else smiles_list
+    )
+    if isinstance(raw_predictions, dict):
+        return [_profile_from_predictions(smiles_list[0], raw_predictions)]
+    if hasattr(raw_predictions, "iterrows"):
+        rows = {
+            str(index): row.to_dict()
+            for index, row in raw_predictions.iterrows()
+        }
+        return [
+            _profile_from_predictions(smiles, rows.get(smiles, {}))
+            for smiles in smiles_list
+        ]
+    raise TypeError(f"Unsupported ADMET prediction type: {type(raw_predictions).__name__}")
+
+
+def _isolated_admet_predictions(
+    admet_python: Path,
+    smiles_list: List[str],
+) -> List[ADMETProfile]:
+    runner = Path(
+        os.environ.get("BIOLOGIX_ADMET_RUNNER", str(_DEFAULT_ADMET_RUNNER))
+    )
+    timeout = float(os.environ.get("BIOLOGIX_ADMET_SUBPROCESS_TIMEOUT_S", "300"))
+    child_environment = dict(os.environ)
+    child_environment["PATH"] = (
+        f"{admet_python.parent}:{child_environment.get('PATH', '')}"
+    )
+    child_environment["LD_LIBRARY_PATH"] = str(admet_python.parent.parent / "lib")
+    child_environment.pop("PYTHONPATH", None)
+    completed = subprocess.run(
+        [str(admet_python), str(runner)],
+        input=json.dumps({"smiles": smiles_list}),
+        text=True,
+        capture_output=True,
+        check=True,
+        timeout=timeout,
+        env=child_environment,
+        cwd=str(_REPO_ROOT),
+    )
+    payload = json.loads(completed.stdout)
+    rows = payload.get("predictions")
+    if not isinstance(rows, list):
+        raise ValueError("ADMET subprocess returned no predictions list")
+    by_smiles = {
+        str(row.get("smiles")): row.get("predictions", {})
+        for row in rows
+        if isinstance(row, dict)
+    }
+    return [
+        _profile_from_predictions(smiles, by_smiles.get(smiles, {}))
+        for smiles in smiles_list
+    ]
+
+
+def _run_admet_batch(smiles_list: List[str]) -> List[ADMETProfile]:
+    if not smiles_list:
+        return []
+    try:
+        admet_python = _admet_python()
+        if admet_python is not None:
+            return _isolated_admet_predictions(admet_python, smiles_list)
+        if importlib.util.find_spec("admet_ai") is not None:
+            return _direct_admet_predictions(smiles_list)
+    except Exception as exc:
+        logger.error("ADMET-AI failed for %s: %s", ",".join(smiles_list), exc)
+    return [
+        ADMETProfile(smiles=smiles, available=False)
+        for smiles in smiles_list
+    ]
 
 
 def _run_smarts_screen(smiles: str) -> List[SMARTSHit]:
@@ -86,64 +217,56 @@ def _run_smarts_screen(smiles: str) -> List[SMARTSHit]:
 
 def _run_admet(smiles: str) -> Optional[ADMETProfile]:
     """Run ADMET-AI predictions on a single SMILES."""
-    if not _is_admet_available():
-        return ADMETProfile(smiles=smiles, available=False)
-
-    try:
-        from admet_ai import ADMETModel
-
-        model = ADMETModel()
-        preds = model.predict(smiles=smiles)
-
-        flags: List[str] = []
-        pred_dict: Dict[str, float] = {}
-
-        if isinstance(preds, dict):
-            pred_dict = {k: float(v) for k, v in preds.items() if isinstance(v, (int, float))}
-        else:
-            pred_dict = {}
-
-        for label, cfg in ADMET_THRESHOLDS.items():
-            val = pred_dict.get(cfg["key"])
-            if val is not None and cfg["threshold"] is not None:
-                if cfg["direction"] == "above_is_bad" and val > cfg["threshold"]:
-                    flags.append(f"{label}={val:.3f} (threshold {cfg['threshold']})")
-                elif cfg["direction"] == "lower_is_bad" and val < cfg["threshold"]:
-                    flags.append(f"{label}={val:.3f} (threshold {cfg['threshold']})")
-
-        return ADMETProfile(smiles=smiles, predictions=pred_dict, flags=flags)
-
-    except Exception as exc:
-        logger.error("ADMET-AI failed for %s: %s", smiles, exc)
-        return ADMETProfile(smiles=smiles, available=False)
+    return _run_admet_batch([smiles])[0]
 
 
-def screen_monomer(smiles: str) -> ToxicityResult:
-    """Full toxicity screen on a single monomer SMILES: SMARTS + ADMET."""
-    smarts_hits = _run_smarts_screen(smiles)
-    admet = _run_admet(smiles)
-
-    warnings: List[str] = []
-    safe = True
-
-    if smarts_hits:
-        safe = False
-        for hit in smarts_hits:
-            warnings.append(f"SMARTS alert: {hit.pattern_name}")
-
-    if admet and admet.flags:
-        safe = False
-        warnings.extend(admet.flags)
-
+def _combine_toxicity_result(
+    smiles: str,
+    smarts_hits: List[SMARTSHit],
+    admet: ADMETProfile,
+) -> ToxicityResult:
+    warnings: List[str] = [
+        f"SMARTS alert: {hit.pattern_name}" for hit in smarts_hits
+    ]
+    warnings.extend(admet.flags)
+    if not admet.available:
+        warnings.append("ADMET-AI unavailable; result contains SMARTS screening only.")
     return ToxicityResult(
         smiles=smiles,
         smarts_hits=smarts_hits,
         admet=admet,
-        safe=safe,
+        safe=not smarts_hits and not admet.flags,
         warnings=warnings,
     )
 
 
+def _smiles_parses(smiles: str) -> bool:
+    """Return whether RDKit accepts the SMILES. Assume true if RDKit is absent."""
+    try:
+        from rdkit import Chem
+    except ImportError:
+        return True
+    return Chem.MolFromSmiles(smiles) is not None
+
+
+def screen_monomer(smiles: str) -> ToxicityResult:
+    """Full toxicity screen on a single monomer SMILES: SMARTS + ADMET."""
+    if not _smiles_parses(smiles):
+        return ToxicityResult(
+            smiles=smiles,
+            safe=False,
+            admet=ADMETProfile(smiles=smiles, available=False),
+            warnings=["SMILES did not parse. ADMET was not run."],
+        )
+    smarts_hits = _run_smarts_screen(smiles)
+    admet = _run_admet(smiles)
+    return _combine_toxicity_result(smiles, smarts_hits, admet)
+
+
 def screen_monomers_batch(smiles_list: List[str]) -> List[ToxicityResult]:
     """Screen multiple monomers."""
-    return [screen_monomer(s) for s in smiles_list]
+    admet_profiles = _run_admet_batch(smiles_list)
+    return [
+        _combine_toxicity_result(smiles, _run_smarts_screen(smiles), admet)
+        for smiles, admet in zip(smiles_list, admet_profiles)
+    ]

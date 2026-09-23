@@ -51,7 +51,7 @@ The `biologix-ai` MCP server uses **stdio**. **Never issue parallel/batched MCP 
 `save_pipeline_stage`, etc. in one turn). OpenCode can deadlock the pipe or hit MCP timeouts:
 tools appear to run forever, saves fail with red icons, and the TUI may stop accepting input.
 
-**Rule:** one MCP tool call → wait for its JSON result → then the next. Parallel calls return **`MCP_BUSY`** — retry **one** MCP call sequentially **only before any timeout**. If **any** call times out → **CLI latch** (no more MCP for the session). Max **6** candidates per Step 3; if `generate_psmiles_from_name` returns `ok: false`, note it and continue.
+**Rule:** one MCP tool call → wait for its JSON result → then the next. Parallel calls return **`MCP_BUSY`** — retry **one** MCP call sequentially **only before any timeout**. If **any** call times out → **CLI latch** (no more MCP for the session). Max **6** candidates per Step 3. Write each PSMILES yourself and read `graph_report`.
 
 ## Protocol
 
@@ -68,8 +68,13 @@ or a new campaign.
 
 ### Step 2 — Session
 
-- `resolve_biologic_target(name_or_pdb_id, fetch_pdb=true, run_dir=<session>)`
-- `start_biologics_session(biologic_target, polymer_target, run_name)`
+- `resolve_biologic_target(name_or_pdb_id, fetch_pdb=true)`. Accepted forms: a name
+  (`semaglutide`), `PDB:chains` (`4ZGM:B`), `uniprot:ACCESSION[:start-end]`, or
+  `sequence:ONE_LETTER` (<=400 residues). If it fails, find a more specific form in the
+  literature yourself and retry (at most twice) before reporting the failure.
+- `start_biologics_session(biologic_target=<resolved_target>, polymer_target, run_name)`
+- Disclose the target's `modifications`, `removed_heterogens`, and `warnings` in the report.
+  When `suggested_compute` is `gpu`, pass `compute="gpu"` to `openmm_evaluate_psmiles`.
 
 Save `run_dir` from the session response for all later tools.
 
@@ -77,10 +82,9 @@ Save `run_dir` from the session response for all later tools.
 
 - `mine_literature(query="<biologic> excipient polymer stabilisation", ...)`
 
-If no polymer target was given, derive up to **6** candidate names from literature, then call
-`generate_psmiles_from_name(material_name)` **one name at a time** (sequential — see MCP concurrency).
+If no polymer target was given, derive up to **6** candidates from literature and **write each PSMILES yourself**. Do not use a stored or PubChem repeat unit.
 
-For each successful PSMILES, call `validate_psmiles` **one at a time**:
+For each PSMILES, call `validate_psmiles` **one at a time** and read `graph_report`:
 
 - `crosscheck_web=false` when `BIOLOGIX_AI_DOCKER=1` (Docker default — avoids web latency)
 - `crosscheck_web=true` only outside Docker when the user wants web cross-check

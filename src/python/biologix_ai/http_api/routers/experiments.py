@@ -254,12 +254,10 @@ def get_materials_status() -> Dict[str, Any]:
     from biologix_ai.services.literature_service import paper_qa_index_status
 
     lines = ["Insulin AI Materials Discovery Status"]
-    md_status = "unavailable"
     try:
-        from biologix_ai.simulation import MDSimulator
+        from biologix_ai.simulation.openmm_compat import describe_md_backend
 
-        sim = MDSimulator()
-        md_status = "insulin + polymer (implicit solvent)" if sim.runner else "unavailable"
+        md_status = describe_md_backend()
     except Exception:
         md_status = "unavailable"
     mutation_status = "unavailable"

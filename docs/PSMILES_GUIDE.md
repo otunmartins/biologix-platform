@@ -14,12 +14,9 @@ This file is the **canonical in-repo reference** for what PSMILES are, how `[*]`
 
 ## Names vs structures (critical)
 
-- **Automated name→PSMILES** is now available via **`generate_psmiles_from_name(material_name)`**. This tool resolves names in three tiers:
-  1. **Known-polymer table** (~60 common polymers/abbreviations: PEG, PLA, PLGA, PCL, PS, PMMA, PVDF, PDMS, chitosan, …). High confidence, no network call.
-  2. **PubChem lookup + auto-conversion**: strips "poly" prefix, fetches monomer SMILES from PubChem, then detects the polymerisation mechanism (vinyl C=C opening, hydroxy-acid ester condensation, amino-acid amide condensation) and places `[*]` at the backbone connection points. Medium confidence.
-  3. If neither tier succeeds the tool returns `ok: false` with the raw PubChem monomer SMILES so the caller can attempt manual conversion.
+- **The model writes every PSMILES.** `generate_psmiles_from_name` does not look up a stored repeat unit or a PubChem monomer. It returns `ok: false` and `source: "model_required"`. Write the repeat unit, then call `validate_psmiles`.
 
-  Always **validate the generated PSMILES** with `validate_psmiles` before evaluation, especially for PubChem auto results (medium confidence).
+  `validate_psmiles` returns `graph_report`: the atom each `[*]` bonds to, substituents on ring atoms, and unspecified stereocenters. The report describes the string as written and does not propose a replacement. Keep the PSMILES when the graph matches the intended polymer; otherwise write a new string or drop the candidate.
 
 - If you already have a PSMILES and want to cross-check it against its name, call **`validate_psmiles(psmiles, material_name="...")`**. The tool returns three automated checks:
 

@@ -20,6 +20,22 @@ def _ambertools_on_path() -> bool:
     return shutil.which("antechamber") is not None and shutil.which("parmchk2") is not None
 
 
+def packmol_available() -> bool:
+    """True when Packmol is on PATH or at ``BIOLOGIX_AI_PACKMOL_BIN``."""
+    from .packmol_packer import packmol_executable
+
+    return packmol_executable() is not None
+
+
+def describe_md_backend() -> str:
+    """Status line for the physics screen. Does not construct a simulator."""
+    if not openmm_available():
+        return "unavailable"
+    if not packmol_available():
+        return "OpenMM importable; Packmol binary missing"
+    return "insulin + polymer matrix (OpenMM + Packmol)"
+
+
 def openmm_available() -> bool:
     """
     True if merged-screening dependencies can be imported: OpenMM, openmmforcefields,

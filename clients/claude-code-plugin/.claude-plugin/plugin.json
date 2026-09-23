@@ -1,0 +1,8 @@
+{
+  "name": "biologix",
+  "version": "1.0.0",
+  "description": "Biologix discovery agent: plans polymer excipient formulations for a biologic (insulin, GLP-1 analogues, antibodies, enzymes, vaccines) with literature, PSMILES screening, OpenMM encapsulation, and retrosynthesis on the Biologix MCP server.",
+  "author": {
+    "name": "Biologix"
+  }
+}
