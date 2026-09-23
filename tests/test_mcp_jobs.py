@@ -80,7 +80,7 @@ def test_default_wait_is_unlimited_on_stdio_and_bounded_over_http(monkeypatch) -
     monkeypatch.setenv("BIOLOGIX_MCP_TRANSPORT", "stdio")
     assert mcp_jobs.tool_wait_s() == 0.0
     monkeypatch.setenv("BIOLOGIX_MCP_TRANSPORT", "http")
-    assert mcp_jobs.tool_wait_s() == 240.0
+    assert mcp_jobs.tool_wait_s() == 90.0
 
 
 def test_progress_from_tool_threads_reaches_the_event_loop() -> None:
@@ -143,5 +143,40 @@ def test_full_stack_await_is_not_blocked_by_the_jobs_own_lock(monkeypatch) -> No
         release.set()
         done = json.loads(await tools["await_biologix_job"].fn(job_id=running["job_id"], wait_s=5))
         assert done["slow"] is True
+
+    asyncio.run(scenario())
+
+
+def test_a_dropped_connection_leaves_the_job_recoverable(monkeypatch) -> None:
+    """A client-side 504 must not lose the run: retrying the tool returns its job_id."""
+    from mcp.server.fastmcp import FastMCP
+
+    monkeypatch.setenv("BIOLOGIX_TOOL_WAIT_S", "0.2")
+    release = threading.Event()
+    mcp = FastMCP("jobs-504")
+    started = {"n": 0}
+
+    @mcp.tool()
+    def openmm_evaluate_psmiles(psmiles_list: str = "") -> str:
+        started["n"] += 1
+        release.wait(timeout=10)
+        return json.dumps({"ok": True, "psmiles_list": psmiles_list})
+
+    install_job_runner(mcp)
+    tool = mcp._tool_manager._tools["openmm_evaluate_psmiles"]
+
+    async def scenario():
+        first = json.loads(await tool.fn(psmiles_list="[*]CC[*]"))
+        assert first["status"] == "running"
+        # The client never saw that payload: its proxy returned 504 instead.
+        # The model retries the identical call, as the protocol now instructs.
+        retry = json.loads(await tool.fn(psmiles_list="[*]CC[*]"))
+        assert retry["error"] == JOB_RUNNING
+        assert retry["job_id"] == first["job_id"]
+        assert retry["protocol"]["next_required_tool"] == AWAIT_TOOL
+        assert started["n"] == 1  # the work was not started a second time
+        release.set()
+        done = json.loads(await await_job(first["job_id"], 5))
+        assert done["psmiles_list"] == "[*]CC[*]"
 
     asyncio.run(scenario())

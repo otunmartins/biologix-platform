@@ -79,7 +79,7 @@ MODAL_ENV = {
     "BIOLOGIX_MODAL_APP": APP_NAME,
     "BIOLOGIX_DEFAULT_COMPUTE": DEFAULT_COMPUTE,
     # Remote clients time out long calls; longer calls come back as jobs.
-    "BIOLOGIX_TOOL_WAIT_S": "240",
+    "BIOLOGIX_TOOL_WAIT_S": "90",
     "BIOLOGIX_AI_STRUCTURE_CACHE": "/app/runs/.structures",
     "BIOLOGIX_MCP_PROFILE": "protocol",
 }

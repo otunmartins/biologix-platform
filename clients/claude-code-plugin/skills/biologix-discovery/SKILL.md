@@ -53,7 +53,7 @@ successful calls, then always stop at Step 7 and wait for the user.
 
 ## When something goes wrong
 
-Read which of three kinds it is. Only the third one ends the run.
+Read which of four kinds it is. Only the last one ends the run.
 
 **1. A redirect.** `PROTOCOL_ORDER`, `JOB_RUNNING`, `MCP_BUSY`, and a result with
 `status: "running"`. Nothing failed. Call the tool named in
@@ -67,7 +67,14 @@ and how many attempts are left. Do not stop and do not ask the user. Make that
 change and call the same tool again. Keep going until the work is done or the
 attempts run out.
 
-**3. The server or a dependency broke.** `abort: true`, a timeout, a missing
+**3. The connection dropped.** An HTTP 504, a gateway or proxy timeout, or a
+reset connection on a long tool. The work did not stop: it is still running on
+the server. Call the same tool again with the same arguments. You will get
+`JOB_RUNNING` carrying the `job_id` of the run already in flight, and
+`await_biologix_job` then returns its result. Never restart the session over
+this, and never report it as a failed calculation.
+
+**4. The server or a dependency broke.** `abort: true`, a timeout, a missing
 dependency, a traceback, or the envelope stage `blocked`. Stop, show the user
 the exact error and the last completed stage. Never replace a failed scientific
 calculation with an estimate, and never invent a local install or a

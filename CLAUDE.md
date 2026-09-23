@@ -16,9 +16,9 @@ which every MCP client receives, live in
   Every result carries a `protocol` envelope with `next_required_tool`,
   `next_arguments`, `step_instructions`, and `user_stop_allowed`.
 - `src/python/biologix_ai/mcp_jobs.py`: moves tools off the event loop. A call longer
-  than `BIOLOGIX_TOOL_WAIT_S` (240 s over HTTP, unlimited over stdio; ChatGPT is
-  measured to accept single calls of at least 144 s, so do not shorten this without
-  evidence) returns a job
+  than `BIOLOGIX_TOOL_WAIT_S` (90 s over HTTP, unlimited over stdio). ChatGPT's proxy
+  completed a 144.5 s call but returned HTTP 504 at 240 s, so its ceiling is between
+  them; change this only with a measurement returns a job
   that the agent waits on with `await_biologix_job`.
 - `src/python/biologix_ai/mcp_stdio_guard.py`: a per-client `MCP_BUSY` lock.
 - `src/python/biologix_ai/mcp_client.py`: the client id: the OAuth client, else a hash of
