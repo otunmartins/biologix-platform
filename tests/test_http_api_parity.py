@@ -41,11 +41,15 @@ class TestLiteratureParity:
 
 
 class TestPSMILESParity:
-    def test_generate_psmiles(self, client):
+    def test_generate_psmiles_asks_the_model_for_the_repeat_unit(self, client):
+        """The server never looks up or invents a structure; the model writes it."""
         resp = client.post("/api/psmiles/generate", json={"material_name": "PEG"})
         assert resp.status_code == 200
         data = resp.json()
-        assert data.get("ok") is True or "psmiles" in data
+        assert data["ok"] is False
+        assert data["source"] == "model_required"
+        assert data["material_name"] == "PEG"
+        assert any("[*]" in hint for hint in data["hints"])
 
     def test_mutate_psmiles(self, client):
         resp = client.post("/api/psmiles/mutate", json={"library_size": 3})

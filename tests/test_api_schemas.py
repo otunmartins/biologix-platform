@@ -197,9 +197,9 @@ class TestFunnelManifestEntry:
 
 class TestPersonaPreset:
     def test_weights_sum_to_one(self):
-        from biologix_ai.http_api.routers.personas import _PERSONAS
+        from biologix_ai.persona_presets import PERSONAS
 
-        for persona in _PERSONAS:
+        for persona in PERSONAS:
             w = persona.weights
             total = (
                 w.thermal_stability
@@ -215,9 +215,9 @@ class TestPersonaPreset:
             )
 
     def test_all_five_personas_present(self):
-        from biologix_ai.http_api.routers.personas import _PERSONAS
+        from biologix_ai.persona_presets import PERSONAS
 
-        ids = {p.id for p in _PERSONAS}
+        ids = {p.id for p in PERSONAS}
         expected = {
             "formulation-scientist",
             "computational-chemist",

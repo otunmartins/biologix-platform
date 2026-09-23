@@ -11,6 +11,8 @@ from pathlib import Path
 
 import pytest
 
+from optional_deps import requires_admet, requires_retrosyn
+
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src", "python"))
 
@@ -61,6 +63,7 @@ class TestNewMCPTools:
     def _server(self):
         self.server = _import_mcp_server()
 
+    @requires_retrosyn
     def test_plan_retrosynthesis_returns_json(self):
         result = self.server.plan_retrosynthesis(
             target="PEG",
@@ -72,6 +75,7 @@ class TestNewMCPTools:
         assert "polymer_routes" in parsed
         assert parsed["request"]["biologic_target"] == "insulin"
 
+    @requires_retrosyn
     def test_plan_retrosynthesis_custom_biologic(self):
         result = self.server.plan_retrosynthesis(
             target="test_polymer",
@@ -85,6 +89,7 @@ class TestNewMCPTools:
         parsed = json.loads(result)
         assert "error" in parsed
 
+    @requires_retrosyn
     def test_submit_and_plan_chain(self, tmp_path):
         prep = self.server.prepare_retrosynthesis(
             target="[*]CC([*])C(=O)O",
@@ -209,6 +214,7 @@ class TestNewMCPTools:
         assert parsed["smiles"] == "CCO"
         assert "safe" in parsed
 
+    @requires_admet
     def test_check_monomers_batch_returns_list(self):
         result = self.server.check_monomers_batch(smiles_list="CCO,CC(=O)O")
         parsed = json.loads(result)
@@ -276,6 +282,7 @@ class TestNewMCPTools:
         assert summary_payload.get("candidates"), "expected explicit polymer_target in candidates"
         assert "iterations" in summary_payload
 
+    @requires_retrosyn
     def test_plan_retrosynthesis_run_dir_writes_artifact_and_world_patch(self, tmp_path):
         """Session-aware persistence from the plan: retrosynthesis/ + discovery_world retrosynthesis_entries."""
         session = tmp_path / "retro_sess"
