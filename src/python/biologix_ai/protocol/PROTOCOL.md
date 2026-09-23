@@ -127,7 +127,8 @@ the server stops the pipeline.
    `disposition_reason`: an ADMET alert is measured on a capped-monomer proxy,
    not on the polymer, so simulate the candidate and report the alert alongside
    the result. Only `fail` means the tools cannot use the structure.
-3. For at most three candidates, call `openmm_evaluate_psmiles` once per
+3. For each eligible candidate the envelope offers (three per iteration by
+   default), call `openmm_evaluate_psmiles` once per
    candidate with that single PSMILES, `max_workers=1`,
    `response_format="concise"`, the `compute` given in `next_arguments`, and
    the session `run_dir`.

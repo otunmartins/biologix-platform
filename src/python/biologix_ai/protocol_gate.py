@@ -29,6 +29,7 @@ from __future__ import annotations
 import functools
 import inspect
 import json
+import os
 from dataclasses import asdict, dataclass, field, fields
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Mapping, Optional, Tuple
@@ -40,8 +41,20 @@ from biologix_ai.protocol import section, step_instructions
 PROTOCOL_ORDER_ERROR = "PROTOCOL_ORDER"
 STATE_FILENAME = "protocol_state.json"
 BOOTSTRAP_TOOL = "begin_biologix_discovery"
-MAX_OPENMM_CANDIDATES = 3
-MAX_RETRO_TARGETS = 3
+def _cap(name: str, default: int) -> int:
+    """A per-iteration budget, raisable without touching the code."""
+    try:
+        value = int(os.environ.get(name, "").strip() or default)
+    except ValueError:
+        return default
+    return value if value > 0 else default
+
+
+# Compute budgets per iteration, not scientific limits: raise them with
+# BIOLOGIX_MAX_OPENMM_CANDIDATES / BIOLOGIX_MAX_RETRO_TARGETS when a run should
+# carry more candidates through simulation and route-finding.
+MAX_OPENMM_CANDIDATES = _cap("BIOLOGIX_MAX_OPENMM_CANDIDATES", 3)
+MAX_RETRO_TARGETS = _cap("BIOLOGIX_MAX_RETRO_TARGETS", 3)
 MAX_RESOLVE_RETRIES = 2
 MAX_RETRO_RETRIES = 2
 MAX_TOOL_RETRIES = 3

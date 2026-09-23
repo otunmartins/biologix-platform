@@ -754,3 +754,23 @@ def test_repair_hints_match_the_failures_the_pipeline_actually_produces() -> Non
     assert "register_retro_precursors" in _repair_hint("kg_empty_after_session_extractions")
     assert "shorter repeat unit" in _repair_hint("Packmol packing failed: timeout")
     assert _repair_hint("") and _repair_hint("unrecognised")
+
+
+def test_candidate_budgets_are_configurable(monkeypatch) -> None:
+    """The per-iteration caps are a compute budget, not a scientific limit."""
+    import importlib
+
+    import biologix_ai.protocol_gate as gate_module
+
+    monkeypatch.setenv("BIOLOGIX_MAX_OPENMM_CANDIDATES", "6")
+    monkeypatch.setenv("BIOLOGIX_MAX_RETRO_TARGETS", "5")
+    reloaded = importlib.reload(gate_module)
+    try:
+        assert reloaded.MAX_OPENMM_CANDIDATES == 6
+        assert reloaded.MAX_RETRO_TARGETS == 5
+        monkeypatch.setenv("BIOLOGIX_MAX_OPENMM_CANDIDATES", "not-a-number")
+        assert importlib.reload(gate_module).MAX_OPENMM_CANDIDATES == 3
+    finally:
+        monkeypatch.delenv("BIOLOGIX_MAX_OPENMM_CANDIDATES", raising=False)
+        monkeypatch.delenv("BIOLOGIX_MAX_RETRO_TARGETS", raising=False)
+        importlib.reload(gate_module)

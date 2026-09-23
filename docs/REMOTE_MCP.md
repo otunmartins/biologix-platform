@@ -225,6 +225,22 @@ substitution and removal. The summary report's "Target structure" section
 repeats them. When resolution fails, the agent retries with a more specific form
 twice before the pipeline stops.
 
+## Budgets
+
+Per iteration the gate carries three candidates through OpenMM and three
+through retrosynthesis. These are compute budgets, not scientific limits: set
+`BIOLOGIX_MAX_OPENMM_CANDIDATES` and `BIOLOGIX_MAX_RETRO_TARGETS` before
+deploying to carry more. A run costs roughly one GPU-minute per OpenMM
+candidate on an L4, more for a large target.
+
+Screening only marks a candidate `fail` when the tools cannot use the
+structure. An ADMET alert is measured on a methyl-capped monomer proxy rather
+than on the polymer, so it is a `warning` with a `disposition_reason` and the
+candidate still reaches simulation, with the alert reported beside the result.
+Zwitterionic repeat units (sulfobetaines, phosphorylcholines) are accepted; a
+repeat unit with a net charge is not, because the matrix box carries no
+counterions.
+
 ## Other clients
 
 `clients/` holds generated setup for Cursor, the Claude Code plugin,
