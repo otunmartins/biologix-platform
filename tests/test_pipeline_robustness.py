@@ -41,14 +41,13 @@ class TestPrescreenPSMILESForMD:
         # [CH] capped with H gives [CH]([H])[H] - 1 radical
         # Whether RDKit interprets this as radical depends on context
 
-    def test_net_charged_rejected_but_zwitterion_accepted(self):
-        """The box has no counterions, so only a *net* charge breaks PME."""
-        net_charged = self._prescreen("[*]CC[N+](C)(C)C[*]")
-        assert net_charged["ok"] is False
-        assert "net charge" in net_charged["error"].lower()
-
-        sulfobetaine = self._prescreen("[*]CC([*])c1ccc(C[N+](C)(C)CCCS(=O)(=O)[O-])cc1")
-        assert sulfobetaine["ok"] is True
+    def test_charged_repeat_units_are_accepted(self):
+        """Polyelectrolytes are packed with counterions; zwitterions need none."""
+        assert self._prescreen("[*]CC[N+](C)(C)C[*]")["ok"] is True
+        assert self._prescreen("[*]CC([*])C(=O)[O-]")["ok"] is True
+        assert self._prescreen(
+            "[*]CC([*])c1ccc(C[N+](C)(C)CCCS(=O)(=O)[O-])cc1"
+        )["ok"] is True
 
     def test_empty_rejected(self):
         r = self._prescreen("")

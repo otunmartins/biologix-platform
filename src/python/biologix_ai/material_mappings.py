@@ -1090,25 +1090,11 @@ def prescreen_psmiles_for_md(psmiles: str) -> Dict[str, Any]:
     if n_radicals > 0:
         return {"ok": False, "error": f"H-capped form has {n_radicals} radical electron(s); OpenFF will reject", "stage": "prescreen"}
 
-    # A zwitterion / inner salt (sulfobetaine, phosphorylcholine, amino acid
-    # side chain) carries formal charges but is net neutral: GAFF and Gasteiger
-    # handle it, and the PME cell stays neutral. Only a net charge is a real
-    # problem, because the box has no counterions and PME would then apply a
-    # uniform neutralising background to every energy.
-    net_charge = Chem.GetFormalCharge(mol)
-    if net_charge != 0:
-        charged = [(a.GetSymbol(), a.GetFormalCharge()) for a in mol.GetAtoms() if a.GetFormalCharge() != 0]
-        symbols = ", ".join(f"{s}({c:+d})" for s, c in charged[:5])
-        return {
-            "ok": False,
-            "error": (
-                f"Repeat unit has net charge {net_charge:+d} ({symbols}). The matrix box has no "
-                "counterions, so PME energies would carry a neutralising-background artefact. "
-                "Use the neutral acid/base form, or pair the charge into an inner salt "
-                "(zwitterion), which is accepted."
-            ),
-            "stage": "prescreen",
-        }
+    # Charged repeat units are supported. A zwitterion (sulfobetaine,
+    # phosphorylcholine) is net neutral and needs nothing. A polyelectrolyte
+    # carries a net charge, and the matrix run packs counterions so its PME cell
+    # is neutral; only an explicitly disabled neutralisation rejects it, and the
+    # simulation itself reports that.
 
     n_heavy = mol.GetNumHeavyAtoms()
     if n_heavy > 200:

@@ -237,9 +237,13 @@ Screening only marks a candidate `fail` when the tools cannot use the
 structure. An ADMET alert is measured on a methyl-capped monomer proxy rather
 than on the polymer, so it is a `warning` with a `disposition_reason` and the
 candidate still reaches simulation, with the alert reported beside the result.
-Zwitterionic repeat units (sulfobetaines, phosphorylcholines) are accepted; a
-repeat unit with a net charge is not, because the matrix box carries no
-counterions.
+Charged repeat units are supported. A zwitterion (sulfobetaine,
+phosphorylcholine) is net neutral and needs nothing. A polyelectrolyte is packed
+with Na+ or Cl- counterions so the polymer matrix is neutral and its PME energy
+carries no neutralising-background artefact; the OpenMM result reports them
+under `counterions`. The protein keeps its own net charge, as it does in every
+run, so existing results stay comparable. `BIOLOGIX_AI_OPENMM_NEUTRALIZE=no`
+refuses a charged matrix instead of packing ions.
 
 ## Other clients
 

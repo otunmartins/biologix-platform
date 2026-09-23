@@ -749,7 +749,7 @@ def test_a_recoverable_failure_names_the_specific_repair(harness) -> None:
 def test_repair_hints_match_the_failures_the_pipeline_actually_produces() -> None:
     from biologix_ai.protocol_gate import _repair_hint
 
-    assert "inner salt" in _repair_hint("Repeat unit has net charge -1 (O(-1))")
+    assert "inner salt" in _repair_hint("counterions were disabled for this server")
     assert "two [*]" in _repair_hint("Expected exactly 2 [*] connection points, found 1")
     assert "register_retro_precursors" in _repair_hint("kg_empty_after_session_extractions")
     assert "shorter repeat unit" in _repair_hint("Packmol packing failed: timeout")

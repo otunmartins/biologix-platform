@@ -26,7 +26,7 @@ import tempfile
 import time
 import warnings
 from pathlib import Path
-from typing import Dict, Literal, Optional, Tuple
+from typing import Dict, Literal, Optional, Sequence, Tuple
 
 PackingMode = Literal["shell", "bulk"]
 
@@ -154,9 +154,15 @@ def build_packmol_inp_content(
     packing_mode: PackingMode = "bulk",
     maxit: int = 20,
     nloop: int = 200,
+    extra_species: Optional[Sequence[Tuple[str, int]]] = None,
 ) -> str:
     """
     Build Packmol input text.
+
+    *extra_species* is ``[(pdb_path, count), ...]`` packed after the polymer,
+    used for the counterions that neutralise a polyelectrolyte matrix. Packmol
+    writes structures in declaration order, so the packed file is protein,
+    then polymer chains, then these.
 
     The box occupies [0, L]³ with insulin centred at (L/2, L/2, L/2).
     Polymer atoms are constrained to [tol/2, L − tol/2]³ so that no atom
@@ -186,6 +192,12 @@ def build_packmol_inp_content(
                 f"radius ({max_radius:.1f} Å) for this box; ignoring shell constraint"
             )
 
+    extra_blocks = "".join(
+        f"\nstructure {path}\n  number {count}\n{polymer_constraints}end structure\n"
+        for path, count in (extra_species or ())
+        if count > 0
+    )
+
     return (
         f"tolerance {tolerance_angstrom}\n"
         f"filetype pdb\n"
@@ -205,6 +217,7 @@ def build_packmol_inp_content(
         f"  number {n_polymers}\n"
         f"{polymer_constraints}"
         f"end structure\n"
+        f"{extra_blocks}"
     )
 
 
@@ -227,6 +240,7 @@ def pack_insulin_polymers(
     padding_angstrom: float = 6.0,
     maxit: int = 20,
     nloop: int = 200,
+    extra_species: Optional[Sequence[Tuple[str, int]]] = None,
 ) -> dict:
     """
     Pack insulin and *n_polymers* polymer chains into a cubic box with Packmol.
@@ -341,6 +355,7 @@ def pack_insulin_polymers(
         packing_mode=packing_mode,
         maxit=maxit,
         nloop=nloop,
+        extra_species=extra_species,
     )
 
     # --- Run Packmol ----------------------------------------------------------

@@ -1128,9 +1128,9 @@ _REPAIR_HINTS: Tuple[Tuple[str, str], ...] = (
         "Use the literature it returned, or the polymerization chemistry you already know.",
     ),
     (
-        "net charge",
-        "Pair the charge into an inner salt (a zwitterion such as a sulfobetaine is accepted) "
-        "or use the neutral acid/base form of the repeat unit.",
+        "counterion",
+        "Counterions were disabled for this server, so a charged matrix cannot be simulated. "
+        "Use the neutral acid/base form, or pair the charge into an inner salt.",
     ),
     (
         "connection points",

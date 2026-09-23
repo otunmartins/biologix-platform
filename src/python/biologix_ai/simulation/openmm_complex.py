@@ -613,14 +613,19 @@ def _read_packed_pdb_positions_nm(
     n_protein: int,
     n_lig_per_chain: int,
     n_chains: int,
+    n_extra_atoms: int = 0,
 ) -> Tuple[List, List]:
-    """Read packed PDB; return (protein_positions_nm, all_ligand_positions_nm)."""
+    """Read packed PDB; return (protein_positions_nm, matrix_positions_nm).
+
+    *n_extra_atoms* counts single-atom counterions packed after the chains; they
+    trail the polymer positions, matching the topology built for the matrix.
+    """
     from .polymer_build import pdb_atom_coords_angstrom
 
     _, coords_ang = pdb_atom_coords_angstrom(packed_pdb_path, include_hetatm=True)
     nm = 0.1  # Angstrom to nm
     all_nm = [[c[0] * nm, c[1] * nm, c[2] * nm] for c in coords_ang]
-    n_expected = n_protein + n_lig_per_chain * n_chains
+    n_expected = n_protein + n_lig_per_chain * n_chains + n_extra_atoms
     if len(all_nm) < n_expected:
         raise ValueError(
             f"Packed PDB has {len(all_nm)} atoms, expected {n_expected} "
@@ -769,7 +774,12 @@ def run_openmm_matrix_relax_and_energy(
         prep_pdb = work / "insulin_ab.pdb"
         prepare_insulin_ab_pdb(str(pdb_path), str(prep_pdb), chains=chains)
         modeller = load_insulin_modeller(str(prep_pdb), add_ssbond=True)
-        protein_ff = app.ForceField("amber14-all.xml")
+        # The ion parameters live in the water-model file. Load it only for a
+        # charged matrix: a neutral run then builds the identical force field it
+        # always did, down to the summation order of its energies.
+        repeat_charge = repeat_unit_charge(psmiles)
+        ff_files = ["amber14-all.xml"] + ([ION_FORCEFIELD] if repeat_charge else [])
+        protein_ff = app.ForceField(*ff_files)
         modeller.addHydrogens(protein_ff, pH=PROTONATION_PH)
         protein_top = modeller.topology
         protein_pos = modeller.positions
@@ -830,6 +840,38 @@ def run_openmm_matrix_relax_and_energy(
         poly_pdb = work / "polymer.pdb"
         Path(poly_pdb).write_text(mol_to_pdb_block(lig_mol))
 
+        chain_charge = Chem.GetFormalCharge(lig_mol)
+        ion_resname, ion_element, n_ions = counterions_for_matrix(chain_charge, n_polymers)
+        if n_ions and not repeat_charge:
+            return _fail(
+                f"The repeat unit reads as neutral but the built chain carries {chain_charge:+d}; "
+                "the ion parameters were not loaded. Rewrite the repeat unit so its charge is "
+                "explicit.",
+                "oligomer_build",
+            )
+        if n_ions and not neutralization_enabled():
+            return _fail(
+                f"Each chain carries a net charge of {chain_charge:+d} and "
+                f"{NEUTRALIZE_ENV} disables counterions, so the PME cell would carry a "
+                "neutralising background. Enable neutralisation or use a neutral repeat unit.",
+                "prescreen",
+            )
+        extra_species: List[Tuple[str, int]] = []
+        if n_ions:
+            if progressive_pack:
+                # The ion count is fixed to the chain count, so growing the chain
+                # count mid-pack would leave the matrix charged.
+                _log("[matrix] charged matrix: progressive packing disabled")
+                progressive_pack = False
+            ion_pdb = work / "counterion.pdb"
+            write_ion_pdb(str(ion_pdb), ion_resname, ion_element)
+            extra_species = [(str(ion_pdb), n_ions)]
+            _stage_heartbeat(
+                "packmol",
+                f"neutralising {n_polymers} chain(s) of charge {chain_charge:+d} "
+                f"with {n_ions} {ion_resname} ion(s)",
+            )
+
         packed_pdb = work / "packed.pdb"
         pack_box_nm: Optional[float] = (
             volume_box_nm if target_density_g_cm3 is not None else box_size_nm
@@ -845,6 +887,7 @@ def run_openmm_matrix_relax_and_energy(
             seed=random_seed,
             shell_only_angstrom=shell_only_angstrom,
             packing_mode=packing_mode,
+            extra_species=extra_species,
         )
         _stage_heartbeat("packmol", f"packing insulin + {n_polymers} polymer chain(s)")
         if progressive_pack:
@@ -915,7 +958,7 @@ def run_openmm_matrix_relax_and_energy(
 
         n_lig = lig_mol.GetNumAtoms()
         prot_pos_nm, lig_pos_nm = _read_packed_pdb_positions_nm(
-            str(packed_pdb), n_protein, n_lig, n_polymers
+            str(packed_pdb), n_protein, n_lig, n_polymers, n_extra_atoms=n_ions
         )
         # Packmol output: coordinates in [0, L] nm (insulin centered at L/2); OpenMM PBC matches
         combined_pos = unit.Quantity(
@@ -933,6 +976,7 @@ def run_openmm_matrix_relax_and_energy(
         _stage_heartbeat("openmm_system_build", "creating combined protein+polymer OpenMM system")
         lig_top, lig_sys = create_ligand_system(lig_mol, box_vectors=None)
         combined_top = _merge_topology_protein_n_ligands(protein_top, lig_top, n_polymers)
+        add_ions_to_topology(combined_top, ion_resname, ion_element, n_ions)
         combined_top.setPeriodicBoxVectors(box_vec_omm)
         mol_off = rdkit_mol_to_openff_with_gasteiger(lig_mol)
         from openmmforcefields.generators import GAFFTemplateGenerator
@@ -972,11 +1016,14 @@ def run_openmm_matrix_relax_and_energy(
             nonbondedCutoff=1.0 * unit.nanometers,
             constraints=app.HBonds,
         )
+        # The counterions belong to the matrix subsystem, so it is neutral and
+        # its PME energy carries no neutralising-background artefact.
         ligands_only_top = _merge_topology_protein_n_ligands(
             app.Topology(), lig_top, n_polymers
         )
+        add_ions_to_topology(ligands_only_top, ion_resname, ion_element, n_ions)
         ligands_only_top.setPeriodicBoxVectors(box_vec_omm)
-        ligands_ff = app.ForceField()
+        ligands_ff = app.ForceField(ION_FORCEFIELD) if n_ions else app.ForceField()
         gaff2 = GAFFTemplateGenerator(molecules=mol_off)
         ligands_ff.registerTemplateGenerator(gaff2.generator)
         ligands_sys = ligands_ff.createSystem(
@@ -1113,7 +1160,18 @@ def run_openmm_matrix_relax_and_energy(
             "n_protein_chains": len(list(protein_top.chains())),
             "random_seed": int(random_seed),
             "protonation_ph": PROTONATION_PH,
+            "polymer_chain_charge": int(chain_charge),
         }
+        if n_ions:
+            out["counterions"] = {
+                "residue": ion_resname,
+                "count": n_ions,
+                "neutralises": "polymer matrix",
+                "note": (
+                    "The matrix subsystem is neutral. The protein keeps its own net charge, "
+                    "as in every run."
+                ),
+            }
         if box_requested_nm is not None and float(box_requested_nm) < box_floor_nm:
             out["box_enlarged"] = {
                 "requested_nm": float(box_requested_nm),
@@ -1140,6 +1198,63 @@ def run_openmm_matrix_relax_and_energy(
         if n_frames_averaged is not None:
             out["n_frames_averaged"] = n_frames_averaged
         return out
+
+
+# Counterions for a polyelectrolyte matrix. AMBER14 monovalent ion parameters
+# ship with the water model file, not with amber14-all.xml.
+ION_FORCEFIELD = "amber14/tip3p.xml"
+NEUTRALIZE_ENV = "BIOLOGIX_AI_OPENMM_NEUTRALIZE"
+_ION_FOR_NEGATIVE = ("NA", "Na", 1)   # a negative matrix needs cations
+_ION_FOR_POSITIVE = ("CL", "Cl", -1)  # a positive matrix needs anions
+
+
+def repeat_unit_charge(psmiles: str) -> int:
+    """Net formal charge of one repeat unit, read before the oligomer is built."""
+    mol = Chem.MolFromSmiles(str(psmiles).strip().replace("[*]", "[H]"))
+    return 0 if mol is None else Chem.GetFormalCharge(mol)
+
+
+def neutralization_enabled() -> bool:
+    """Whether a charged polymer matrix gets counterions (default: yes)."""
+    return os.environ.get(NEUTRALIZE_ENV, "yes").strip().lower() not in ("0", "no", "false")
+
+
+def counterions_for_matrix(polymer_charge: int, n_polymers: int) -> Tuple[str, str, int]:
+    """``(residue name, element, count)`` neutralising *n_polymers* chains.
+
+    The ions neutralise the polymer matrix only. The protein keeps its own net
+    charge, exactly as in every neutral-polymer run, so existing results stay
+    comparable and nothing silently changes underneath them.
+    """
+    total = int(polymer_charge) * int(n_polymers)
+    if total == 0:
+        return "", "", 0
+    resname, element, _sign = _ION_FOR_NEGATIVE if total < 0 else _ION_FOR_POSITIVE
+    return resname, element, abs(total)
+
+
+def write_ion_pdb(path: str, resname: str, element: str) -> str:
+    """Write a one-atom PDB for Packmol, named as the AMBER14 template expects."""
+    from openmm import Vec3
+
+    topology = app.Topology()
+    chain = topology.addChain("I")
+    residue = topology.addResidue(resname, chain)
+    topology.addAtom(resname, app.Element.getBySymbol(element), residue)
+    with open(path, "w", encoding="utf-8") as handle:
+        app.PDBFile.writeFile(topology, [Vec3(0, 0, 0)] * 1, handle)
+    return path
+
+
+def add_ions_to_topology(topology: app.Topology, resname: str, element: str, count: int) -> None:
+    """Append *count* single-atom ion residues as their own chain."""
+    if count <= 0:
+        return
+    chain = topology.addChain("I")
+    ion_element = app.Element.getBySymbol(element)
+    for _ in range(count):
+        residue = topology.addResidue(resname, chain)
+        topology.addAtom(resname, ion_element, residue)
 
 
 def polymer_md_preflight(

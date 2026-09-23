@@ -31,7 +31,10 @@ which every MCP client receives, live in
 - `src/python/biologix_ai/compute/`: where OpenMM runs. That is either in the MCP
   process (`local`) or on the Modal `openmm_worker_cpu` / `openmm_worker_gpu`
   functions (`modal`).
-- `src/python/biologix_ai/simulation/`: the OpenMM matrix. Platform selection is in
+- `src/python/biologix_ai/simulation/`: the OpenMM matrix. A charged polymer is
+  packed with counterions (`counterions_for_matrix`) so the matrix subsystem is
+  neutral; a neutral polymer builds the identical force field it always did, so
+  do not load the ion file unconditionally. Platform selection is in
   `select_openmm_platform` (`BIOLOGIX_AI_OPENMM_PLATFORM=CPU|CUDA|OpenCL|auto`). GPU
   candidates run in a fresh interpreter (`matrix_subprocess.py`).
 - `modal_app.py`: the web function `serve` plus the CPU and GPU OpenMM workers.

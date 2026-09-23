@@ -92,9 +92,11 @@ the server stops the pipeline.
 - A named polymer needs a PSMILES you wrote. Give `material_name` the plain
   monomer or polymer name, with no descriptive suffix, so the cross-check is
   meaningful.
-- Zwitterions and inner salts (sulfobetaines, phosphorylcholines) are accepted.
-  A repeat unit with a *net* charge is not, because the box has no counterions:
-  pair the charge into an inner salt or use the neutral form.
+- Charged repeat units are supported. Zwitterions (sulfobetaines,
+  phosphorylcholines) need nothing. A polyelectrolyte (polyacrylate, a
+  quaternary ammonium) is packed with Na+ or Cl- counterions so the matrix is
+  neutral; the result reports them under `counterions`, and the report must say
+  they were added.
 
 ## Step 2 — Session
 

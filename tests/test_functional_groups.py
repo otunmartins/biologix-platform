@@ -134,6 +134,18 @@ class TestNameStructureConsistency:
 # ---------------------------------------------------------------------------
 # Layer 3: PubChem monomer lookup
 # ---------------------------------------------------------------------------
+def _require_pubchem(*results):
+    """Skip when PubChem itself is unavailable.
+
+    The lookup is advisory in the product: an outage marks the result
+    ``advisory`` and never stops a discovery run, so it must not turn the test
+    suite red either. When PubChem answers, every assertion below still runs.
+    """
+    for result in results:
+        if result.get("advisory"):
+            pytest.skip(f"PubChem unavailable: {result.get('error')}")
+
+
 class TestPubChemLookup:
     def test_strip_poly_prefix(self):
         assert _strip_poly_prefix("poly(glutaric acid)") == "glutaric acid"
@@ -164,6 +176,7 @@ class TestPubChemLookup:
         clear_pubchem_lookup_cache()
         r1 = lookup_monomer_pubchem("glutaric acid", "[*]OCC[*]")
         r2 = lookup_monomer_pubchem("glutaric acid", "[*]CC[*]")
+        _require_pubchem(r1, r2)
         assert r1["ok"] and r2["ok"]
         assert r1["pubchem_smiles"] == r2["pubchem_smiles"]
         assert r1.get("similarity") != r2.get("similarity")
@@ -173,6 +186,7 @@ class TestPubChemLookup:
         """Live PubChem query for glutaric acid monomer."""
         clear_pubchem_lookup_cache()
         r = lookup_monomer_pubchem("poly(glutaric acid)", "[*]C(=O)CCC([*])=O")
+        _require_pubchem(r)
         assert r["ok"] is True
         assert r["monomer_name"] == "glutaric acid"
         assert "C(=O)O" in r["pubchem_smiles"] or "C(O)=O" in r["pubchem_smiles"]
@@ -184,12 +198,14 @@ class TestPubChemLookup:
         clear_pubchem_lookup_cache()
         r_bad = lookup_monomer_pubchem("poly(glutaric acid)", "[*]C(=O)CCC([*])=O")
         r_good = lookup_monomer_pubchem("poly(glutaric acid)", "[*]OC(=O)CCC(=O)O[*]")
+        _require_pubchem(r_bad, r_good)
         assert r_bad["ok"] and r_good["ok"]
         assert r_good["similarity"] > r_bad["similarity"]
 
     @pytest.mark.slow
     def test_lookup_succinic_acid(self):
         r = lookup_monomer_pubchem("poly(succinic acid)")
+        _require_pubchem(r)
         assert r["ok"] is True
         assert r["pubchem_cid"] is not None
 
