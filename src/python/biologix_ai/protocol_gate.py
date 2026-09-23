@@ -44,6 +44,8 @@ MAX_OPENMM_CANDIDATES = 3
 MAX_RETRO_TARGETS = 3
 MAX_RESOLVE_RETRIES = 2
 MAX_RETRO_RETRIES = 2
+MAX_TOOL_RETRIES = 3
+FAILURE_SECTION = "When something goes wrong"
 AWAIT_TOOL = "await_biologix_job"
 STATUS_TOOL = "biologix_runtime_status"
 
@@ -253,6 +255,8 @@ class ProtocolState:
     retro_disposition: Dict[str, str] = field(default_factory=dict)
     md_ready: Dict[str, bool] = field(default_factory=dict)
     compute: str = ""
+    failures: Dict[str, int] = field(default_factory=dict)
+    last_error: str = ""
 
     @classmethod
     def from_dict(cls, data: Mapping[str, Any]) -> "ProtocolState":
@@ -463,12 +467,9 @@ class ProtocolGate:
             return self._checkpoint_failure(tool, arguments, state)
 
         if tool == "mine_literature":
-            iteration = _as_int(arguments.get("iteration"), 1)
-            if iteration != state.iteration:
-                return (
-                    f"This is iteration {state.iteration}; pass iteration={state.iteration}. "
-                    "Finish it before starting another."
-                )
+            # Always allowed inside an iteration: the user may redirect the search
+            # at any time, and re-mining adds candidates without discarding the
+            # work already done. Only the checkpoint requires iteration N+1.
             return ""
         if tool == "mutate_psmiles":
             if state.iteration < 2:
@@ -680,8 +681,9 @@ class ProtocolGate:
             if state.at_checkpoint() and tool in ("mine_literature", "mutate_psmiles"):
                 state = state.next_iteration()
             self._apply(tool, arguments, payload, result, state)
+            self._record_recoverable(tool, payload, result, state)
         save_state(state)
-        return _attach(result, payload, self.envelope(state))
+        return _attach(result, payload, self.envelope(state, after=tool))
 
     def _record_bootstrap(self, arguments: Mapping[str, Any], payload: Any) -> Dict[str, Any]:
         client = self.client()
@@ -730,7 +732,7 @@ class ProtocolGate:
             "user_stop_allowed": False,
             "resolve_retries_left": MAX_RESOLVE_RETRIES + 1 - client.resolve_failures,
             "rule": _RULE_RESOLVE_RETRY,
-            "step_instructions": section("Failure policy"),
+            "step_instructions": section(FAILURE_SECTION),
         }
 
     def _record_session_start(self, payload: Any) -> Dict[str, Any]:
@@ -759,11 +761,14 @@ class ProtocolGate:
         result: str,
         state: ProtocolState,
     ) -> None:
-        # Retrosynthesis attempts count even when the route fails: the failure
-        # detail is the scientific result that CLAUDE.md asks the report to show.
+        # A failed route still counts as an attempt: the failure detail is the
+        # scientific result the report has to show.
         if tool == "submit_retro_extractions":
             target = self._retro_target(arguments, state)
-            if target:
+            # A rejected submission wrote nothing, so it is not an attempt: the
+            # model fixes the extractions and submits again. A failed *route*
+            # (plan_retrosynthesis) is a scientific result and does count.
+            if target and _succeeded(tool, payload, result):
                 if target not in state.retro_submitted:
                     state.retro_submitted.append(target)
                 state.retro_submissions[target] = state.retro_submissions.get(target, 0) + 1
@@ -815,6 +820,29 @@ class ProtocolGate:
         elif tool in _REPORT_SEQUENCE:
             state.mark(tool)
 
+    def _record_recoverable(
+        self, tool: str, payload: Any, result: str, state: ProtocolState
+    ) -> None:
+        """Count a scientific or input failure that the model can fix and retry.
+
+        These are not infrastructure failures: an unparameterizable PSMILES, an
+        empty extraction set, a route the graph cannot close. The model should
+        correct the input and call the tool again; only a tool that keeps failing
+        stops the pipeline.
+        """
+        if _succeeded(tool, payload, result):
+            state.failures.pop(tool, None)
+            state.last_error = ""
+            return
+        attempts = state.failures.get(tool, 0) + 1
+        state.failures[tool] = attempts
+        state.last_error = _failure_text(payload, result)
+        if attempts > MAX_TOOL_RETRIES:
+            state.blocked_tool = tool
+            state.blocked_error = (
+                f"{tool} failed {attempts} times; the last error was: {state.last_error}"
+            )
+
     def _apply_stage_record(self, arguments: Mapping[str, Any], state: ProtocolState) -> None:
         stage = _clean(arguments.get("stage")).lower()
         candidate = _clean(arguments.get("candidate_psmiles"))
@@ -857,7 +885,12 @@ class ProtocolGate:
                 "rule": _RULE_CONTINUE,
                 "step_instructions": step_instructions(next_tool),
             }
+        retry_of = after if after and state.failures.get(after) else ""
         stage, next_tool, next_arguments, hint = _next_step(state)
+        if retry_of and not state.blocked_tool:
+            # The step did not advance, so _next_step still points at it. Say so
+            # explicitly instead of letting the model read a bare error and stop.
+            next_tool, next_arguments = retry_of, dict(arguments_for_retry(retry_of, next_arguments))
         if next_tool and "run_dir" not in next_arguments:
             next_arguments = {**next_arguments, "run_dir": state.session_dir}
         envelope: Dict[str, Any] = {
@@ -873,7 +906,7 @@ class ProtocolGate:
             envelope["blocked_tool"] = state.blocked_tool
             envelope["blocked_error"] = state.blocked_error
             envelope["rule"] = _RULE_BLOCKED
-            envelope["step_instructions"] = section("Failure policy")
+            envelope["step_instructions"] = section(FAILURE_SECTION)
         elif stage == "checkpoint":
             envelope["rule"] = (
                 f"Iteration {state.iteration} is complete. Present the Step 7 checkpoint with "
@@ -883,11 +916,30 @@ class ProtocolGate:
             )
         else:
             envelope["rule"] = f"{_RULE_CONTINUE} {hint}".strip()
+        if retry_of and not state.blocked_tool:
+            attempts = state.failures[retry_of]
+            envelope["recoverable_failure"] = {
+                "tool": retry_of,
+                "attempt": attempts,
+                "retries_left": MAX_TOOL_RETRIES + 1 - attempts,
+                "error": state.last_error,
+            }
+            envelope["rule"] = (
+                f"{retry_of} did not succeed: {state.last_error} This is not an infrastructure "
+                "failure and not a reason to stop. Fix what you sent (a different PSMILES, "
+                "complete extractions, a registered precursor, another candidate) and call it "
+                f"again. {MAX_TOOL_RETRIES + 1 - attempts} attempt(s) left before the pipeline stops."
+            )
         if stage == "checkpoint":
             envelope["step_instructions"] = section("Step 7")
         elif next_tool:
             envelope["step_instructions"] = step_instructions(next_tool)
         return envelope
+
+
+def arguments_for_retry(tool: str, suggested: Dict[str, Any]) -> Dict[str, Any]:
+    """Arguments to suggest when *tool* is retried after a recoverable failure."""
+    return suggested if suggested else {}
 
 
 def _resolve_blocked_envelope(client: ClientState) -> Dict[str, Any]:
@@ -905,7 +957,7 @@ def _resolve_blocked_envelope(client: ClientState) -> Dict[str, Any]:
             "the user for a PDB ID with chains, a UniProt accession, or a sequence, then call "
             "begin_biologix_discovery with it."
         ),
-        "step_instructions": section("Failure policy"),
+        "step_instructions": section(FAILURE_SECTION),
     }
 
 
@@ -1049,6 +1101,15 @@ def _blocking_reactants(payload: Any) -> List[str]:
     if blocking is None and isinstance(validation, dict):
         blocking = validation.get("blocking_reactants")
     return [str(b) for b in blocking or []]
+
+
+def _failure_text(payload: Any, result: str) -> str:
+    """Short reason a tool call failed, for the retry rule."""
+    if isinstance(payload, dict):
+        for key in ("error", "reason", "hint"):
+            if payload.get(key):
+                return str(payload[key])[:300]
+    return str(result).strip()[:300]
 
 
 def _openmm_disposition(payload: Any) -> str:

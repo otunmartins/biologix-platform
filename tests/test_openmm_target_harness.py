@@ -115,3 +115,32 @@ def test_polymer_preflight_flags_unparameterizable_chemistry() -> None:
     assert ok["md_ready"] is True and ok["n_atoms_per_chain"] > 10
     bad = polymer_md_preflight("not-a-psmiles", n_repeats=2)
     assert bad["md_ready"] is False and bad["stage"] == "oligomer_build"
+
+
+def test_zwitterions_reach_the_simulation_but_net_charged_units_do_not() -> None:
+    """A sulfobetaine is net neutral: GAFF parameterizes it and PME stays neutral.
+
+    The old rule rejected every formal charge, which excluded sulfobetaines,
+    phosphorylcholines and other zwitterionic stabilizers from the platform.
+    """
+    pytest.importorskip("rdkit")
+    from biologix_ai.material_mappings import prescreen_psmiles_for_md
+
+    sulfobetaine = "[*]CC([*])c1ccc(C[N+](C)(C)CCCS(=O)(=O)[O-])cc1"
+    assert prescreen_psmiles_for_md(sulfobetaine) == {"ok": True}
+    assert prescreen_psmiles_for_md("[*]CC([*])C(=O)[O-]")["ok"] is False
+    reason = prescreen_psmiles_for_md("[*]CC([*])C(=O)[O-]")["error"]
+    assert "net charge" in reason and "inner salt" in reason
+    assert prescreen_psmiles_for_md("[*]CC([*])O") == {"ok": True}
+
+
+def test_preflight_and_prescreen_agree_on_a_zwitterion() -> None:
+    """md_ready in screening must not promise what the simulation then refuses."""
+    pytest.importorskip("openmmforcefields")
+    from biologix_ai.material_mappings import prescreen_psmiles_for_md
+    from biologix_ai.simulation.openmm_complex import polymer_md_preflight
+
+    sulfobetaine = "[*]CC([*])c1ccc(C[N+](C)(C)CCCS(=O)(=O)[O-])cc1"
+    preflight = polymer_md_preflight(sulfobetaine, n_repeats=2)
+    assert preflight["md_ready"] is True and preflight["net_charge"] == 0
+    assert prescreen_psmiles_for_md(sulfobetaine)["ok"] is True

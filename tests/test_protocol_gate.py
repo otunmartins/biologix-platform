@@ -154,8 +154,14 @@ def _build_fake_server(session_dir: Path, config: Dict[str, Any]) -> FastMCP:
     @mcp.tool()
     def submit_retro_extractions(run_dir: str, material_name: str, extractions: str, target: str = "") -> str:
         _mark("submit_retro_extractions")
+        if config.get("submit_fails"):
+            return json.dumps({"ok": False, "error": "extractions must contain at least one paper entry"})
         return json.dumps(
-            {"ok": True, "material_name": material_name, "blocking_reactants": config.get("blocking", [])}
+            {
+                "ok": True,
+                "material_name": material_name,
+                "validation": {"blocking_reactants": config.get("blocking", [])},
+            }
         )
 
     @mcp.tool()
@@ -481,8 +487,10 @@ def test_next_iteration_opens_only_from_the_checkpoint(harness) -> None:
     session = str(harness["session"])
     _through_screen(call, harness["session"], [PASS_A])
 
+    # Re-mining mid-iteration is allowed (the user may redirect) but does not
+    # open iteration 2: that still requires the finished checkpoint.
     early = call("mine_literature", query="insulin", iteration=2)
-    assert early["error"] == PROTOCOL_ORDER_ERROR
+    assert _protocol(early)["iteration"] == 1
     early_mutation = call("mutate_psmiles", library_size=3)
     assert early_mutation["error"] == PROTOCOL_ORDER_ERROR
 
@@ -652,3 +660,71 @@ def test_order_refusals_say_they_are_not_failures(harness) -> None:
     refused = call("screen_candidate_library", psmiles_list=PASS_A, run_dir=str(harness["session"]))
     assert refused["error"] == PROTOCOL_ORDER_ERROR
     assert refused["not_a_failure"] is True and "not a failure" in refused["rule"]
+
+
+# -- persistence: recoverable failures, redirection, re-mining ------------------
+
+
+def test_a_tool_the_model_called_wrongly_is_retried_not_fatal(harness) -> None:
+    call, config = harness["call"], harness["config"]
+    session = str(harness["session"])
+    config["blocking"] = []
+    _through_screen(call, harness["session"], [PASS_A])
+    call("openmm_evaluate_psmiles", psmiles_list=PASS_A)
+    call("save_pipeline_stage", candidate_psmiles=PASS_A, stage="openmm", disposition="pass")
+    call("prepare_retrosynthesis", target=PASS_A, run_dir=session)
+
+    config["submit_fails"] = True
+    first = call(
+        "submit_retro_extractions", run_dir=session, material_name="poly_9", extractions="", target=PASS_A
+    )
+    envelope = _protocol(first)
+    assert envelope["stage"] != "blocked"
+    assert envelope["user_stop_allowed"] is False
+    assert envelope["next_required_tool"] == "submit_retro_extractions"
+    assert envelope["recoverable_failure"]["retries_left"] == 3
+    assert "not an infrastructure failure" in envelope["rule"]
+
+    # A rejected submission is not an attempt: the retry still goes to submit.
+    config["submit_fails"] = False
+    fixed = call(
+        "submit_retro_extractions", run_dir=session, material_name="poly_9", extractions="{}", target=PASS_A
+    )
+    assert _protocol(fixed)["next_required_tool"] == "plan_retrosynthesis"
+    assert "recoverable_failure" not in _protocol(fixed)
+
+
+def test_a_tool_that_keeps_failing_finally_stops_the_run(harness) -> None:
+    call, config = harness["call"], harness["config"]
+    session = str(harness["session"])
+    _through_screen(call, harness["session"], [PASS_A])
+    call("openmm_evaluate_psmiles", psmiles_list=PASS_A)
+    call("save_pipeline_stage", candidate_psmiles=PASS_A, stage="openmm", disposition="pass")
+    call("prepare_retrosynthesis", target=PASS_A, run_dir=session)
+    config["submit_fails"] = True
+    for _ in range(4):
+        last = call(
+            "submit_retro_extractions", run_dir=session, material_name="poly_9", extractions="", target=PASS_A
+        )
+    envelope = _protocol(last)
+    assert envelope["stage"] == "blocked"
+    assert envelope["user_stop_allowed"] is True
+    assert "failed 4 times" in envelope["blocked_error"]
+
+
+def test_the_user_can_redirect_mid_iteration_without_losing_the_session(harness) -> None:
+    call = harness["call"]
+    session = str(harness["session"])
+    _through_screen(call, harness["session"], [PASS_A])
+    call("openmm_evaluate_psmiles", psmiles_list=PASS_A)
+    call("save_pipeline_stage", candidate_psmiles=PASS_A, stage="openmm", disposition="pass")
+
+    # "Actually, look at something else" — mid-iteration, any iteration number.
+    again = call("mine_literature", query="different polymer family", iteration=2, run_dir=session)
+    assert not (isinstance(again, dict) and again.get("error") == PROTOCOL_ORDER_ERROR)
+    added = call("validate_psmiles", psmiles=PASS_B, material_name="second idea")
+    assert added.get("error") != PROTOCOL_ORDER_ERROR
+    screened = call("screen_candidate_library", psmiles_list=f"{PASS_A},{PASS_B}", run_dir=session)
+    assert _protocol(screened)["iteration"] == 1  # same session, work kept
+    state = json.loads((harness["session"] / STATE_FILENAME).read_text())
+    assert PASS_A in state["openmm_runs"] and PASS_B in state["validated"]

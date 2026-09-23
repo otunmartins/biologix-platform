@@ -221,25 +221,25 @@ class TestMCPValidatePSMILES:
             pytest.skip(f"MCP dependencies unavailable: {e}")
 
     def test_fg_always_present(self):
-        out = json.loads(self.mod.validate_psmiles("[*]OCC[*]"))
+        out = json.loads(self.mod.validate_psmiles(None, "[*]OCC[*]"))
         assert out.get("valid") is True
         assert "functional_groups" in out
         assert out["functional_groups"]["ether"] >= 1
 
     def test_name_consistency_present_when_name_given(self):
         out = json.loads(
-            self.mod.validate_psmiles("[*]C(=O)CCC([*])=O", material_name="poly(glutaric acid)")
+            self.mod.validate_psmiles(None, "[*]C(=O)CCC([*])=O", material_name="poly(glutaric acid)")
         )
         assert "name_consistency" in out
         assert out["name_consistency"]["consistent"] is False
 
     def test_pubchem_lookup_present_when_name_given(self):
         out = json.loads(
-            self.mod.validate_psmiles("[*]OCC[*]", material_name="PEG")
+            self.mod.validate_psmiles(None, "[*]OCC[*]", material_name="PEG")
         )
         assert "pubchem_lookup" in out
 
     def test_no_name_no_consistency(self):
-        out = json.loads(self.mod.validate_psmiles("[*]CC[*]"))
+        out = json.loads(self.mod.validate_psmiles(None, "[*]CC[*]"))
         assert "name_consistency" not in out
         assert "pubchem_lookup" not in out

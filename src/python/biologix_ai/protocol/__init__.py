@@ -57,7 +57,7 @@ def load_protocol() -> str:
 
 @lru_cache(maxsize=None)
 def _sections() -> Dict[str, str]:
-    """``{"Step 4": "## Step 4 — Screen ...", "Failure policy": ...}`` keyed by heading prefix."""
+    """``{"Step 4": "## Step 4 — Screen ...", "Reporting rules": ...}`` keyed by heading prefix."""
     out: Dict[str, str] = {}
     heading, lines, in_fence = "", [], False
     for line in load_protocol().splitlines():
@@ -74,7 +74,7 @@ def _sections() -> Dict[str, str]:
 
 
 def section(key: str) -> str:
-    """One protocol section by heading prefix (``"Step 5"``, ``"Failure policy"``)."""
+    """One protocol section by heading prefix (``"Step 5"``, ``"When something goes wrong"``)."""
     for heading, text in _sections().items():
         if heading.startswith(key):
             return _clip(text)

@@ -3,6 +3,38 @@
 import pytest
 
 
+def test_npt_integrator_and_barostat_use_the_caller_seed():
+    """NPT energies are comparable only when Langevin and the barostat share the run seed."""
+    openmm = pytest.importorskip("openmm")
+    import openmm.unit as unit
+
+    from biologix_ai.simulation.openmm_complex import seeded_barostat, seeded_langevin
+
+    integrator = seeded_langevin(300.0, 1.0, 0.002, 42)
+    barostat = seeded_barostat(1.0, 300.0, 25, 42)
+    assert isinstance(integrator, openmm.LangevinIntegrator)
+    assert integrator.getRandomNumberSeed() == 42
+    assert barostat.getDefaultTemperature() == 300.0 * unit.kelvin
+    assert barostat.getRandomNumberSeed() == 42
+
+
+def test_matrix_npt_is_seeded_and_records_conditions():
+    """The matrix NPT leg must use the seeded builders and report seed and pH."""
+    import inspect
+
+    from biologix_ai.simulation.openmm_complex import (
+        PROTONATION_PH,
+        run_openmm_matrix_relax_and_energy,
+    )
+
+    source = inspect.getsource(run_openmm_matrix_relax_and_energy)
+    assert "seeded_langevin" in source
+    assert "seeded_barostat" in source
+    assert '"random_seed": int(random_seed)' in source
+    assert "protonation_ph" in source
+    assert PROTONATION_PH == 7.0
+
+
 def test_parse_ssbond_from_pdb():
     """Parse SSBOND lines from 4F1C; expect 6 total, 3 for chains A+B."""
     from biologix_ai.simulation.openmm_complex import parse_ssbond_pairs

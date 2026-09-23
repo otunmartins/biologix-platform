@@ -20,6 +20,18 @@ from biologix_ai.discovery_world import load_world, world_path_for_session, ensu
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
 
+def test_force_field_check_uses_the_simulation_ph():
+    import inspect
+
+    from biologix_ai.simulation.openmm_complex import PROTONATION_PH
+
+    source = inspect.getsource(br.force_field_check)
+    assert "PROTONATION_PH" in source
+    assert "pH=PROTONATION_PH" in source
+    target = br.BiologicTarget(query="insulin", protonation_ph=PROTONATION_PH)
+    assert target.protonation_ph == 7.0
+
+
 def test_lookup_pdb_id_common_names():
     assert br.lookup_pdb_id("insulin") == "4F1C"
     assert br.lookup_pdb_id("  Adalimumab ") == "3WD5"

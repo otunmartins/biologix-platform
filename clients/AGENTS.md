@@ -26,9 +26,6 @@ those results.
 - A long tool returns `status: "running"` with a `job_id`. Call
   `await_biologix_job(job_id)` until the result arrives. That is not a failure
   and not a checkpoint; do not summarize or estimate while you wait.
-- `PROTOCOL_ORDER`, `JOB_RUNNING`, and `MCP_BUSY` are not failures. They name
-  the tool to call instead (`required_next_tool` or `next_required_tool`): call
-  it and continue without stopping.
 - `biologix_runtime_status` reports the server's dependencies and compute. You
   may call it at any time; it never changes the pipeline.
 
@@ -50,17 +47,52 @@ Biologix tool.
 The workflow is human-in-the-loop: run Steps 2–6 without pausing between
 successful calls, then always stop at Step 7 and wait for the user.
 
-## Failure policy
+## When something goes wrong
 
-Apart from the three redirects above, if a tool reports an error, a timeout, a
-missing dependency, or `abort: true`, stop the pipeline. Show the user the exact
-server error and the last completed stage. Never replace a failed scientific calculation with an estimate or a
-workaround, and never invent a local install or command-line substitute.
+Read which of three kinds it is. Only the third one ends the run.
 
-One exception is structure resolution. If `resolve_biologic_target` fails, find
+**1. A redirect.** `PROTOCOL_ORDER`, `JOB_RUNNING`, `MCP_BUSY`, and a result with
+`status: "running"`. Nothing failed. Call the tool named in
+`required_next_tool` or `next_required_tool` and carry on.
+
+**2. Something you sent did not work.** A PSMILES that will not parameterize, a
+screen row that fails, extractions with no paper entry, a route the graph cannot
+close, a candidate rejected before simulation. The envelope marks these
+`recoverable_failure` and says how many attempts are left. Do not stop and do
+not ask the user. Fix the input and call the same tool again: write a different
+repeat unit, complete the extractions, register the precursor, or move to
+another candidate. Keep going until the work is done or the attempts run out.
+
+**3. The server or a dependency broke.** `abort: true`, a timeout, a missing
+dependency, a traceback, or the envelope stage `blocked`. Stop, show the user
+the exact error and the last completed stage. Never replace a failed scientific
+calculation with an estimate, and never invent a local install or a
+command-line substitute.
+
+Fields *inside* a result are not tool failures. `pubchem_lookup`, name
+cross-checks and similar carry `advisory: true`: they never stop the pipeline,
+and a PubChem miss says nothing about whether a polymer is valid or novel.
+
+Structure resolution has its own rule. If `resolve_biologic_target` fails, find
 a more specific form yourself — a PDB ID with chains, a UniProt accession, or a
-sequence — in the literature or your own knowledge, and call it again without
-asking the user. After two failed retries the server stops the pipeline.
+sequence — and call it again without asking the user. After two failed retries
+the server stops the pipeline.
+
+## Being useful
+
+- The user may redirect at any time. `mine_literature` can be called again
+  within the same iteration: do that, add the new candidates, and keep the work
+  already done. Do not start a new session and do not discard the session's
+  earlier results.
+- When a candidate is rejected, say why in one line and try a different
+  structure. Six candidates is the cap, not the target; one that survives to a
+  measured result is worth more than six that stop at validation.
+- A named polymer needs a PSMILES you wrote. Give `material_name` the plain
+  monomer or polymer name, with no descriptive suffix, so the cross-check is
+  meaningful.
+- Zwitterions and inner salts (sulfobetaines, phosphorylcholines) are accepted.
+  A repeat unit with a *net* charge is not, because the box has no counterions:
+  pair the charge into an inner salt or use the neutral form.
 
 ## Step 2 — Session
 

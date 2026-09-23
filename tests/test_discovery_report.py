@@ -265,4 +265,34 @@ def test_summary_report_discloses_target_structure(tmp_path) -> None:
     assert "## Target structure" in text
     assert "`4ZGM:B`" in text and "32M x1" in text and "AIB B8 -> ALA" in text
     assert "HIS-AIB-GLU" in text
+    assert "pH 7.0" in text
     assert target_structure_lines(tmp_path / "missing") == []
+
+
+def test_report_finds_psmiles_when_high_performers_are_names() -> None:
+    """The ChatGPT run saved high_performers=["PVA","PVP"] and the report failed."""
+    from biologix_ai.discovery_report import collect_psmiles_entries_from_feedback
+
+    feedback = {
+        "high_performers": ["PVA", "PVP"],
+        "property_analysis": {
+            "PVA": {"psmiles": "[*]CC([*])O", "interaction_energy_kj_mol": -205.4},
+            "PVP": {"psmiles": "[*]CC([*])N1CCCC1=O", "interaction_energy_kj_mol": -727.3},
+        },
+    }
+    assert collect_psmiles_entries_from_feedback(feedback) == [
+        ("PVA", "[*]CC([*])O"),
+        ("PVP", "[*]CC([*])N1CCCC1=O"),
+    ]
+
+
+def test_report_still_reads_psmiles_and_dicts_directly() -> None:
+    from biologix_ai.discovery_report import collect_psmiles_entries_from_feedback
+
+    assert collect_psmiles_entries_from_feedback({"high_performers": ["[*]CC[*]"]}) == [
+        ("[*]CC[*]", "[*]CC[*]")
+    ]
+    assert collect_psmiles_entries_from_feedback(
+        {"high_performers": [{"name": "PEG", "psmiles": "[*]OCC[*]"}]}
+    ) == [("PEG", "[*]OCC[*]")]
+    assert collect_psmiles_entries_from_feedback({"high_performers": ["Unknown"]}) == []

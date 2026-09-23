@@ -7,6 +7,8 @@ import os
 import sys
 from pathlib import Path
 
+import pytest
+
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src", "python"))
 
@@ -116,6 +118,17 @@ class TestGetCandidateProfile:
         assert len(lines) >= 1
 
 
+def _admet_available() -> bool:
+    """ADMET-AI lives in the separate biologix-admet env, present only in the image."""
+    try:
+        from biologix_ai.services.toxicity_service import _is_admet_available
+
+        return bool(_is_admet_available())
+    except Exception:
+        return False
+
+
+@pytest.mark.skipif(not _admet_available(), reason="ADMET-AI env not installed (image-only)")
 class TestScreenCandidateLibrary:
     def setup_method(self):
         self.server = _import_mcp_server()
@@ -205,6 +218,7 @@ class TestPipelineAuditMCPTools:
 
     def test_save_and_retrieve_audit(self, tmp_path):
         self.server.save_pipeline_stage(
+            None,
             candidate_psmiles="[*]OCC[*]",
             stage="admet",
             disposition="pass",

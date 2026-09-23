@@ -560,6 +560,11 @@ def pubchem_timeout_s() -> float:
     return max(1.0, val)
 
 
+ADVISORY_NOTE = (
+    "Advisory cross-check only: it does not affect validity and never stops the pipeline."
+)
+
+
 def lookup_monomer_pubchem(
     material_name: str,
     psmiles: Optional[str] = None,
@@ -608,12 +613,24 @@ def lookup_monomer_pubchem(
     try:
         resp = _req.get(url, timeout=(connect_t, read_t))
     except Exception as e:
-        return {"ok": False, "error": f"PubChem request failed: {e}", "monomer_name": monomer}
+        return {
+            "ok": False,
+            "advisory": True,
+            "error": f"PubChem request failed: {e}",
+            "note": ADVISORY_NOTE,
+            "monomer_name": monomer,
+        }
 
     if resp.status_code == 404:
         err: Dict[str, Any] = {
             "ok": False,
+            "advisory": True,
             "error": f"PubChem has no compound named '{monomer}'",
+            "note": (
+                "PubChem indexes small molecules under common names. A miss says nothing about "
+                "whether the polymer is valid or novel, and never stops the pipeline. "
+                "Pass a plain monomer name (no descriptive suffix) for a useful cross-check."
+            ),
             "monomer_name": monomer,
         }
         _pubchem_cache_set(cache_key, dict(err))
@@ -621,14 +638,22 @@ def lookup_monomer_pubchem(
     if resp.status_code != 200:
         return {
             "ok": False,
+            "advisory": True,
             "error": f"PubChem returned HTTP {resp.status_code}",
+            "note": ADVISORY_NOTE,
             "monomer_name": monomer,
         }
 
     try:
         props = resp.json()["PropertyTable"]["Properties"][0]
     except (KeyError, IndexError, ValueError) as e:
-        return {"ok": False, "error": f"Unexpected PubChem response: {e}", "monomer_name": monomer}
+        return {
+            "ok": False,
+            "advisory": True,
+            "error": f"Unexpected PubChem response: {e}",
+            "note": ADVISORY_NOTE,
+            "monomer_name": monomer,
+        }
 
     ref_smiles = props.get("CanonicalSMILES") or props.get("ConnectivitySMILES") or ""
     result: Dict[str, Any] = {
@@ -1065,10 +1090,25 @@ def prescreen_psmiles_for_md(psmiles: str) -> Dict[str, Any]:
     if n_radicals > 0:
         return {"ok": False, "error": f"H-capped form has {n_radicals} radical electron(s); OpenFF will reject", "stage": "prescreen"}
 
-    charged = [(a.GetSymbol(), a.GetFormalCharge()) for a in mol.GetAtoms() if a.GetFormalCharge() != 0]
-    if charged:
+    # A zwitterion / inner salt (sulfobetaine, phosphorylcholine, amino acid
+    # side chain) carries formal charges but is net neutral: GAFF and Gasteiger
+    # handle it, and the PME cell stays neutral. Only a net charge is a real
+    # problem, because the box has no counterions and PME would then apply a
+    # uniform neutralising background to every energy.
+    net_charge = Chem.GetFormalCharge(mol)
+    if net_charge != 0:
+        charged = [(a.GetSymbol(), a.GetFormalCharge()) for a in mol.GetAtoms() if a.GetFormalCharge() != 0]
         symbols = ", ".join(f"{s}({c:+d})" for s, c in charged[:5])
-        return {"ok": False, "error": f"Formally charged atoms ({symbols}); GAFF/Gasteiger may fail", "stage": "prescreen"}
+        return {
+            "ok": False,
+            "error": (
+                f"Repeat unit has net charge {net_charge:+d} ({symbols}). The matrix box has no "
+                "counterions, so PME energies would carry a neutralising-background artefact. "
+                "Use the neutral acid/base form, or pair the charge into an inner salt "
+                "(zwitterion), which is accepted."
+            ),
+            "stage": "prescreen",
+        }
 
     n_heavy = mol.GetNumHeavyAtoms()
     if n_heavy > 200:

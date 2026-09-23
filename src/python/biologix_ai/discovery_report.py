@@ -31,12 +31,37 @@ def _load_iteration_files(session_dir: Path) -> List[Path]:
     return sorted(files, key=lambda p: p.name)
 
 
+def _psmiles_by_name(feedback: Dict[str, Any]) -> Dict[str, str]:
+    """``{label: psmiles}`` from feedback sections that pair a name with a structure."""
+    found: Dict[str, str] = {}
+    for key in ("property_analysis", "candidates", "top_candidates", "materials"):
+        section = feedback.get(key)
+        entries: List[Tuple[str, Any]] = []
+        if isinstance(section, dict):
+            entries = list(section.items())
+        elif isinstance(section, list):
+            entries = [
+                (str(item.get("name") or item.get("material_name") or "candidate"), item)
+                for item in section
+                if isinstance(item, dict)
+            ]
+        for label, value in entries:
+            if not isinstance(value, dict):
+                continue
+            psm = value.get("psmiles") or value.get("chemical_structure")
+            if psm and "[*]" in str(psm):
+                found.setdefault(str(label), str(psm).strip())
+    return found
+
+
 def collect_psmiles_entries_from_feedback(feedback: Any) -> List[Tuple[str, str]]:
     """
     Extract (label, psmiles) pairs from a feedback dict.
 
-    Supports high_performers as list of dicts (name, psmiles) or list of strings,
-    and high_performer_psmiles as list of strings.
+    Accepts every shape the agent actually writes: ``high_performers`` as PSMILES
+    strings, as names, or as dicts; ``high_performer_psmiles``; and names paired
+    with a PSMILES inside ``property_analysis`` / ``candidates``. A run whose
+    high performers are named ("PVA", "PVP") must still produce a report.
     """
     out: List[Tuple[str, str]] = []
     if not isinstance(feedback, dict):
@@ -59,6 +84,14 @@ def collect_psmiles_entries_from_feedback(feedback: Any) -> List[Tuple[str, str]
         for psm in hpp:
             if isinstance(psm, str) and "[*]" in psm:
                 out.append((psm[:48], psm.strip()))
+
+    # Names resolved through a PSMILES recorded elsewhere in the feedback.
+    named = _psmiles_by_name(feedback)
+    for item in hp if isinstance(hp, list) else []:
+        if isinstance(item, str) and "[*]" not in item and item.strip() in named:
+            out.append((item.strip(), named[item.strip()]))
+    if not out:
+        out.extend((name, psm) for name, psm in named.items())
 
     # Dedupe by psmiles, keep first label
     seen: set[str] = set()

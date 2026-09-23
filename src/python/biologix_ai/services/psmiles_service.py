@@ -42,7 +42,14 @@ def validate_psmiles(
         try:
             out["pubchem_lookup"] = lookup_monomer_pubchem(name, psm, timeout=5.0)
         except Exception as exc:
-            out["pubchem_lookup"] = {"ok": False, "error": str(exc)}
+            from biologix_ai.material_mappings import ADVISORY_NOTE
+
+            out["pubchem_lookup"] = {
+                "ok": False,
+                "advisory": True,
+                "error": str(exc),
+                "note": ADVISORY_NOTE,
+            }
 
     if crosscheck_web and name:
         try:
