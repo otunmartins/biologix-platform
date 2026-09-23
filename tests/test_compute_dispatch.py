@@ -126,11 +126,23 @@ def test_run_conditions_reach_the_agent_in_candidate_outcomes(monkeypatch) -> No
 
 
 class _FakeModal:
-    """Just enough of `modal` to exercise the spawn-and-poll loop."""
+    """Just enough of `modal` to exercise the spawn-and-poll loop.
+
+    The exception behaviour mirrors what the real client does, observed by
+    spawning a worker on Modal and polling it with ``timeout=0`` (modal 1.5.5):
+    a poll that is not ready raises Python's *builtin* ``TimeoutError``, and
+    ``modal.exception.TimeoutError`` / ``FunctionTimeoutError`` are separate
+    ``modal.exception.Error`` subclasses, not builtin ``TimeoutError``s. An
+    earlier version of this fake assumed the opposite and let a production
+    failure through, so do not "simplify" it.
+    """
 
     class exception:  # noqa: N801 — mirrors modal.exception
-        class TimeoutError(Exception):
-            """Modal's 'not ready yet' poll timeout (the base class)."""
+        class Error(Exception):
+            pass
+
+        class TimeoutError(Error):
+            """Modal's own TimeoutError: not the builtin, and not a poll timeout."""
 
         class FunctionTimeoutError(TimeoutError):
             """The worker itself timed out: a real failure."""
@@ -179,12 +191,12 @@ def _no_sleep(monkeypatch):
 
 def test_worker_stages_are_relayed_to_the_running_job(monkeypatch) -> None:
     _no_sleep(monkeypatch)
-    not_ready = _FakeModal.exception.TimeoutError
+    not_ready = TimeoutError  # what a real poll raises when the worker is still running
     fake = _FakeModal(
         gets=[not_ready(), not_ready(), not_ready(), {"result": {"ok": True}, "files": {}}],
         dict_values=[
-            {"stage": "packmol", "message": "packing 8 polymer chains"},
-            {"stage": "packmol", "message": "packing 8 polymer chains"},   # unchanged: not repeated
+            {"stage": "packmol", "message": "packing 8 polymer chains", "at": 1.0},
+            {"stage": "packmol", "message": "packing 8 polymer chains", "at": 4.0},  # same stage, new timestamp
             {"stage": "minimize", "message": "LocalEnergyMinimizer"},
         ],
     )
@@ -200,7 +212,7 @@ def test_worker_stages_are_relayed_to_the_running_job(monkeypatch) -> None:
 
 
 def test_a_worker_that_times_out_is_a_failure_not_a_reason_to_keep_polling(monkeypatch) -> None:
-    """FunctionTimeoutError subclasses the poll timeout: catching the base loops forever."""
+    """The worker's own timeout must end the call, not be mistaken for 'not ready yet'."""
     _no_sleep(monkeypatch)
     fake = _FakeModal(gets=[_FakeModal.exception.FunctionTimeoutError("3600s")], dict_values=[])
     with pytest.raises(_FakeModal.exception.FunctionTimeoutError):
@@ -226,7 +238,7 @@ def test_without_a_progress_callback_the_call_is_unchanged() -> None:
 
 def test_a_broken_progress_callback_cannot_fail_the_run(monkeypatch) -> None:
     _no_sleep(monkeypatch)
-    not_ready = _FakeModal.exception.TimeoutError
+    not_ready = TimeoutError
     fake = _FakeModal(
         gets=[not_ready(), {"result": {"ok": True}, "files": {}}],
         dict_values=[{"stage": "packmol", "message": "x"}],
@@ -262,3 +274,22 @@ def test_the_worker_writes_throttled_progress_and_survives_an_unreachable_dict(m
     assert openmm_job.modal_progress_writer("") is None
     monkeypatch.setitem(sys.modules, "modal", types.SimpleNamespace())  # no Dict at all
     assert openmm_job.modal_progress_writer("job-key") is None
+
+
+def test_modals_own_timeout_exception_is_not_mistaken_for_a_poll_timeout(monkeypatch) -> None:
+    """The regression that shipped: catching the wrong TimeoutError.
+
+    A poll that is not ready is the builtin TimeoutError. If a worker reports
+    ``modal.exception.TimeoutError`` it is a real failure and must surface, not be
+    swallowed as 'still running'.
+    """
+    _no_sleep(monkeypatch)
+    fake = _FakeModal(gets=[_FakeModal.exception.TimeoutError("boom")], dict_values=[])
+    with pytest.raises(_FakeModal.exception.TimeoutError):
+        compute._call_worker(fake, fake._function, {}, lambda event: None)
+
+
+def test_the_builtin_poll_timeout_is_not_a_modal_exception() -> None:
+    """Pin the observed fact the loop depends on."""
+    assert not issubclass(_FakeModal.exception.TimeoutError, TimeoutError)
+    assert not issubclass(_FakeModal.exception.FunctionTimeoutError, TimeoutError)

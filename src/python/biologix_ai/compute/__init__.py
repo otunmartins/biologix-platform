@@ -109,21 +109,25 @@ def _call_worker(
             try:
                 response = call.get(timeout=PROGRESS_POLL_S)
                 break
-            except modal.exception.TimeoutError as exc:
-                # The base class is Modal's "not ready yet". The worker's own
-                # timeout is a subclass and, like an expired output, is real.
-                if isinstance(
-                    exc, (modal.exception.FunctionTimeoutError, modal.exception.OutputExpiredError)
-                ):
-                    raise
+            except TimeoutError:
+                # Not ready yet. Verified against the real client: a poll that
+                # times out raises Python's builtin TimeoutError, not
+                # modal.exception.TimeoutError. The worker's own timeout
+                # (FunctionTimeoutError) and an expired output are Modal
+                # exceptions that are not builtin TimeoutErrors, so they are not
+                # caught here and end the call, as they should.
+                pass
             entry = None
             if store is not None:
                 try:
                     entry = store.get(key)
                 except Exception:
                     entry = None
-            if entry and entry != seen:
-                seen = entry
+            # Compare stage and message, not the whole entry: it carries a timestamp,
+            # so a worker re-reporting the same stage would otherwise repeat.
+            marker = (entry.get("stage"), entry.get("message")) if entry else None
+            if entry and marker != seen:
+                seen = marker
                 try:
                     progress_callback(
                         {
