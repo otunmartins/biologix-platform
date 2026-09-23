@@ -195,7 +195,7 @@ web container.
 ## Long calls
 
 Remote clients time out long tool calls. A call that takes longer than
-`BIOLOGIX_TOOL_WAIT_S` (240 s) keeps running and returns
+`BIOLOGIX_TOOL_WAIT_S` (45 s, under ChatGPT's roughly 60 s tool-call limit) keeps running and returns
 `{"status": "running", "job_id": ...}`; its envelope names
 `await_biologix_job`, which waits again and returns the finished result with
 the normal envelope. While a job runs, other pipeline calls from the same client

@@ -16,10 +16,12 @@ which every MCP client receives, live in
   Every result carries a `protocol` envelope with `next_required_tool`,
   `next_arguments`, `step_instructions`, and `user_stop_allowed`.
 - `src/python/biologix_ai/mcp_jobs.py`: moves tools off the event loop. A call longer
-  than `BIOLOGIX_TOOL_WAIT_S` (240 s over HTTP, unlimited over stdio) returns a job
+  than `BIOLOGIX_TOOL_WAIT_S` (45 s over HTTP, unlimited over stdio) returns a job
   that the agent waits on with `await_biologix_job`.
 - `src/python/biologix_ai/mcp_stdio_guard.py`: a per-client `MCP_BUSY` lock.
-- `src/python/biologix_ai/mcp_client.py`: the client id (the `Mcp-Session-Id` header).
+- `src/python/biologix_ai/mcp_client.py`: the client id: the OAuth client, else a hash of
+  the bearer token, else the `Mcp-Session-Id` header. Don't key on the session alone:
+  ChatGPT opens a new MCP session for every tool call.
 - `src/python/biologix_ai/services/biologic_resolver.py`: resolves any biologic. It
   accepts a name, `PDB:chains`, `uniprot:ACC[:a-b]`, or `sequence:`. It prepares the
   structure with PDBFixer, then runs an AMBER14 check. The bundled insulin

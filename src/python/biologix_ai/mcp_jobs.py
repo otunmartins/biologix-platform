@@ -57,7 +57,8 @@ def tool_wait_s() -> float:
         except ValueError:
             pass
     transport = os.environ.get("BIOLOGIX_MCP_TRANSPORT", "stdio").strip().lower()
-    return 240.0 if transport in ("http", "streamable-http") else 0.0
+    # ChatGPT abandons an MCP tool call after about 60 s; stay well under it.
+    return 45.0 if transport in ("http", "streamable-http") else 0.0
 
 
 @dataclass
@@ -250,7 +251,10 @@ async def await_job(job_id: str, wait_s: float = 0.0, ctx: Any = None) -> str:
         )
     if job.client != client_key():
         return json.dumps({"ok": False, "error": "JOB_NOT_FOUND", "job_id": job_id, "abort": True})
-    limit = wait_s if wait_s and wait_s > 0 else tool_wait_s()
+    default = tool_wait_s()
+    limit = wait_s if wait_s and wait_s > 0 else default
+    if default > 0:
+        limit = min(limit, default)  # a client-requested wait may not outlast its own timeout
     if await _wait(job.future, limit, ctx, job.tool):
         return _result_text(job.future)
     return running_json(job)

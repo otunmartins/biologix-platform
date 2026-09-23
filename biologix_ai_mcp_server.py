@@ -1410,7 +1410,8 @@ async def await_biologix_job(ctx: Context, job_id: str, wait_s: int = 0) -> str:
 
     Long tools (OpenMM, retrosynthesis, literature) return ``status: "running"`` and a
     ``job_id`` when they outlast the client's patience. Call this with that job_id: it
-    waits up to ``wait_s`` seconds (0 = the server default) and returns the finished
+    waits up to ``wait_s`` seconds (0 = the server default, which is also the cap, 45 s
+    over HTTP) and returns the finished
     tool result, with its protocol envelope, or another ``running`` payload.
     """
     return await await_job(job_id, float(wait_s or 0), ctx)

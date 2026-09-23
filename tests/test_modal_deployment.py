@@ -66,7 +66,7 @@ def test_modal_runtime_knobs_enable_full_native_amd64_stack() -> None:
         "BIOLOGIX_AI_COMPUTE_BACKEND": "modal",
         "BIOLOGIX_MODAL_APP": "biologix-mcp",
         "BIOLOGIX_DEFAULT_COMPUTE": "cpu",
-        "BIOLOGIX_TOOL_WAIT_S": "240",
+        "BIOLOGIX_TOOL_WAIT_S": "45",
         "BIOLOGIX_AI_STRUCTURE_CACHE": "/app/runs/.structures",
         "BIOLOGIX_MCP_PROFILE": "protocol",
     }
