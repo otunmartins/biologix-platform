@@ -3379,20 +3379,30 @@ def screen_candidate_library(
         except Exception as exc:
             profile = {"psmiles": psmiles, "error": str(exc)}
 
-        # Derive overall disposition
+        # Derive overall disposition. Only a structure the tools cannot use is a
+        # hard fail. ADMET runs on a methyl-capped monomer proxy, not the polymer,
+        # so an alert there is a disclosure that follows the candidate through the
+        # report, not a reason to refuse to simulate it.
         disposition = "pass"
+        reason = ""
         admet = profile.get("admet") or {}
         admet_warnings = " ".join(str(item) for item in admet.get("warnings") or [])
         if profile.get("validation", {}).get("valid") is False:
-            disposition = "fail"
+            disposition, reason = "fail", "PSMILES did not validate; rewrite the repeat unit"
         elif "did not parse" in admet_warnings:
-            disposition = "warning"
+            disposition, reason = "warning", "ADMET could not parse the capped-monomer proxy"
         elif admet.get("safe") is False:
-            disposition = "fail"
+            disposition, reason = (
+                "warning",
+                "ADMET alert on the capped-monomer proxy (residual-monomer risk, not polymer "
+                "safety): simulate it, and report the alert with the result",
+            )
         elif profile.get("compliance", {}).get("overall_status") == "flagged":
-            disposition = "warning"
+            disposition, reason = "warning", "no approved excipient precedent found"
 
         profile["library_disposition"] = disposition
+        if reason:
+            profile["disposition_reason"] = reason
         if preflight:
             check = _md_preflight(psmiles)
             profile["md_ready"] = check.get("md_ready")

@@ -924,11 +924,12 @@ class ProtocolGate:
                 "retries_left": MAX_TOOL_RETRIES + 1 - attempts,
                 "error": state.last_error,
             }
+            hint = _repair_hint(state.last_error)
+            envelope["recoverable_failure"]["repair"] = hint
             envelope["rule"] = (
                 f"{retry_of} did not succeed: {state.last_error} This is not an infrastructure "
-                "failure and not a reason to stop. Fix what you sent (a different PSMILES, "
-                "complete extractions, a registered precursor, another candidate) and call it "
-                f"again. {MAX_TOOL_RETRIES + 1 - attempts} attempt(s) left before the pipeline stops."
+                f"failure and not a reason to stop. {hint} Then call {retry_of} again. "
+                f"{MAX_TOOL_RETRIES + 1 - attempts} attempt(s) left before the pipeline stops."
             )
         if stage == "checkpoint":
             envelope["step_instructions"] = section("Step 7")
@@ -1101,6 +1102,67 @@ def _blocking_reactants(payload: Any) -> List[str]:
     if blocking is None and isinstance(validation, dict):
         blocking = validation.get("blocking_reactants")
     return [str(b) for b in blocking or []]
+
+
+# What to change after a specific failure, keyed by a phrase in the error. The
+# generic advice ("fix what you sent") is not actionable for a model that has
+# just been told a route is blocked or a repeat unit will not parameterize.
+_REPAIR_HINTS: Tuple[Tuple[str, str], ...] = (
+    (
+        "at least one paper entry",
+        "Write the extractions yourself: at least one block with Reactants:, Products: and "
+        "Conditions:, where Products includes the material_name from prepare_retrosynthesis. "
+        "Use the literature it returned, or the polymerization chemistry you already know.",
+    ),
+    (
+        "net charge",
+        "Pair the charge into an inner salt (a zwitterion such as a sulfobetaine is accepted) "
+        "or use the neutral acid/base form of the repeat unit.",
+    ),
+    (
+        "connection points",
+        "A repeat unit needs exactly two [*] connection points, one at each end of the "
+        "backbone. Rewrite the PSMILES and validate it again.",
+    ),
+    (
+        "did not validate",
+        "Rewrite the repeat unit from the chemistry and call validate_psmiles again; read "
+        "graph_report to see what the string actually encodes.",
+    ),
+    (
+        "kg_empty_after_session_extractions",
+        "The graph holds no reaction for this target. Submit extractions whose Products name "
+        "the material exactly, add the upstream route to any specialty reactant, or register "
+        "commercial precursors with register_retro_precursors.",
+    ),
+    (
+        "blocking",
+        "Call diagnose_retro_extractions, then either register the commercial precursor with "
+        "register_retro_precursors or add the upstream reaction that makes it.",
+    ),
+    (
+        "packmol",
+        "Packing failed for this geometry. Try a shorter repeat unit or a different candidate; "
+        "the box is already enlarged and retried automatically.",
+    ),
+    (
+        "parameteriz",
+        "GAFF cannot type this structure. Simplify the repeat unit (fewer exotic atoms, no "
+        "unusual valences) or move to the next candidate.",
+    ),
+)
+
+
+def _repair_hint(error: str) -> str:
+    """Concrete instruction for a known failure, or a general one."""
+    lowered = (error or "").lower()
+    for marker, hint in _REPAIR_HINTS:
+        if marker in lowered:
+            return hint
+    return (
+        "Change what you sent: a different repeat unit, complete extractions, a registered "
+        "precursor, or the next candidate."
+    )
 
 
 def _failure_text(payload: Any, result: str) -> str:

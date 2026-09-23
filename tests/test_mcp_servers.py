@@ -84,12 +84,12 @@ def test_validate_psmiles_json_shape():
         import pytest
 
         pytest.skip(f"MCP dependencies unavailable: {e}")
-    out = json.loads(mod.validate_psmiles("[*]OCC[*]", material_name="", crosscheck_web=False))
+    out = json.loads(mod.validate_psmiles(None, "[*]OCC[*]", material_name="", crosscheck_web=False))
     assert "valid" in out
     assert out.get("valid") is True
     assert "name_crosscheck" not in out
     out2 = json.loads(
-        mod.validate_psmiles("[*]OCC[*]", material_name="polyethylene glycol", crosscheck_web=True)
+        mod.validate_psmiles(None, "[*]OCC[*]", material_name="polyethylene glycol", crosscheck_web=True)
     )
     assert out2.get("valid") is True
     assert "name_crosscheck" in out2

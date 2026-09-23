@@ -62,10 +62,10 @@ Read which of three kinds it is. Only the third one ends the run.
 **2. Something you sent did not work.** A PSMILES that will not parameterize, a
 screen row that fails, extractions with no paper entry, a route the graph cannot
 close, a candidate rejected before simulation. The envelope marks these
-`recoverable_failure` and says how many attempts are left. Do not stop and do
-not ask the user. Fix the input and call the same tool again: write a different
-repeat unit, complete the extractions, register the precursor, or move to
-another candidate. Keep going until the work is done or the attempts run out.
+`recoverable_failure`, which carries `repair` — the specific change to make —
+and how many attempts are left. Do not stop and do not ask the user. Make that
+change and call the same tool again. Keep going until the work is done or the
+attempts run out.
 
 **3. The server or a dependency broke.** `abort: true`, a timeout, a missing
 dependency, a traceback, or the envelope stage `blocked`. Stop, show the user
@@ -91,6 +91,8 @@ the server stops the pipeline.
 - When a candidate is rejected, say why in one line and try a different
   structure. Six candidates is the cap, not the target; one that survives to a
   measured result is worth more than six that stop at validation.
+- A network hiccup at RCSB, AlphaFold or ESMFold is retried by the server
+  before you ever see it. If one still surfaces, it is real.
 - A named polymer needs a PSMILES you wrote. Give `material_name` the plain
   monomer or polymer name, with no descriptive suffix, so the cross-check is
   meaningful.
@@ -126,8 +128,11 @@ the server stops the pipeline.
 1. Call `screen_candidate_library` with ADMET and compliance enabled. Each row
    has `library_disposition` and `md_ready` (the oligomer builds and GAFF
    parameterizes it).
-2. OpenMM takes only `library_disposition="pass"` rows; warning rows only when
-   no row passes, and say so. Prefer `md_ready` rows.
+2. OpenMM takes `library_disposition="pass"` rows; warning rows only when no
+   row passes, and say so. Prefer `md_ready` rows. A `warning` carries
+   `disposition_reason`: an ADMET alert is measured on a capped-monomer proxy,
+   not on the polymer, so simulate the candidate and report the alert alongside
+   the result. Only `fail` means the tools cannot use the structure.
 3. For at most three candidates, call `openmm_evaluate_psmiles` once per
    candidate with that single PSMILES, `max_workers=1`,
    `response_format="concise"`, the `compute` given in `next_arguments`, and

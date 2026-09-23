@@ -80,7 +80,7 @@ def test_default_wait_is_unlimited_on_stdio_and_bounded_over_http(monkeypatch) -
     monkeypatch.setenv("BIOLOGIX_MCP_TRANSPORT", "stdio")
     assert mcp_jobs.tool_wait_s() == 0.0
     monkeypatch.setenv("BIOLOGIX_MCP_TRANSPORT", "http")
-    assert mcp_jobs.tool_wait_s() == 45.0
+    assert mcp_jobs.tool_wait_s() == 240.0
 
 
 def test_progress_from_tool_threads_reaches_the_event_loop() -> None:

@@ -57,8 +57,13 @@ def tool_wait_s() -> float:
         except ValueError:
             pass
     transport = os.environ.get("BIOLOGIX_MCP_TRANSPORT", "stdio").strip().lower()
-    # ChatGPT abandons an MCP tool call after about 60 s; stay well under it.
-    return 45.0 if transport in ("http", "streamable-http") else 0.0
+    # Measured from real ChatGPT sessions on this server: single tool calls of
+    # 144.5 s (openmm_evaluate_psmiles) and 120.0 s (prepare_retrosynthesis)
+    # completed and their results reached the model. Modal holds the request for
+    # as long as the function timeout (3600 s), so the limit is the client's.
+    # Wait inline well past those measurements and hand off only beyond them;
+    # a short window turns one call into many polling round trips.
+    return 240.0 if transport in ("http", "streamable-http") else 0.0
 
 
 @dataclass

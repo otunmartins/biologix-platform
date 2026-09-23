@@ -24,6 +24,7 @@ import os
 import re
 import shutil
 import tempfile
+import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
@@ -48,6 +49,10 @@ LARGE_TARGET_ENV = "BIOLOGIX_LARGE_TARGET_ATOMS"
 STRUCTURE_CACHE_ENV = "BIOLOGIX_AI_STRUCTURE_CACHE"
 TARGET_BASENAME = "biologic_target"
 _HTTP_TIMEOUT_S = 60
+_HTTP_ATTEMPTS = 3
+_HTTP_BACKOFF_S = 1.5
+# Rate limiting and server-side faults are worth another try; 404 is an answer.
+_RETRY_STATUS = frozenset({408, 425, 429, 500, 502, 503, 504})
 _FOLD_TIMEOUT_S = 180
 _INTERNAL_GAP_WARN = 10
 
@@ -204,11 +209,27 @@ def _http(
 
     Returns parsed JSON, bytes, or text according to *expect*; ``None`` for an
     empty 204 search result. Raises :class:`ResolutionError` on any failure.
+
+    A dropped connection or a 429/5xx from RCSB, AlphaFold or ESMFold is
+    transient: it is retried here with backoff rather than surfaced as a
+    resolution failure, because the model cannot fix someone else's outage by
+    rewriting its query.
     """
-    try:
-        response = requests.request(method, url, json=json_body, data=data, timeout=timeout)
-    except requests.RequestException as exc:
-        raise ResolutionError(f"{method} {url} failed: {exc}") from exc
+    last = ""
+    for attempt in range(_HTTP_ATTEMPTS):
+        if attempt:
+            time.sleep(_HTTP_BACKOFF_S * (2 ** (attempt - 1)))
+        try:
+            response = requests.request(method, url, json=json_body, data=data, timeout=timeout)
+        except requests.RequestException as exc:
+            last = f"{method} {url} failed: {exc}"
+            continue
+        if response.status_code in _RETRY_STATUS:
+            last = f"{method} {url} returned HTTP {response.status_code}"
+            continue
+        break
+    else:
+        raise ResolutionError(f"{last} (after {_HTTP_ATTEMPTS} attempts)")
     if response.status_code == 204:
         return None
     if response.status_code >= 400:

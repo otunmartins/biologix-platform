@@ -728,3 +728,29 @@ def test_the_user_can_redirect_mid_iteration_without_losing_the_session(harness)
     assert _protocol(screened)["iteration"] == 1  # same session, work kept
     state = json.loads((harness["session"] / STATE_FILENAME).read_text())
     assert PASS_A in state["openmm_runs"] and PASS_B in state["validated"]
+
+
+def test_a_recoverable_failure_names_the_specific_repair(harness) -> None:
+    call, config = harness["call"], harness["config"]
+    session = str(harness["session"])
+    _through_screen(call, harness["session"], [PASS_A])
+    call("openmm_evaluate_psmiles", psmiles_list=PASS_A)
+    call("save_pipeline_stage", candidate_psmiles=PASS_A, stage="openmm", disposition="pass")
+    call("prepare_retrosynthesis", target=PASS_A, run_dir=session)
+    config["submit_fails"] = True
+    failed = call(
+        "submit_retro_extractions", run_dir=session, material_name="poly_9", extractions="", target=PASS_A
+    )
+    repair = _protocol(failed)["recoverable_failure"]["repair"]
+    assert "Reactants:" in repair and "Products:" in repair
+    assert repair in _protocol(failed)["rule"]
+
+
+def test_repair_hints_match_the_failures_the_pipeline_actually_produces() -> None:
+    from biologix_ai.protocol_gate import _repair_hint
+
+    assert "inner salt" in _repair_hint("Repeat unit has net charge -1 (O(-1))")
+    assert "two [*]" in _repair_hint("Expected exactly 2 [*] connection points, found 1")
+    assert "register_retro_precursors" in _repair_hint("kg_empty_after_session_extractions")
+    assert "shorter repeat unit" in _repair_hint("Packmol packing failed: timeout")
+    assert _repair_hint("") and _repair_hint("unrecognised")

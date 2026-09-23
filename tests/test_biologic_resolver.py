@@ -300,3 +300,54 @@ def test_bundled_insulin_keeps_original_path_and_chains(tmp_path):
     meta = json.loads((tmp_path / "structures" / "biologic_target.json").read_text())
     assert meta["resolved_target"] == "4F1C:A,B"
     assert br.load_session_target(tmp_path).pdb_path == bio.pdb_path
+
+
+def test_transient_network_faults_are_retried_before_the_model_sees_them(monkeypatch):
+    """An RCSB 503 or a dropped connection is not something the model can fix."""
+    monkeypatch.setattr(br.time, "sleep", lambda _s: None)
+    calls = []
+
+    class Resp:
+        def __init__(self, code):
+            self.status_code = code
+            self.content = b"ok"
+
+        def json(self):
+            return {"ok": True}
+
+    def flaky(method, url, **kwargs):
+        calls.append(url)
+        if len(calls) < 3:
+            return Resp(503)
+        return Resp(200)
+
+    monkeypatch.setattr(br.requests, "request", flaky)
+    assert br._http("GET", "https://example/x") == {"ok": True}
+    assert len(calls) == 3
+
+
+def test_a_persistent_outage_is_reported_once_with_the_attempt_count(monkeypatch):
+    monkeypatch.setattr(br.time, "sleep", lambda _s: None)
+
+    def always_down(method, url, **kwargs):
+        raise br.requests.RequestException("connection reset")
+
+    monkeypatch.setattr(br.requests, "request", always_down)
+    with pytest.raises(br.ResolutionError, match="after 3 attempts"):
+        br._http("GET", "https://example/x")
+
+
+def test_a_404_is_an_answer_and_is_not_retried(monkeypatch):
+    calls = []
+
+    class Missing:
+        status_code = 404
+
+    def not_found(method, url, **kwargs):
+        calls.append(url)
+        return Missing()
+
+    monkeypatch.setattr(br.requests, "request", not_found)
+    with pytest.raises(br.ResolutionError, match="404"):
+        br._http("GET", "https://example/x")
+    assert len(calls) == 1
