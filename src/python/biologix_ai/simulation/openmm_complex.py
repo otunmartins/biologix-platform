@@ -46,6 +46,15 @@ def _append_progress_file(stage: str, msg: str) -> None:
         pass
 
 
+def _packing_failure_text(pack_result: Dict[str, Any]) -> str:
+    """Why Packmol failed, in its own words: stderr, else the last lines of what it printed."""
+    text = str(pack_result.get("stderr") or "").strip()
+    if not text:
+        tail = [ln.strip() for ln in str(pack_result.get("stdout") or "").splitlines() if ln.strip()]
+        text = " | ".join(tail[-3:])
+    return (text or "unknown reason")[:300]
+
+
 def _protein_label(protein_pdb_path: Optional[str]) -> str:
     """Name of the simulated protein for progress text: "insulin" only for the bundled default.
 
@@ -950,12 +959,19 @@ def run_openmm_matrix_relax_and_energy(
                 **pack_common_kw,
             )
         else:
+            def _packing_wait(seconds: float) -> None:
+                _stage_heartbeat(
+                    "packmol",
+                    f"packing {protein_label} + {n_polymers} polymer chain(s), {int(seconds)} s so far",
+                )
+
+            # No wall-clock limit: Packmol runs until it finishes or reports a failure.
             pack_result = pack_protein_polymers(
                 str(ins_packmol),
                 str(poly_pdb),
                 n_polymers,
                 str(packed_pdb),
-                timeout_s=300,
+                on_wait=_packing_wait,
                 **pack_common_kw,
             )
             first_edge_nm = pack_result.get("box_edge_nm") or pack_box_nm
@@ -963,7 +979,7 @@ def run_openmm_matrix_relax_and_energy(
                 retry_box_nm = round(float(first_edge_nm) * 1.15, 3)
                 _stage_heartbeat(
                     "packmol",
-                    f"Packmol did not converge; retrying once with a 15% larger box ({retry_box_nm} nm)",
+                    f"Packmol reported it did not converge; retrying once with a 15% larger box ({retry_box_nm} nm)",
                 )
                 packmol_retry = {
                     "first_box_nm": float(first_edge_nm),
@@ -975,12 +991,11 @@ def run_openmm_matrix_relax_and_energy(
                     str(poly_pdb),
                     n_polymers,
                     str(packed_pdb),
-                    timeout_s=300,
+                    on_wait=_packing_wait,
                     **{**pack_common_kw, "box_size_nm": retry_box_nm},
                 )
         if not pack_result.get("success"):
-            pack_err = pack_result.get("stderr", "unknown reason")
-            return _fail(f"Packmol packing failed: {str(pack_err)[:300]}", "packmol")
+            return _fail(f"Packmol packing failed: {_packing_failure_text(pack_result)}", "packmol")
         if progressive_pack:
             n_polymers = int(pack_result["n_polymers"])
             if verbose:

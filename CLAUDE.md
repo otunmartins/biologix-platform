@@ -64,7 +64,9 @@ which every MCP client receives, live in
   packed with counterions (`counterions_for_matrix`) so the matrix subsystem is
   neutral; a neutral polymer builds the identical force field it always did, so
   do not load the ion file unconditionally. Platform selection is in
-  `select_openmm_platform` (`BIOLOGIX_AI_OPENMM_PLATFORM=CPU|CUDA|OpenCL|auto`). GPU
+  `select_openmm_platform` (`BIOLOGIX_AI_OPENMM_PLATFORM=CPU|CUDA|OpenCL|auto`). Packmol has no wall-clock limit: it runs until it finishes or reports failure, and
+  shows "N s so far" in the job's progress. Only the per-candidate cap
+  (`BIOLOGIX_AI_OPENMM_CANDIDATE_TIMEOUT_S`) and the progressive search's per-attempt limit remain. GPU
   candidates run in a fresh interpreter (`matrix_subprocess.py`).
 - `modal_app.py`: the web function `serve` plus the CPU and GPU OpenMM workers.
   `verify_runtime` and `verify_gpu` check a deployed image.

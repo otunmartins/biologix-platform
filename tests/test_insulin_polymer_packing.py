@@ -178,3 +178,59 @@ def test_polymer_build_ensure_pdb_or_skip():
         assert p.endswith(".pdb")
     except FileNotFoundError:
         pytest.skip("4F1C.pdb not present")
+
+
+# -- Packmol runs until it finishes or reports failure: no wall-clock limit ---------------
+
+
+def _fake_packmol(tmp_path, body: str) -> str:
+    exe = tmp_path / "fake_packmol"
+    exe.write_text("#!/bin/sh\n" + body + "\n")
+    exe.chmod(0o755)
+    return str(exe)
+
+
+def test_packmol_is_not_stopped_by_a_clock_and_reports_that_it_is_still_working(tmp_path, monkeypatch):
+    """A 54-chain system ran past the old 300 s limit and was reported as a failure."""
+    import biologix_ai.simulation.packmol_packer as pp
+
+    monkeypatch.setattr(pp, "_WAIT_TICK_S", 0.2)
+    exe = _fake_packmol(tmp_path, "sleep 1.2; echo 'SUCCESS!'; exit 0")
+    waits = []
+    with open(tmp_path / "in.inp", "w") as stdin:
+        result = pp._run_packmol(exe, stdin, cwd=str(tmp_path), timeout_s=None, on_wait=waits.append)
+    assert result.returncode == 0 and "SUCCESS" in result.stdout
+    assert len(waits) >= 3 and waits == sorted(waits)  # elapsed seconds, reported as it ran
+
+
+def test_a_packmol_that_reports_failure_is_a_failure_with_its_own_message(tmp_path):
+    import biologix_ai.simulation.packmol_packer as pp
+    from biologix_ai.simulation.openmm_complex import _packing_failure_text
+
+    exe = _fake_packmol(tmp_path, "echo 'ENDED WITHOUT PERFECT PACKING'; exit 173")
+    with open(tmp_path / "in.inp", "w") as stdin:
+        result = pp._run_packmol(exe, stdin, cwd=str(tmp_path), timeout_s=None, on_wait=None)
+    assert result.returncode == 173
+    text = _packing_failure_text({"stderr": result.stderr, "stdout": result.stdout})
+    assert "ENDED WITHOUT PERFECT PACKING" in text
+
+
+def test_an_explicit_limit_still_works_for_the_progressive_search(tmp_path):
+    import subprocess
+
+    import biologix_ai.simulation.packmol_packer as pp
+
+    exe = _fake_packmol(tmp_path, "sleep 30")
+    with open(tmp_path / "in.inp", "w") as stdin:
+        with pytest.raises(subprocess.TimeoutExpired):
+            pp._run_packmol(exe, stdin, cwd=str(tmp_path), timeout_s=1, on_wait=None)
+
+
+def test_the_default_and_the_matrix_path_set_no_packmol_limit():
+    import inspect
+
+    import biologix_ai.simulation.openmm_complex as oc
+    import biologix_ai.simulation.packmol_packer as pp
+
+    assert inspect.signature(pp.pack_protein_polymers).parameters["timeout_s"].default is None
+    assert "timeout_s=300" not in inspect.getsource(oc)

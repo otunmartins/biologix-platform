@@ -26,7 +26,7 @@ import tempfile
 import time
 import warnings
 from pathlib import Path
-from typing import Dict, Literal, Optional, Sequence, Tuple
+from typing import Callable, Dict, Literal, Optional, Sequence, Tuple
 
 PackingMode = Literal["shell", "bulk"]
 
@@ -226,6 +226,36 @@ def build_packmol_inp_content(
 # ---------------------------------------------------------------------------
 
 
+_WAIT_TICK_S = 30.0
+
+
+def _run_packmol(exe, stdin, *, cwd, timeout_s, on_wait):
+    """Run Packmol to completion, reporting elapsed time; raises ``TimeoutExpired`` only if *timeout_s* is set."""
+    proc = subprocess.Popen(
+        [exe], stdin=stdin, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, cwd=cwd
+    )
+    started = time.monotonic()
+    while True:
+        elapsed = time.monotonic() - started
+        tick = _WAIT_TICK_S
+        if timeout_s:
+            tick = min(tick, max(0.1, timeout_s - elapsed))
+        try:
+            stdout, stderr = proc.communicate(timeout=tick)
+            return subprocess.CompletedProcess([exe], proc.returncode, stdout, stderr)
+        except subprocess.TimeoutExpired:
+            elapsed = time.monotonic() - started
+            if timeout_s and elapsed >= timeout_s:
+                proc.kill()
+                proc.communicate()
+                raise
+            if on_wait is not None:
+                try:
+                    on_wait(elapsed)
+                except Exception:
+                    pass  # a broken progress callback must not stop the packing
+
+
 def pack_protein_polymers(
     protein_pdb_path: str,
     polymer_pdb_path: str,
@@ -234,7 +264,8 @@ def pack_protein_polymers(
     box_size_nm: Optional[float] = None,
     tolerance_angstrom: float = 2.0,
     seed: int = 42,
-    timeout_s: int = 300,
+    timeout_s: Optional[int] = None,
+    on_wait: Optional[Callable[[float], None]] = None,
     shell_only_angstrom: Optional[float] = None,
     packing_mode: PackingMode = "bulk",
     padding_angstrom: float = 6.0,
@@ -266,8 +297,14 @@ def pack_protein_polymers(
         Minimum inter-molecular distance (Å).
     seed : int
         Random seed for Packmol.
-    timeout_s : int
-        Subprocess timeout in seconds.
+    timeout_s : int or None
+        Wall-clock limit in seconds. ``None`` (the default) sets none: Packmol runs until it
+        finishes or reports that it failed. Packmol bounds itself (``nloop`` loops of
+        ``maxit`` iterations), so it cannot run forever. Only the progressive search, which
+        probes how many chains fit, passes a limit.
+    on_wait : callable or None
+        Called with the elapsed seconds about every 30 s while Packmol runs, so the caller
+        can show that the packing is still working.
     shell_only_angstrom : float or None
         Exclusion-sphere radius (Å) for **shell** mode.
     packing_mode : ``"bulk"`` or ``"shell"``
@@ -369,13 +406,12 @@ def pack_protein_polymers(
 
         packmol_exe = packmol_executable()
         with open(inp_path, encoding="utf-8") as inp_file:
-            result = subprocess.run(
-                [packmol_exe],
-                stdin=inp_file,
-                capture_output=True,
-                text=True,
-                timeout=timeout_s,
+            result = _run_packmol(
+                packmol_exe,
+                inp_file,
                 cwd=str(Path(output_path).parent),
+                timeout_s=timeout_s,
+                on_wait=on_wait,
             )
 
         success = result.returncode == 0 and Path(output_path).is_file()
