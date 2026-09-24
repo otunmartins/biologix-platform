@@ -150,6 +150,9 @@ class _FakeModal:
         class OutputExpiredError(TimeoutError):
             pass
 
+        class NotFoundError(Error):
+            """Real Modal: FunctionCall.from_id() succeeds for any id; get() raises this."""
+
     def __init__(self, gets, dict_values):
         self.gets = list(gets)              # each: an exception to raise, or a response
         self.dict_values = list(dict_values)
@@ -159,6 +162,8 @@ class _FakeModal:
         outer = self
 
         class _Call:
+            object_id = "fc-spawned"
+
             def get(self, timeout=None):
                 item = outer.gets.pop(0)
                 if isinstance(item, BaseException):
@@ -181,6 +186,15 @@ class _FakeModal:
             def pop(self, key, default=None):
                 outer.popped.append(key)
 
+        self.reattached = []
+
+        class _FunctionCall:
+            @staticmethod
+            def from_id(call_id):
+                outer.reattached.append(call_id)
+                return _Call()
+
+        self.FunctionCall = _FunctionCall
         self.Dict = type("D", (), {"from_name": staticmethod(lambda *a, **k: _Dict())})
         self._function = _Function()
 
@@ -293,3 +307,45 @@ def test_the_builtin_poll_timeout_is_not_a_modal_exception() -> None:
     """Pin the observed fact the loop depends on."""
     assert not issubclass(_FakeModal.exception.TimeoutError, TimeoutError)
     assert not issubclass(_FakeModal.exception.FunctionTimeoutError, TimeoutError)
+
+
+def _job_with_resume(resume):
+    from biologix_ai import mcp_jobs
+
+    job = mcp_jobs.Job(job_id="j1", client="c", tool="openmm_evaluate_psmiles", resume_worker=resume)
+    return mcp_jobs, job
+
+
+def test_a_restarted_job_reattaches_to_its_running_worker_instead_of_simulating_again(monkeypatch) -> None:
+    """A deploy replaced the web container mid-run; the Modal worker was still going."""
+    _no_sleep(monkeypatch)
+    fake = _FakeModal(gets=[TimeoutError(), {"result": {"ok": True}, "files": {}}], dict_values=[])
+    mcp_jobs, job = _job_with_resume(("fc-old", "old-key"))
+    mcp_jobs.CURRENT_JOB.set(job)
+    response = compute._call_worker(fake, fake._function, {"psmiles": ["[*]CC[*]"]}, lambda e: None)
+    assert response["result"]["ok"] is True
+    assert fake.reattached == ["fc-old"] and fake.spawned == []
+    assert fake.popped == ["old-key"]  # the original progress key is reused, then cleaned up
+
+
+def test_a_worker_call_that_no_longer_exists_is_spawned_afresh(monkeypatch) -> None:
+    _no_sleep(monkeypatch)
+    fake = _FakeModal(
+        gets=[_FakeModal.exception.NotFoundError("gone"), {"result": {"ok": True}, "files": {}}],
+        dict_values=[],
+    )
+    mcp_jobs, job = _job_with_resume(("fc-gone", "k"))
+    mcp_jobs.CURRENT_JOB.set(job)
+    response = compute._call_worker(fake, fake._function, {}, lambda e: None)
+    assert response["result"]["ok"] is True
+    assert len(fake.spawned) == 1
+    assert job.worker_call_id == "fc-spawned"  # recorded for the next restart
+
+
+def test_a_fresh_spawn_records_its_call_id_for_a_later_restart(monkeypatch) -> None:
+    _no_sleep(monkeypatch)
+    fake = _FakeModal(gets=[{"result": {"ok": True}, "files": {}}], dict_values=[])
+    mcp_jobs, job = _job_with_resume(None)
+    mcp_jobs.CURRENT_JOB.set(job)
+    compute._call_worker(fake, fake._function, {}, lambda e: None)
+    assert (job.worker_call_id, job.worker_key) == ("fc-spawned", fake.spawned[0]["progress_key"])

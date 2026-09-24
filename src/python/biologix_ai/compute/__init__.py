@@ -96,20 +96,45 @@ def _call_worker(
     if progress_callback is None:
         return function.remote(spec_dict)
 
+    from biologix_ai import mcp_jobs  # noqa: PLC0415
+
     key = uuid.uuid4().hex
+    call = None
+    resume = mcp_jobs.resumable_worker()
+    if resume:
+        # The server restarted while this simulation ran; the worker did not. Pick up
+        # its call rather than simulating again. A call that has expired falls through
+        # to a fresh spawn below.
+        try:
+            call = modal.FunctionCall.from_id(resume[0])
+            key = resume[1] or key
+        except Exception:
+            call = None
     spec_dict = {**spec_dict, "progress_key": key}
     try:
         store = modal.Dict.from_name(PROGRESS_DICT, create_if_missing=True)
     except Exception:
         store = None
-    call = function.spawn(spec_dict)
+    reattached = call is not None
+    if call is None:
+        call = function.spawn(spec_dict)
+        mcp_jobs.note_worker_call(getattr(call, "object_id", ""), key)
     seen: Any = None
     try:
         while True:
             try:
                 response = call.get(timeout=PROGRESS_POLL_S)
                 break
-            except TimeoutError:
+            except Exception as exc:
+                # Observed on real Modal: from_id() never fails, a call that no longer
+                # exists raises NotFoundError (or OutputExpiredError) from get().
+                if reattached and type(exc).__name__ in ("NotFoundError", "OutputExpiredError"):
+                    reattached = False
+                    call = function.spawn(spec_dict)
+                    mcp_jobs.note_worker_call(getattr(call, "object_id", ""), key)
+                    continue
+                if not isinstance(exc, TimeoutError):
+                    raise
                 # Not ready yet. Verified against the real client: a poll that
                 # times out raises Python's builtin TimeoutError, not
                 # modal.exception.TimeoutError. The worker's own timeout

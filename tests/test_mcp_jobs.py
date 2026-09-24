@@ -72,7 +72,7 @@ def test_slow_call_becomes_a_job_that_await_returns(monkeypatch) -> None:
 
 def test_unknown_job_asks_for_a_rerun() -> None:
     missing = json.loads(asyncio.run(await_job("nope")))
-    assert missing["error"] == "JOB_NOT_FOUND" and missing["abort"] is True
+    assert missing["error"] == "JOB_NOT_FOUND" and "abort" not in missing
 
 
 def test_default_wait_is_unlimited_on_stdio_and_bounded_over_http(monkeypatch) -> None:
@@ -256,3 +256,71 @@ def test_a_job_is_recoverable_even_before_the_wait_window_elapses(monkeypatch) -
     from biologix_ai import mcp_client
 
     asyncio.run(scenario())
+
+
+def _forget_jobs() -> None:
+    """What a container replacement does to the in-memory job table."""
+    with mcp_jobs._JOBS_LOCK:
+        mcp_jobs._JOBS.clear()
+
+
+def test_a_finished_job_survives_a_restart(monkeypatch, tmp_path) -> None:
+    monkeypatch.setenv("BIOLOGIX_JOBS_DIR", str(tmp_path))
+    monkeypatch.setenv("BIOLOGIX_TOOL_WAIT_S", "0.2")
+    release = threading.Event()
+    mcp = _server(release)
+
+    async def scenario():
+        running = json.loads(await mcp._tool_manager._tools["slow"].fn(value="kept"))
+        release.set()
+        for _ in range(100):  # let it finish
+            if json.loads((tmp_path / f"{running['job_id']}.json").read_text())["status"] == "done":
+                break
+            await asyncio.sleep(0.05)
+        _forget_jobs()  # the container was replaced
+        return json.loads(await await_job(running["job_id"], 1))
+
+    assert asyncio.run(scenario())["value"] == "kept"
+
+
+def test_a_running_job_is_resumed_after_a_restart_not_aborted(monkeypatch, tmp_path) -> None:
+    """The ChatGPT failure: a deploy mid-simulation, then JOB_NOT_FOUND with abort."""
+    monkeypatch.setenv("BIOLOGIX_JOBS_DIR", str(tmp_path))
+    monkeypatch.setenv("BIOLOGIX_TOOL_WAIT_S", "0.2")
+    release = threading.Event()
+    mcp = _server(release)
+
+    async def scenario():
+        running = json.loads(await mcp._tool_manager._tools["slow"].fn(value="again"))
+        _forget_jobs()  # the container was replaced while the tool ran
+        release.set()
+        resumed = json.loads(await await_job(running["job_id"], 0.2))
+        assert resumed.get("error") != "JOB_NOT_FOUND"
+        assert resumed["job_id"] == running["job_id"]
+        assert resumed["resumed_after_restart"] is True
+        assert resumed["protocol"]["next_required_tool"] == AWAIT_TOOL
+        return json.loads(await await_job(running["job_id"], 5))
+
+    done = asyncio.run(scenario())
+    assert done["value"] == "again"  # re-run with the saved arguments
+
+
+def test_another_client_cannot_resume_or_read_a_job(monkeypatch, tmp_path) -> None:
+    monkeypatch.setenv("BIOLOGIX_JOBS_DIR", str(tmp_path))
+    (tmp_path / "abc123.json").write_text(
+        json.dumps({"job_id": "abc123", "client": "oauth:someone-else", "tool": "slow",
+                    "status": "done", "result": "secret"})
+    )
+    assert json.loads(asyncio.run(await_job("abc123")))["error"] == "JOB_NOT_FOUND"
+
+
+def test_a_job_record_survives_arguments_that_are_not_json(monkeypatch, tmp_path) -> None:
+    monkeypatch.setenv("BIOLOGIX_JOBS_DIR", str(tmp_path))
+    job = mcp_jobs._register("c", "slow", {"value": "x", "ctx": object()})
+    assert json.loads((tmp_path / f"{job.job_id}.json").read_text())["arguments"] == {"value": "x"}
+
+
+def test_jobs_are_not_persisted_over_stdio(monkeypatch, tmp_path) -> None:
+    monkeypatch.delenv("BIOLOGIX_JOBS_DIR", raising=False)
+    monkeypatch.setenv("BIOLOGIX_MCP_TRANSPORT", "stdio")
+    assert mcp_jobs.jobs_dir() is None

@@ -28,6 +28,7 @@ import time
 import uuid
 from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any, Callable, Dict, Optional, Tuple
 
 from biologix_ai.mcp_client import client_key
@@ -77,6 +78,12 @@ class Job:
     finished: Optional[float] = None
     progress: str = ""
     stage: str = ""
+    arguments: Dict[str, Any] = field(default_factory=dict)
+    # The Modal call this job spawned, and the call to re-attach to when the server
+    # restarted while it ran (see ``resume_job``).
+    worker_call_id: str = ""
+    worker_key: str = ""
+    resume_worker: Optional[Tuple[str, str]] = None
 
     def done(self) -> bool:
         return self.future is not None and self.future.done()
@@ -108,6 +115,119 @@ _JOBS: Dict[str, Job] = {}
 _JOBS_LOCK = threading.Lock()
 
 
+# --- Durable job records -----------------------------------------------------------
+#
+# The job table above lives in one container's memory, and a deploy, crash, or
+# scale-down replaces that container while a simulation is still running. A ChatGPT
+# run was lost that way: the check-back got JOB_NOT_FOUND and the agent stopped.
+# Each job therefore also leaves a small record on the runs volume: what was asked,
+# which Modal call it spawned, and the result once it finished. A fresh container
+# can then hand back a finished result, re-attach to the still-running worker, or
+# re-run the call, instead of losing the job.
+
+_MAX_STORED_RESULT = 8_000_000
+_TOOL_FNS: Dict[str, Callable[..., Any]] = {}
+
+
+def jobs_dir() -> Optional[Path]:
+    """Where job records live, or None when jobs need no durability (local stdio)."""
+    explicit = os.environ.get("BIOLOGIX_JOBS_DIR", "").strip()
+    if explicit:
+        return Path(explicit)
+    transport = os.environ.get("BIOLOGIX_MCP_TRANSPORT", "stdio").strip().lower()
+    if transport not in ("http", "streamable-http"):
+        return None
+    from biologix_ai.run_paths import repo_root_from_package
+
+    return repo_root_from_package() / "runs" / ".jobs"
+
+
+def _commit_volume() -> None:
+    """Make the record visible to the next container (best effort, off the caller's thread)."""
+    if not os.environ.get("MODAL_TASK_ID"):
+        return
+
+    def _commit() -> None:
+        try:
+            import modal
+
+            modal.Volume.from_name("biologix-mcp-runs").commit()
+        except Exception:
+            pass
+
+    threading.Thread(target=_commit, daemon=True).start()
+
+
+def _json_safe(arguments: Dict[str, Any]) -> Dict[str, Any]:
+    safe: Dict[str, Any] = {}
+    for key, value in arguments.items():
+        try:
+            json.dumps(value)
+        except (TypeError, ValueError):
+            continue  # a Context or other live object; the tool re-creates it
+        safe[key] = value
+    return safe
+
+
+def _record_path(job_id: str) -> Optional[Path]:
+    root = jobs_dir()
+    if root is None or not job_id.isalnum():
+        return None
+    return root / f"{job_id}.json"
+
+
+def _persist(job: Job, status: str = "running", result: Optional[str] = None) -> None:
+    path = _record_path(job.job_id)
+    if path is None:
+        return
+    record: Dict[str, Any] = {
+        "job_id": job.job_id,
+        "client": job.client,
+        "tool": job.tool,
+        "arguments": job.arguments,
+        "started": job.started,
+        "status": status,
+        "worker_call_id": job.worker_call_id,
+        "worker_key": job.worker_key,
+    }
+    if result is not None and len(result) <= _MAX_STORED_RESULT:
+        record["result"] = result
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = path.with_suffix(".tmp")
+        tmp.write_text(json.dumps(record), encoding="utf-8")
+        tmp.replace(path)
+        _commit_volume()
+    except OSError:
+        pass
+
+
+def _load_record(job_id: str) -> Optional[Dict[str, Any]]:
+    path = _record_path(job_id)
+    if path is None or not path.is_file():
+        return None
+    try:
+        record = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    return record if isinstance(record, dict) else None
+
+
+def note_worker_call(call_id: str, key: str) -> None:
+    """Record the Modal call the current job spawned, so a restarted server can re-attach."""
+    job = CURRENT_JOB.get()
+    if job is None:
+        return
+    job.worker_call_id, job.worker_key = str(call_id), str(key)
+    _persist(job)
+
+
+def resumable_worker() -> Optional[Tuple[str, str]]:
+    """``(call_id, progress_key)`` of a worker the current job should re-attach to, if any."""
+    job = CURRENT_JOB.get()
+    return job.resume_worker if job is not None else None
+
+
 def _prune() -> None:
     now = time.time()
     with _JOBS_LOCK:
@@ -124,11 +244,19 @@ def pending_job(client: str) -> Optional[Job]:
     return None
 
 
-def _register(client: str, tool: str) -> Job:
+def _register(
+    client: str, tool: str, arguments: Optional[Dict[str, Any]] = None, job_id: str = ""
+) -> Job:
     """Record a job before its work starts; the future is attached next."""
-    job = Job(job_id=uuid.uuid4().hex[:16], client=client, tool=tool)
+    job = Job(
+        job_id=job_id or uuid.uuid4().hex[:16],
+        client=client,
+        tool=tool,
+        arguments=_json_safe(arguments or {}),
+    )
     with _JOBS_LOCK:
         _JOBS[job.job_id] = job
+    _persist(job)
     _prune()
     return job
 
@@ -136,6 +264,7 @@ def _register(client: str, tool: str) -> Job:
 def _attach_future(job: Job, future: Future) -> None:
     def _mark(_f: Future) -> None:
         job.finished = time.time()
+        _persist(job, status="done", result=_result_text(_f))
 
     job.future = future
     future.add_done_callback(_mark)
@@ -227,6 +356,9 @@ def _current_context(server: Any) -> Any:
 
 
 def _wrap(name: str, fn: Callable[..., Any], server: Any) -> Callable[..., Any]:
+    signature = inspect.signature(fn)
+    _TOOL_FNS[name] = fn
+
     @functools.wraps(fn)
     async def wrapped(*args: Any, **kwargs: Any) -> str:
         client = client_key()
@@ -238,7 +370,11 @@ def _wrap(name: str, fn: Callable[..., Any], server: Any) -> Callable[..., Any]:
         EVENT_LOOP.set(asyncio.get_running_loop())
         # Register before the work starts: if the connection drops at any point,
         # even before the wait window elapses, the run is still there to check on.
-        job = _register(client, name)
+        try:
+            asked = dict(signature.bind_partial(*args, **kwargs).arguments)
+        except TypeError:
+            asked = dict(kwargs)
+        job = _register(client, name, asked)
         CURRENT_JOB.set(job)
         future = _EXECUTOR.submit(contextvars.copy_context().run, call)
         _attach_future(job, future)
@@ -272,27 +408,80 @@ def install_job_runner(server: Any) -> None:
         tool.is_async = True
 
 
+def _not_found(job_id: str) -> str:
+    return json.dumps(
+        {
+            "ok": False,
+            "error": "JOB_NOT_FOUND",
+            "job_id": job_id,
+            "not_a_failure": True,
+            "hint": (
+                "The server has no record of this job id. Nothing was lost: call the tool that "
+                "started it again with the same arguments."
+            ),
+        },
+        indent=2,
+    )
+
+
+def resume_job(record: Dict[str, Any], ctx: Any = None) -> Optional[Job]:
+    """Bring a job back after a restart: re-run its tool, re-attaching to a live worker.
+
+    The Modal worker of a simulation keeps running when the web container that spawned
+    it is replaced, so the new container re-attaches to that call (``resume_worker``)
+    instead of simulating again. Every other tool simply runs again with its saved
+    arguments.
+    """
+    fn = _TOOL_FNS.get(str(record.get("tool", "")))
+    if fn is None:
+        return None
+    job_id = str(record["job_id"])
+    with _JOBS_LOCK:
+        existing = _JOBS.get(job_id)
+        if existing is not None:  # another check-back already resumed it
+            return existing
+        job = Job(
+            job_id=job_id,
+            client=str(record.get("client", "")),
+            tool=str(record["tool"]),
+            started=float(record.get("started") or time.time()),
+            arguments=dict(record.get("arguments") or {}),
+        )
+        if record.get("worker_call_id"):
+            job.resume_worker = (str(record["worker_call_id"]), str(record.get("worker_key", "")))
+        _JOBS[job_id] = job
+    _persist(job)
+    call = functools.partial(fn, **job.arguments)
+    EVENT_LOOP.set(asyncio.get_running_loop())
+    CURRENT_JOB.set(job)
+    _attach_future(job, _EXECUTOR.submit(contextvars.copy_context().run, call))
+    return job
+
+
 async def await_job(job_id: str, wait_s: float = 0.0, ctx: Any = None) -> str:
     """Wait for a job of the calling client; return its result or a new ``running`` payload."""
     job_id = (job_id or "").strip()
     with _JOBS_LOCK:
         job = _JOBS.get(job_id)
     if job is None:
-        return json.dumps(
-            {
-                "ok": False,
-                "error": "JOB_NOT_FOUND",
-                "job_id": job_id,
-                "abort": True,
-                "hint": (
-                    "The server has no job with this id (it may have restarted). Call the "
-                    "tool that started it again with the same arguments."
-                ),
-            },
-            indent=2,
+        record = _load_record(job_id)
+        if record is None or record.get("client") != client_key():
+            return _not_found(job_id)
+        if record.get("status") == "done" and isinstance(record.get("result"), str):
+            return record["result"]  # finished before the restart
+        job = resume_job(record, ctx)
+        if job is None:
+            return _not_found(job_id)
+        payload = json.loads(running_json(job))
+        payload["resumed_after_restart"] = True
+        payload["protocol"]["rule"] = (
+            "The server restarted while this ran; it has been resumed"
+            + (" and re-attached to the running simulation" if job.resume_worker else "")
+            + ". " + payload["protocol"]["rule"]
         )
+        return json.dumps(payload, indent=2)
     if job.client != client_key():
-        return json.dumps({"ok": False, "error": "JOB_NOT_FOUND", "job_id": job_id, "abort": True})
+        return _not_found(job_id)
     if job.future is None:  # registered but not yet started
         return running_json(job)
     default = tool_wait_s()
