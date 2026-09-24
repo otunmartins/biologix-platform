@@ -33,6 +33,8 @@ those results.
   while you wait.
 - `biologix_runtime_status` reports the server's dependencies and compute. You
   may call it at any time; it never changes the pipeline.
+- `export_session_outputs` zips the reports, PDBs, images, and logs into
+  download links. Call it when the user wants files and at Step 7.
 
 ## Step 1 — Onboard
 
@@ -190,7 +192,8 @@ survives, report the exact failure detail, including
 ## Step 7 — Iteration checkpoint
 
 1. Call `save_session_transcript`. Its result sets `user_stop_allowed`.
-2. Present only this checkpoint, with this run's values:
+2. Call `export_session_outputs`.
+3. Present only this checkpoint, with this run's values:
 
 ```text
 ## Iteration N complete
@@ -199,6 +202,7 @@ survives, report the exact failure detail, including
 **Top candidates:** ...
 **What worked:** ...
 **What to avoid:** ...
+**Downloads:** <zip link>, <report link>, <key PDB and image links> (expire in 24 h)
 
 **Iteration N+1 would:**
 - refine high performers with `mutate_psmiles`, and/or
@@ -208,11 +212,11 @@ survives, report the exact failure detail, including
 Would you like to run Iteration N+1 with refined candidates, or stop here?
 ```
 
-3. Wait for the user. Call no tool until they answer.
+4. Wait for the user. Call no tool until they answer.
 
 If they approve, keep the same `run_dir`, skip onboarding unless they change
 the biologic, and run Steps 3–7 again with the saved feedback. If they stop,
-say where the session artifacts are and end.
+give the download links (re-export if expired) and end.
 
 ## Reporting rules
 

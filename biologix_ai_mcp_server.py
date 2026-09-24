@@ -50,7 +50,13 @@ from mcp.server.auth.settings import (
 from mcp.server.fastmcp import Context, FastMCP
 from mcp.server.transport_security import TransportSecuritySettings
 from starlette.requests import Request
-from starlette.responses import HTMLResponse, JSONResponse, PlainTextResponse, RedirectResponse
+from starlette.responses import (
+    FileResponse,
+    HTMLResponse,
+    JSONResponse,
+    PlainTextResponse,
+    RedirectResponse,
+)
 
 from biologix_ai.run_paths import ENV_SESSION, new_session_dir, session_dir_from_env
 from biologix_ai.discovery_world import (
@@ -84,6 +90,7 @@ from biologix_ai.oauth_provider import (
     OAuthApprovalError,
 )
 from biologix_ai.protocol_gate import (
+    EXPORT_TOOL,
     FIRST_CONTACT_DIRECTIVE,
     REMOTE_PROTOCOL_TOOLS,
     REMOTE_TOOL_STEPS,
@@ -192,6 +199,7 @@ LOCAL_MCP_INSTRUCTIONS = (
 )
 
 HEALTH_PATH = "/healthz"
+DOWNLOAD_ROUTE = "/downloads"
 
 TOOL_FAILURE_HINT = (
     "Report this exact error and the last completed stage to the user. Do not substitute "
@@ -227,7 +235,9 @@ class BearerTokenAuth:
         self._expected_header = f"Bearer {clean_token}".encode("utf-8")
 
     async def __call__(self, scope: dict, receive: Any, send: Any) -> None:
-        if scope.get("type") == "http" and scope.get("path") != HEALTH_PATH:
+        path = str(scope.get("path", ""))
+        signed_download = path.startswith(DOWNLOAD_ROUTE + "/")
+        if scope.get("type") == "http" and path != HEALTH_PATH and not signed_download:
             headers = dict(scope.get("headers", []))
             supplied_header = headers.get(b"authorization", b"")
             if not hmac.compare_digest(supplied_header, self._expected_header):
@@ -522,6 +532,35 @@ if oauth_provider is not None:
         )
 
 
+_INLINE_DOWNLOAD_SUFFIXES = {".png", ".jpg", ".jpeg", ".pdf"}
+
+
+def runs_root() -> Path:
+    """Where session folders live; downloads never leave it."""
+    return Path(ROOT) / "runs"
+
+
+@mcp.custom_route(DOWNLOAD_ROUTE + "/{token}/{filename}", methods=["GET"])
+async def download_session_file(request: Request) -> Any:
+    """Serve one file named by a signed, unexpired link from ``export_session_outputs``."""
+    from biologix_ai.session_export import resolve_download
+
+    target = resolve_download(request.path_params["token"], runs_root())
+    if target is None:
+        return PlainTextResponse(
+            "This download link is invalid or has expired. Ask the agent to package the "
+            "session again.",
+            status_code=404,
+        )
+    disposition = "inline" if target.suffix.lower() in _INLINE_DOWNLOAD_SUFFIXES else "attachment"
+    return FileResponse(
+        target,
+        filename=target.name,
+        content_disposition_type=disposition,
+        headers={"Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff"},
+    )
+
+
 protocol_gate = ProtocolGate()
 
 
@@ -584,6 +623,7 @@ _TOOL_TITLES = {
     "mutate_psmiles": "Mutate PSMILES",
     AWAIT_TOOL: "Wait for a running Biologix job",
     "biologix_runtime_status": "Biologix runtime status",
+    EXPORT_TOOL: "Download session outputs",
 }
 
 
@@ -1415,6 +1455,30 @@ async def await_biologix_job(ctx: Context, job_id: str, wait_s: int = 0) -> str:
     tool result, with its protocol envelope, or another ``running`` payload.
     """
     return await await_job(job_id, float(wait_s or 0), ctx)
+
+
+@mcp.tool()
+def export_session_outputs(run_dir: str = "", include_logs: bool = True) -> str:
+    """Package the session's output into a zip and return download links.
+
+    Everything a run produced stays on the server: the summary report (PDF and
+    Markdown), minimized complex PDBs, structure renders and PyMOL images, energies
+    and candidate data, retrosynthesis output, and logs. This zips the session folder
+    and returns signed links (valid for 24 hours) to the zip and to the key files.
+    ``run_dir`` defaults to this client's active session. Safe at any step, including
+    mid-run and after the report; call it again for fresh links.
+    """
+    from biologix_ai.session_export import package_session
+
+    session = _optional_session_dir(run_dir) or session_dir_from_env(Path(ROOT))
+    if session is None:
+        return json.dumps(
+            {"ok": False, "error": "No session to export. Start a discovery session first."}
+        )
+    root = runs_root().resolve()
+    if root not in session.resolve().parents:
+        return json.dumps({"ok": False, "error": "run_dir must be a session folder under runs/."})
+    return json.dumps(package_session(session, root, include_logs=include_logs), indent=2)
 
 
 @mcp.tool()

@@ -61,6 +61,7 @@ MAX_TOOL_RETRIES = 3
 FAILURE_SECTION = "When something goes wrong"
 AWAIT_TOOL = "await_biologix_job"
 STATUS_TOOL = "biologix_runtime_status"
+EXPORT_TOOL = "export_session_outputs"
 
 FIRST_CONTACT_DIRECTIVE = (
     "Biologix runs a fixed discovery pipeline. If the user has not named a biologic "
@@ -170,12 +171,18 @@ REMOTE_TOOL_STEPS: Dict[str, str] = {
         "Any step. Reports the server's Packmol, OpenMM platforms (CPU/GPU), AiZynthFinder, "
         "and ADMET status. Never changes the pipeline."
     ),
+    EXPORT_TOOL: (
+        "Any step. Zips the session's reports, PDB structures, PyMOL/structure images, "
+        "energies, and logs and returns download links for the user. Call it when the user "
+        "wants the files, and offer it at the end of every iteration. Never changes the "
+        "pipeline."
+    ),
 }
 
 REMOTE_PROTOCOL_TOOLS: Tuple[str, ...] = tuple(REMOTE_TOOL_STEPS)
 
 _SESSION_TOOLS = ("resolve_biologic_target", "start_biologics_session")
-_UNGATED_TOOLS = (STATUS_TOOL,)
+_UNGATED_TOOLS = (STATUS_TOOL, EXPORT_TOOL)
 _REPORT_SEQUENCE = (
     "assemble_retrosynthesis_report",
     "save_discovery_state",

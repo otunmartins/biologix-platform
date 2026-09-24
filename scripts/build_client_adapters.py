@@ -72,7 +72,7 @@ def render() -> Dict[str, str]:
 # Biologix MCP client setup
 
 Server: `{MCP_URL}` (Streamable HTTP, OAuth 2.1 with Dynamic Client Registration;
-a bearer token also works). Every client gets the same 24 protocol tools, and the
+a bearer token also works). Every client gets the same 25 protocol tools, and the
 server tells the model which tool comes next in every result, so any client works
 without these files. They make the model adopt the protocol from the first message.
 

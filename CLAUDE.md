@@ -9,7 +9,7 @@ which every MCP client receives, live in
 
 - `biologix_ai_mcp_server.py`: the FastMCP server. It has two profiles, set with
   `BIOLOGIX_MCP_PROFILE`:
-  - `protocol` (default, and always used over HTTP): the 24 protocol tools, the gate,
+  - `protocol` (default, and always used over HTTP): the 25 protocol tools, the gate,
     and the job runner.
   - `full`: every tool, ungated. OpenCode uses this through `.opencode/opencode.jsonc`.
 - `src/python/biologix_ai/protocol_gate.py`: the step order and the per-client state.
@@ -29,6 +29,12 @@ which every MCP client receives, live in
   Across containers, the Modal worker writes its stage to the `biologix-job-progress`
   Dict and the web container polls it (`compute._call_worker`). The tailer must hand
   control back at the candidate deadline, or the time limit never fires.
+- `src/python/biologix_ai/session_export.py` and `export_session_outputs`: session output
+  (reports, PDBs, PyMOL/structure PNGs, energies, logs) lives on the server's volume, so
+  the tool zips it and returns HMAC-signed links (24 h) served by the `/downloads/{token}/{name}`
+  route, which needs no Authorization header. The key is `BIOLOGIX_OAUTH_STORAGE_KEY`; the
+  origin comes from `BIOLOGIX_MCP_RESOURCE_URL`. A token names one file under `runs/`.
+  The tool is ungated, like `biologix_runtime_status`.
 - `src/python/biologix_ai/mcp_stdio_guard.py`: a per-client `MCP_BUSY` lock.
 - `src/python/biologix_ai/mcp_client.py`: the client id: the OAuth client, else a hash of
   the bearer token, else the `Mcp-Session-Id` header. Don't key on the session alone:

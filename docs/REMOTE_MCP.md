@@ -215,6 +215,21 @@ and jobs are all per MCP session. `scaledown_window=900` keeps the web
 container alive between waits. Set `BIOLOGIX_MIN_CONTAINERS=1` to avoid cold
 starts, at the cost of one always-on container.
 
+## Downloading results
+
+A run's output stays on the server's `biologix-mcp-runs` volume: the summary report
+(PDF and Markdown), minimized complex PDBs, structure and PyMOL renders, energies,
+retrosynthesis output, and logs. `export_session_outputs` zips the session and returns
+signed download links (24 hours) for the zip and the key files. The agent calls it at
+every iteration checkpoint; ask it for the files at any time.
+
+The links open in a browser with no login: each is HMAC-signed with
+`BIOLOGIX_OAUTH_STORAGE_KEY`, names one file under `runs/`, and expires. Rotating that
+secret invalidates every outstanding link. Without a public URL (stdio) the tool still
+builds the zip and reports its path on the machine.
+
+To fetch a session yourself: `modal volume get biologix-mcp-runs /<session> ./`.
+
 ## Biologic targets
 
 `resolve_biologic_target` accepts a name (`semaglutide`), `PDB:chains`

@@ -268,7 +268,7 @@ def test_first_contact_directive_fits_chatgpt_limit() -> None:
 def test_remote_tool_surface_is_the_protocol_tools_with_step_descriptions() -> None:
     assert BOOTSTRAP_TOOL == "begin_biologix_discovery"
     assert REMOTE_PROTOCOL_TOOLS[0] == BOOTSTRAP_TOOL
-    assert len(REMOTE_PROTOCOL_TOOLS) == len(set(REMOTE_PROTOCOL_TOOLS)) == 24
+    assert len(REMOTE_PROTOCOL_TOOLS) == len(set(REMOTE_PROTOCOL_TOOLS)) == 25
     for hidden in ("pubmed_search", "run_autonomous_discovery", "start_discovery_session", "generate_psmiles_from_name"):
         assert hidden not in REMOTE_PROTOCOL_TOOLS
     assert set(REMOTE_TOOL_STEPS) == set(REMOTE_PROTOCOL_TOOLS)
