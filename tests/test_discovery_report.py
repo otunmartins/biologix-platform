@@ -62,8 +62,8 @@ def test_compile_markdown_to_pdf_minimal(tmp_path):
     assert (sess / "SUMMARY_REPORT.pdf").is_file()
 
 
-def test_compile_markdown_to_pdf_table_fallback(tmp_path):
-    """GitHub-style tables that break fpdf2 should fall back to plain-text blocks."""
+def test_compile_markdown_to_pdf_renders_tables(tmp_path):
+    """GitHub-style tables render as real tables."""
     pytest.importorskip("markdown")
     pytest.importorskip("fpdf")
 
@@ -76,9 +76,7 @@ def test_compile_markdown_to_pdf_table_fallback(tmp_path):
     out = compile_markdown_to_pdf(sess, markdown_filename="SUMMARY_REPORT.md")
     assert out.get("ok") is True, out
     assert (sess / "SUMMARY_REPORT.pdf").is_file()
-    assert out.get("pdf_render_mode") in ("html", "plain_tables_fallback")
-    if out.get("pdf_render_mode") == "plain_tables_fallback":
-        assert out.get("warnings")
+    assert out.get("pdf_render_mode") == "native"
 
 
 def test_compile_markdown_to_pdf_rgba_png_no_manual_raster(tmp_path):

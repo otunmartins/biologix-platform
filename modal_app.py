@@ -136,8 +136,11 @@ base_image = modal.Image.from_dockerfile(
     ignore=_outside_base_context,
     build_args={"VERIFY_IMAGE": "0"},
 )
+# Node runs the avoid-ai-writing detector that checks report prose. A pip wheel supplies it
+# as a thin layer over the base image, so adding it does not rebuild the base.
 image = (
-    base_image.add_local_dir(REPO_ROOT / "src" / "python", "/app/src/python", ignore=_SOURCE_IGNORE)
+    base_image.pip_install("nodejs-wheel-binaries>=22")
+    .add_local_dir(REPO_ROOT / "src" / "python", "/app/src/python", ignore=_SOURCE_IGNORE)
     .add_local_dir(REPO_ROOT / "scripts", "/app/scripts", ignore=_SOURCE_IGNORE)
     .add_local_file(REPO_ROOT / "biologix_ai_mcp_server.py", "/app/biologix_ai_mcp_server.py")
 )
@@ -237,8 +240,25 @@ def verify_runtime() -> dict[str, Any]:
     return {
         "ok": True,
         "modal_runtime_path": str(Path(modal_module.__file__).parent),
+        "report_tools": _verify_report_tools(),
         **asdict(report),
     }
+
+
+def _verify_report_tools() -> dict[str, Any]:
+    """The report needs Node (style detector) and bundled fonts (PDF text); prove both work."""
+    import tempfile
+
+    style = importlib.import_module("biologix_ai.report.style_check")
+    pdf = importlib.import_module("biologix_ai.report.pdf_render")
+    seen = style.analyze("It is important to note that this robust, comprehensive tool delves in.")
+    with tempfile.TemporaryDirectory() as tmp:
+        out = Path(tmp) / "r.pdf"
+        result = pdf.render_markdown_to_pdf("# Check\n\nEnergy \u22123931.2 kJ/mol \u2014 ok.\n", out, Path(tmp))
+        rendered = out.is_file() and out.stat().st_size > 1000
+    ok = bool(seen["available"] and seen["issues"] and rendered)
+    return {"ok": ok, "detector": seen["available"], "findings": len(seen["issues"]), "pdf": rendered,
+            "pages": result.pages}
 
 
 @app.function(

@@ -690,6 +690,15 @@ class ProtocolGate:
                 return _attach(result, payload, self._record_resolve(payload))
             return _attach(result, payload, self.envelope(None, after=tool))
 
+        if isinstance(payload, dict) and payload.get("revision_requested") is True:
+            # A request to rewrite prose, not a failure: nothing was written, so the tool
+            # is not done and its failure count does not move.
+            envelope = self.envelope(state, after=tool)
+            envelope["user_stop_allowed"] = False
+            envelope["rule"] = str(payload.get("instructions") or envelope.get("rule", ""))
+            save_state(state)
+            return _attach(result, payload, envelope)
+
         failure = _infrastructure_failure(payload, result)
         if failure:
             state.blocked_tool = tool

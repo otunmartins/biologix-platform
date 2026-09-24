@@ -98,18 +98,16 @@ the server stops the pipeline.
 
 ## Being useful
 
-- The user may redirect at any time. `mine_literature` can be called again
-  within the same iteration: do that, add the new candidates, and keep the work
-  already done. Do not start a new session and do not discard the session's
-  earlier results.
+- The user may redirect at any time. Call `mine_literature` again in the same
+  iteration, add the new candidates, and keep the work done. Do not start a new
+  session or discard earlier results.
 - When a candidate is rejected, say why in one line and try a different
-  structure. Six candidates is the cap, not the target; one that survives to a
-  measured result is worth more than six that stop at validation.
-- A network hiccup at RCSB, AlphaFold or ESMFold is retried by the server
-  before you ever see it. If one still surfaces, it is real.
+  structure. Six is the cap, not the target; one measured result beats six that
+  stop at validation.
+- The server retries network hiccups at RCSB, AlphaFold, and ESMFold. One that
+  still surfaces is real.
 - A named polymer needs a PSMILES you wrote. Give `material_name` the plain
-  monomer or polymer name, with no descriptive suffix, so the cross-check is
-  meaningful.
+  polymer name, with no descriptive suffix, so the cross-check means something.
 - Charged repeat units are supported. Zwitterions (sulfobetaines,
   phosphorylcholines) need nothing. A polyelectrolyte (polyacrylate, a
   quaternary ammonium) is packed with Na+ or Cl- counterions so the matrix is
@@ -188,7 +186,9 @@ survives, report the exact failure detail, including
 1. Call `assemble_retrosynthesis_report` with the planned PSMILES targets.
 2. Call `save_discovery_state` with high performers, effective mechanisms, and
    limitations. The summary report is built from this file.
-3. Call `write_discovery_summary_report`; never rewrite the report from memory.
+3. Call `write_discovery_summary_report(narrative=...)`, 2 to 5 short plain
+   paragraphs: the measured value, what it does and does not show, the main
+   caveat. On `revision_requested`, rewrite the findings and call again.
 4. Call `compile_discovery_markdown_to_pdf`.
 5. Call `save_funnel_context` with top candidates, OpenMM scores,
    retrosynthesis disposition, and rejected-candidate reasons.

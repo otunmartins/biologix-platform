@@ -2518,27 +2518,54 @@ def compile_discovery_markdown_to_pdf(
     run_dir: str = "",
 ) -> str:
     """
-    Convert **agent-written** Markdown (default ``SUMMARY_REPORT.md``) to a PDF in the session folder.
+    Render a Markdown file in the session folder (default ``SUMMARY_REPORT.md``) to a PDF.
 
-    You compose the narrative, tables, and interpretation in Markdown; follow ``docs/SUMMARY_REPORT_STYLE.md``
-    (research-paper tone, full journal-style references, avoid em-dash/colon AI prose patterns). Call
-    ``render_psmiles_png`` for 2D figures, reference them in the MD, then run this tool to produce
-    ``SUMMARY_REPORT.pdf``. Uses **markdown** + **fpdf2** + **Pillow** (see ``docs/DEPENDENCIES.md``).
-    Local images (e.g. under ``structures/``) are re-encoded to RGB PNG for fpdf2; you do not need
-    separate ``*_raster.png`` copies. Relative image paths are resolved against the session directory.
+    Images are scaled to fit the page and each image is drawn once, so list a figure once.
+    Tables, lists, headings, code, and Unicode text are supported.
+
+    The writing is checked first. Report text is cleaned of em dashes, curly quotes, and
+    emoji. A report you wrote yourself is also held to the avoid-ai-writing check: if it
+    still carries AI-sounding patterns the tool returns ``revision_requested`` with the
+    findings and writes nothing; rewrite the flagged passages and call again. The report
+    ``write_discovery_summary_report`` builds is only cleaned, not held back.
     """
     session = _session_dir_for_mcp(run_dir)
     from biologix_ai.discovery_report import compile_markdown_to_pdf
+    from biologix_ai.report import style_check
+    from biologix_ai.report.builder import GENERATED_MARKER
 
     md_name = markdown_path.strip() or "SUMMARY_REPORT.md"
     pdf_name = output_pdf_name.strip() or "SUMMARY_REPORT.pdf"
+    md_file = Path(md_name) if Path(md_name).is_absolute() else session / md_name
+    style: Dict[str, Any] = {}
+    if md_file.is_file():
+        original = md_file.read_text(encoding="utf-8")
+        outcome = style_check.review(original, attempt=style_check.attempts(session, "compile"), label="the report")
+        generated = original.lstrip().startswith(GENERATED_MARKER)
+        if outcome["revise"] and not generated:
+            style_check.record_attempt(session, "compile")
+            return json.dumps(
+                style_check.revision_payload(outcome, "the report", "compile_discovery_markdown_to_pdf"),
+                indent=2,
+                default=str,
+            )
+        if outcome["text"] != original:
+            md_file.write_text(outcome["text"], encoding="utf-8")
+        style = {
+            "mechanical_fixes": outcome["mechanical_fixes"],
+            "findings_remaining": outcome["findings_count"],
+            "checked": outcome["detector_available"],
+        }
+        if outcome.get("note"):
+            style["note"] = outcome["note"]
 
     def _run() -> Dict[str, Any]:
-        return compile_markdown_to_pdf(
-            session,
-            markdown_filename=md_name,
-            output_pdf_name=pdf_name,
+        result = compile_markdown_to_pdf(
+            session, markdown_filename=md_name, output_pdf_name=pdf_name
         )
+        if style:
+            result["style"] = style
+        return result
 
     payload = run_guarded_tool(
         "compile_discovery_markdown_to_pdf",
@@ -2546,40 +2573,69 @@ def compile_discovery_markdown_to_pdf(
         _run,
         stage="pdf_compile",
         artifact_key="pdf",
-        failure_hint=(
-            "PDF compile failed; SUMMARY_REPORT.md may contain tables fpdf2 cannot render. "
-            "Check tool_errors.log — a plain-text table fallback is attempted automatically."
-        ),
+        failure_hint="PDF compile failed; read tool_errors.log in the session folder.",
     )
     return json.dumps(payload, indent=2, default=str)
 
 
 @mcp.tool()
 def write_discovery_summary_report(
-    title: str = "Discovery summary",
+    title: str = "",
     run_dir: str = "",
     include_all_iterations: bool = True,
+    narrative: str = "",
 ) -> str:
     """
-    **Optional batch helper** (not a substitute for an AI-written report): reads ``agent_iteration_*.json``,
-    auto-builds a minimal **SUMMARY_REPORT.md** + PNGs + PDF from saved feedback only—use when you need
-    a quick skeleton without narrative. Any openmm_evaluate_psmiles-style files already in ``structures/``
-    (``*_monomer.png``, ``*_complex_preview.png``, ``*_complex_chemviz.png``, optional ``*_complex_minimized_pymol.png``)
-    are embedded in the Markdown (and PDF) under each matching candidate slug, or in a **Molecular visualizations**
-    section for filenames that do not match feedback labels (e.g. ``Candidate_0_*``). For **normal** scientific
-    summaries, the agent should write ``SUMMARY_REPORT.md`` and call ``compile_discovery_markdown_to_pdf`` after
-    ``render_psmiles_png`` (same image paths; see ``docs/SUMMARY_REPORT_STYLE.md``).
-    Requires **psmiles**, **fpdf2**, **markdown** (see ``docs/DEPENDENCIES.md``).
+    Build the session report (``SUMMARY_REPORT.md`` and its PDF) from everything the session saved.
+
+    It carries a summary, the target structure, the method, a candidate table with screening,
+    OpenMM energy, platform and retrosynthesis outcome per candidate, each structure image once,
+    your saved findings and limitations, the full retrosynthesis report, and references.
+
+    ``narrative`` is optional: 2 to 5 short paragraphs of your own interpretation, placed after
+    the summary. Write them the way a chemist writes a lab report. Give the measured value, say
+    what it does and does not show, and name the caveat. Avoid filler openers ("it is important
+    to note"), inflated words (robust, comprehensive, seamless, landscape, leverage, delve,
+    transformative), stacked hedges, and em dashes. Your narrative and your saved findings are
+    checked with the avoid-ai-writing detector. If they still read as AI-written the tool
+    returns ``revision_requested`` with the exact findings and writes nothing; rewrite those
+    passages and call again. After two rewrites the report is written as it stands.
     """
     session = _session_dir_for_mcp(run_dir)
+    from biologix_ai.report import style_check
+    from biologix_ai.report.builder import agent_written_text
     from biologix_ai.discovery_report import write_session_summary_reports
 
+    prose = agent_written_text(session, narrative, include_all_iterations)
+    tries = style_check.attempts(session, "summary")
+    outcome = style_check.review(prose, attempt=tries, label="your narrative and saved findings")
+    if outcome["revise"]:
+        style_check.record_attempt(session, "summary")
+        return json.dumps(
+            style_check.revision_payload(
+                outcome, "your narrative and saved findings", "write_discovery_summary_report"
+            ),
+            indent=2,
+            default=str,
+        )
+    clean_narrative, _ = style_check.mechanical_fixes(narrative)
+
     def _run() -> Dict[str, Any]:
-        return write_session_summary_reports(
+        result = write_session_summary_reports(
             session,
             title=title,
             include_all_iterations=include_all_iterations,
+            narrative=clean_narrative,
         )
+        result["style"] = {
+            "mechanical_fixes": outcome["mechanical_fixes"],
+            "findings_remaining": outcome["findings_count"],
+            "checked": outcome["detector_available"],
+            "rewrites_requested": tries,
+        }
+        if outcome.get("note"):
+            result["style"]["note"] = outcome["note"]
+        return result
 
     payload = run_guarded_tool(
         "write_discovery_summary_report",
@@ -2588,6 +2644,7 @@ def write_discovery_summary_report(
         stage="summary_report",
         artifact_key="markdown",
     )
+    style_check.reset_attempts(session, "summary")
     return json.dumps(payload, indent=2, default=str)
 
 
