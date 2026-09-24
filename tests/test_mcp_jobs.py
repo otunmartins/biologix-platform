@@ -324,3 +324,48 @@ def test_jobs_are_not_persisted_over_stdio(monkeypatch, tmp_path) -> None:
     monkeypatch.delenv("BIOLOGIX_JOBS_DIR", raising=False)
     monkeypatch.setenv("BIOLOGIX_MCP_TRANSPORT", "stdio")
     assert mcp_jobs.jobs_dir() is None
+
+
+def test_a_job_cut_off_by_container_shutdown_is_resumed_not_recorded_as_failed(monkeypatch, tmp_path) -> None:
+    """The real failure: a deploy closed Modal's client under a running simulation. The dying
+    thread's error was stored as the job's final result and replayed to the agent."""
+    from mcp.server.fastmcp import FastMCP
+
+    monkeypatch.setenv("BIOLOGIX_JOBS_DIR", str(tmp_path))
+    monkeypatch.setenv("BIOLOGIX_TOOL_WAIT_S", "0.2")
+    calls = []
+    mcp = FastMCP("cutoff")
+
+    @mcp.tool()
+    def simulate(value: str = "x") -> str:
+        calls.append(value)
+        if len(calls) == 1:  # the first container is shut down while this runs
+            return json.dumps({"ok": False, "error": "47026404682448",
+                               "traceback": "modal.exception.ClientClosed: 47026404682448"})
+        return json.dumps({"ok": True, "value": value, "run": len(calls)})
+
+    install_job_runner(mcp)
+
+    async def scenario():
+        first = json.loads(await mcp._tool_manager._tools["simulate"].fn(value="sim"))
+        job_id = first.get("job_id") or json.loads(next(iter(tmp_path.glob("*.json"))).read_text())["job_id"]
+        for _ in range(100):
+            await asyncio.sleep(0.02)
+        record = json.loads((tmp_path / f"{job_id}.json").read_text())
+        assert record["status"] == "running" and "result" not in record  # not stored as an outcome
+        _forget_jobs()                                                    # the next container
+        resumed = json.loads(await await_job(job_id, 0.3))
+        assert resumed.get("error") != "47026404682448"
+        return json.loads(await await_job(job_id, 5))
+
+    done = asyncio.run(scenario())
+    assert done["ok"] is True and done["value"] == "sim" and len(calls) == 2
+
+
+def test_shutdown_errors_are_recognised_and_ordinary_failures_are_not() -> None:
+    from biologix_ai.interruption import is_shutdown_interruption
+
+    assert is_shutdown_interruption("modal.exception.ClientClosed: 4702")
+    assert is_shutdown_interruption(RuntimeError("cannot schedule new futures after interpreter shutdown"))
+    assert not is_shutdown_interruption('{"ok": false, "error": "Packmol did not converge"}')
+    assert not is_shutdown_interruption("PSMILES failed GAFF parameterization")

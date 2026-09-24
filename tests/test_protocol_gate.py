@@ -18,7 +18,8 @@ from mcp.server.fastmcp import FastMCP
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src" / "python"))
 
-from biologix_ai.protocol_gate import (  # noqa: E402
+from biologix_ai.protocol_gate import (
+    MAX_TOOL_RETRIES,  # noqa: E402
     BOOTSTRAP_TOOL,
     FIRST_CONTACT_DIRECTIVE,
     PROTOCOL_ORDER_ERROR,
@@ -124,6 +125,12 @@ def _build_fake_server(session_dir: Path, config: Dict[str, Any]) -> FastMCP:
         response_format: str = "concise",
     ) -> str:
         _mark("openmm_evaluate_psmiles")
+        if config.get("openmm_interrupted"):
+            # What run_guarded_tool returns when a deploy closes Modal's client under a running job.
+            return json.dumps(
+                {"ok": False, "error": "47026404682448",
+                 "traceback": "Traceback ...\nmodal.exception.ClientClosed: 47026404682448\n"}
+            )
         if config.get("openmm_abort"):
             return json.dumps({"ok": False, "abort": True, "error": "packmol not on PATH"})
         return json.dumps(
@@ -774,3 +781,20 @@ def test_candidate_budgets_are_configurable(monkeypatch) -> None:
         monkeypatch.delenv("BIOLOGIX_MAX_OPENMM_CANDIDATES", raising=False)
         monkeypatch.delenv("BIOLOGIX_MAX_RETRO_TARGETS", raising=False)
         importlib.reload(gate_module)
+
+
+def test_a_call_cut_off_by_a_restart_is_not_recorded_as_a_failure(harness) -> None:
+    """A deploy mid-simulation produced ClientClosed; it counted as a failed attempt and stopped the run."""
+    call = harness["call"]
+    _through_screen(call, harness["session"], [PASS_A])
+    harness["config"]["openmm_interrupted"] = True
+    for _ in range(MAX_TOOL_RETRIES + 2):  # far more than the retry cap
+        result = call("openmm_evaluate_psmiles", psmiles_list=PASS_A)
+        assert result.get("protocol", {}).get("stage") != "blocked"
+    from biologix_ai.protocol_gate import load_state
+
+    state = load_state(Path(harness["session"]))
+    assert state.blocked_tool == "" and state.failures.get("openmm_evaluate_psmiles", 0) == 0
+    harness["config"]["openmm_interrupted"] = False
+    ok = call("openmm_evaluate_psmiles", psmiles_list=PASS_A)
+    assert _protocol(ok)["next_required_tool"] == "save_pipeline_stage"

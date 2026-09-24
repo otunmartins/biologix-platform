@@ -34,6 +34,7 @@ from dataclasses import asdict, dataclass, field, fields
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Mapping, Optional, Tuple
 
+from biologix_ai.interruption import is_shutdown_interruption
 from biologix_ai.mcp_client import client_key
 from biologix_ai.mcp_tool_guard import log_tool_event
 from biologix_ai.protocol import section, step_instructions
@@ -676,6 +677,8 @@ class ProtocolGate:
 
     def record(self, tool: str, arguments: Mapping[str, Any], result: str) -> str:
         """Update the stage machine from *result* and attach the protocol envelope."""
+        if is_shutdown_interruption(result):
+            return result  # cut off by a restart: not an outcome, so nothing is recorded
         payload = _parse(result)
         if tool in _UNGATED_TOOLS:
             return result

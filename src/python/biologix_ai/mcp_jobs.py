@@ -31,6 +31,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable, Dict, Optional, Tuple
 
+from biologix_ai.interruption import is_shutdown_interruption
 from biologix_ai.mcp_client import client_key
 
 JOB_RUNNING = "JOB_RUNNING"
@@ -264,7 +265,12 @@ def _register(
 def _attach_future(job: Job, future: Future) -> None:
     def _mark(_f: Future) -> None:
         job.finished = time.time()
-        _persist(job, status="done", result=_result_text(_f))
+        text = _result_text(_f)
+        if is_shutdown_interruption(text):
+            # This container is going away mid-job. Leave the record "running" so the next
+            # container resumes the job; a stored "done" would replay this error forever.
+            return
+        _persist(job, status="done", result=text)
 
     job.future = future
     future.add_done_callback(_mark)

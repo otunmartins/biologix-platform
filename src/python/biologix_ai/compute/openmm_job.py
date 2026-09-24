@@ -10,6 +10,7 @@ no volume has to be shared or reloaded between containers.
 from __future__ import annotations
 
 import os
+import json
 import tempfile
 import time
 from dataclasses import asdict, dataclass, field
@@ -40,6 +41,8 @@ class OpenMMJobSpec:
     # bundled insulin), or the PDB text of a prepared target. Neither = default insulin.
     target_package_path: str = ""
     target_pdb_text: str = ""
+    # The biologic's display name, for progress text; the worker has only the PDB text.
+    target_label: str = ""
     env: Dict[str, str] = field(default_factory=dict)
     # Where a worker reports its stage so the caller's job can show it.
     progress_key: str = ""
@@ -61,7 +64,13 @@ def target_for_spec(target_pdb_path: str) -> Dict[str, str]:
     try:
         return {"target_package_path": str(path.relative_to(PACKAGE_ROOT))}
     except ValueError:
-        return {"target_pdb_text": path.read_text(encoding="utf-8")}
+        spec: Dict[str, str] = {"target_pdb_text": path.read_text(encoding="utf-8")}
+        try:
+            info = json.loads((path.parent / "biologic_target.json").read_text(encoding="utf-8"))
+            spec["target_label"] = str(info.get("canonical_name") or info.get("resolved_target") or "")
+        except (OSError, ValueError):
+            pass
+        return spec
 
 
 def run_openmm_job(
@@ -227,6 +236,10 @@ def run_openmm_job_remote(spec_dict: Dict[str, Any]) -> Dict[str, Any]:
         elif spec.target_pdb_text:
             target_file = root / "biologic_target.pdb"
             target_file.write_text(spec.target_pdb_text, encoding="utf-8")
+            if spec.target_label:  # progress text names the protein from the file beside the PDB
+                (root / "biologic_target.json").write_text(
+                    json.dumps({"canonical_name": spec.target_label}), encoding="utf-8"
+                )
             target = str(target_file)
         structures = root / "structures"
         structures.mkdir()
