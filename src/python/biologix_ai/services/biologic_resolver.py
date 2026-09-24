@@ -89,7 +89,7 @@ _CURATED_TARGETS: Dict[str, str] = {
 }
 
 # The bundled insulin file is simulated as it always has been: chains A+B of
-# 4F1C, prepared by openmm_insulin rather than PDBFixer.
+# 4F1C, prepared by openmm_protein rather than PDBFixer.
 _BUNDLED_INSULIN_ID = "4F1C"
 _BUNDLED_INSULIN_CHAINS: Tuple[str, ...] = ("A", "B")
 
@@ -750,16 +750,16 @@ def force_field_check(pdb_path: Path) -> Tuple[int, str]:
         PROTONATION_PH,
         target_protein_chains,
     )
-    from biologix_ai.simulation.openmm_insulin import (  # noqa: PLC0415
-        load_insulin_modeller,
-        prepare_insulin_ab_pdb,
+    from biologix_ai.simulation.openmm_protein import (  # noqa: PLC0415
+        load_protein_modeller,
+        prepare_protein_pdb,
     )
 
     with tempfile.TemporaryDirectory(prefix="biologix_ffcheck_") as work:
         work_pdb = Path(work) / "target.pdb"
-        prepare_insulin_ab_pdb(str(pdb_path), str(work_pdb), chains=target_protein_chains(str(pdb_path)))
+        prepare_protein_pdb(str(pdb_path), str(work_pdb), chains=target_protein_chains(str(pdb_path)))
         try:
-            modeller = load_insulin_modeller(str(work_pdb), add_ssbond=True)
+            modeller = load_protein_modeller(str(work_pdb), add_ssbond=True)
             forcefield = app.ForceField("amber14-all.xml")
             modeller.addHydrogens(forcefield, pH=PROTONATION_PH)
             forcefield.createSystem(modeller.topology, nonbondedMethod=app.NoCutoff)

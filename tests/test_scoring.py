@@ -64,7 +64,7 @@ def test_discovery_score_composite_branch():
         "property_analysis": {
             "a": {
                 "interaction_energy_kj_mol": -150.0,
-                "insulin_rmsd_to_initial_nm": 0.06,
+                "protein_rmsd_to_initial_nm": 0.06,
             },
         },
     }

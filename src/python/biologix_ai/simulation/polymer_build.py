@@ -15,7 +15,7 @@ INSULIN_PDB_URL = "https://files.rcsb.org/download/4F1C.pdb"
 INSULIN_PDB_ALT = "https://files.rcsb.org/download/4INS.pdb"
 
 
-def ensure_insulin_pdb() -> str:
+def ensure_default_target_pdb() -> str:
     os.makedirs(DATA_DIR, exist_ok=True)
     if os.path.isfile(INSULIN_PDB_PATH) and os.path.getsize(INSULIN_PDB_PATH) > 1000:
         return INSULIN_PDB_PATH

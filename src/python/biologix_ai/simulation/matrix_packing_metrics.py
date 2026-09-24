@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-Quantitative packing metrics for insulin + polymer matrix PDBs.
+Quantitative packing metrics for protein + polymer matrix PDBs.
 
-OpenMM writes **all** protein atoms first (``n_insulin_atoms`` records), then polymer atoms.
+OpenMM writes **all** protein atoms first (``n_protein_atoms`` records), then polymer atoms.
 """
 
 from __future__ import annotations
@@ -68,7 +68,7 @@ def compute_matrix_packing_metrics(
 
     Args:
         pdb_path: Minimized complex PDB.
-        n_protein_atoms_total: OpenMM ``n_insulin_atoms`` (includes hydrogens in count).
+        n_protein_atoms_total: OpenMM ``n_protein_atoms`` (includes hydrogens in count).
     """
     path = Path(pdb_path)
     if not path.is_file():

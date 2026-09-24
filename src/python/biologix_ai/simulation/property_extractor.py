@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Property extraction after OpenMM minimize on merged insulin + polymer.
+Property extraction after OpenMM minimize on merged protein + polymer.
 
 Uses interaction energy, optional RMSD/contacts when present, and composite score.
 """
@@ -17,13 +17,13 @@ class PropertyExtractor:
         self,
         interaction_favorable_max_kj: float = -5.0,
         interaction_unfavorable_min_kj: float = 50.0,
-        min_insulin_polymer_contacts: int = 5,
-        insulin_rmsd_problematic_nm: float = 0.45,
+        min_protein_polymer_contacts: int = 5,
+        protein_rmsd_problematic_nm: float = 0.45,
     ):
         self.interaction_favorable_max_kj = interaction_favorable_max_kj
         self.interaction_unfavorable_min_kj = interaction_unfavorable_min_kj
-        self.min_insulin_polymer_contacts = min_insulin_polymer_contacts
-        self.insulin_rmsd_problematic_nm = insulin_rmsd_problematic_nm
+        self.min_protein_polymer_contacts = min_protein_polymer_contacts
+        self.protein_rmsd_problematic_nm = protein_rmsd_problematic_nm
 
     def extract_feedback(
         self,
@@ -45,9 +45,9 @@ class PropertyExtractor:
                 problematic_features.append(f"evaluation_failed:{name}")
                 continue
             e_int = res.get("interaction_energy_kj_mol")
-            contacts = res.get("insulin_polymer_contacts")
+            contacts = res.get("protein_polymer_contacts")
             e_complex = res.get("potential_energy_complex_kj_mol")
-            rmsd = res.get("insulin_rmsd_to_initial_nm")
+            rmsd = res.get("protein_rmsd_to_initial_nm")
             composite = None
             if e_int is not None and rmsd is not None:
                 try:
@@ -62,22 +62,22 @@ class PropertyExtractor:
                     problematic_features.append(f"high_interaction_energy:{name}")
             if rmsd is not None and rmsd == rmsd:
                 if rmsd <= 0.15:
-                    effective_mechanisms.append("insulin_structure_preserved")
-                if rmsd >= self.insulin_rmsd_problematic_nm:
-                    problematic_features.append(f"high_insulin_distortion:{name}")
+                    effective_mechanisms.append("protein_structure_preserved")
+                if rmsd >= self.protein_rmsd_problematic_nm:
+                    problematic_features.append(f"high_protein_distortion:{name}")
             if contacts is not None:
-                if contacts >= self.min_insulin_polymer_contacts:
-                    effective_mechanisms.append("insulin_polymer_contacts")
+                if contacts >= self.min_protein_polymer_contacts:
+                    effective_mechanisms.append("protein_polymer_contacts")
                 elif contacts < 2:
-                    problematic_features.append(f"low_insulin_contacts:{name}")
+                    problematic_features.append(f"low_protein_contacts:{name}")
             property_analysis[name] = {
                 "interaction_energy_kj_mol": e_int,
-                "insulin_rmsd_to_initial_nm": rmsd,
+                "protein_rmsd_to_initial_nm": rmsd,
                 "composite_screening_score": composite,
                 "potential_energy_complex_kj_mol": e_complex,
-                "potential_energy_insulin_kj_mol": res.get("potential_energy_insulin_kj_mol"),
+                "potential_energy_protein_kj_mol": res.get("potential_energy_protein_kj_mol"),
                 "potential_energy_polymer_kj_mol": res.get("potential_energy_polymer_kj_mol"),
-                "insulin_polymer_contacts": contacts,
+                "protein_polymer_contacts": contacts,
                 "method": res.get("method"),
                 "psmiles": res.get("psmiles"),
             }

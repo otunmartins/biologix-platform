@@ -253,7 +253,7 @@ def run_autonomous_discovery(req: RunAutonomousDiscoveryRequest) -> Dict[str, An
 def get_materials_status() -> Dict[str, Any]:
     from biologix_ai.services.literature_service import paper_qa_index_status
 
-    lines = ["Insulin AI Materials Discovery Status"]
+    lines = ["Biologix Materials Discovery Status"]
     try:
         from biologix_ai.simulation.openmm_compat import describe_md_backend
 

@@ -109,7 +109,7 @@ Discovery runs write outputs to `runs/<session_id>/`. Each session gets its own 
 | Capability | Requires |
 |------------|----------|
 | `validate_psmiles`, `generate_psmiles_from_name`, `render_psmiles_png` | RDKit, psmiles (from conda env). No OpenMM. |
-| `openmm_evaluate_psmiles`, `run_autonomous_discovery` | OpenMM, Packmol, insulin PDB (`data/4F1C.pdb` or `ensure_insulin_pdb`). |
+| `openmm_evaluate_psmiles`, `run_autonomous_discovery` | OpenMM, Packmol, insulin PDB (`data/4F1C.pdb` or `ensure_default_target_pdb`). |
 | `mine_literature` (semantic search) | Optional: Asta API key (`ASTA_API_KEY`) for richer search; else Semantic Scholar (no key). |
 
 If OpenMM or Packmol is missing, literature search and validation still work; screening tools will fail with a clear error. See [DEPENDENCIES.md](DEPENDENCIES.md) and [OPENMM_SCREENING.md](OPENMM_SCREENING.md).

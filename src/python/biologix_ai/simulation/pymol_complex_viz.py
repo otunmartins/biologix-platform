@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-PyMOL (open-source) rendering for insulin–polymer complexes:
+PyMOL (open-source) rendering for protein–polymer complexes:
 
-- **Protein (insulin):** cartoon ribbon with ``dss``-assigned secondary structure
+- **Protein (protein):** cartoon ribbon with ``dss``-assigned secondary structure
   (helix/sheet/coil).
 - **Polymer:** bonded sticks (distance connect when CONECT records are missing).
 
@@ -106,7 +106,7 @@ def write_complex_pymol_png(
     Parameters
     ----------
     n_protein_atoms
-        Number of leading atoms in the PDB that belong to insulin (matrix minimize output
+        Number of leading atoms in the PDB that belong to protein (matrix minimize output
         order). Strongly recommended for correct protein vs polymer split.
     protein_chains
         Used only when *n_protein_atoms* is unset: cartoon for these chains, sticks for

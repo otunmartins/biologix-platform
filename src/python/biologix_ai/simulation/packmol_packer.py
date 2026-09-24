@@ -1,22 +1,22 @@
 #!/usr/bin/env python3
 """
-Packmol integration for insulin + polymer matrix packing.
+Packmol integration for protein + polymer matrix packing.
 
-Packs insulin (1 copy, fixed at box center) and polymer chains (N copies)
+Packs protein (1 copy, fixed at box center) and polymer chains (N copies)
 into a cubic periodic box.  Two packing modes are supported:
 
-  **bulk** (default): polymers fill the entire cell around insulin.
-  Suitable for periodic MD of an insulin–polymer matrix.
+  **bulk** (default): polymers fill the entire cell around protein.
+  Suitable for periodic MD of an protein–polymer matrix.
 
   **shell**: polymers are placed inside the box but outside a central
-  exclusion sphere, creating an annular shell around insulin.
+  exclusion sphere, creating an annular shell around protein.
 
 When *box_size_nm* is None (default), the box is auto-sized to be just
-large enough to contain the insulin and the requested number of polymer
+large enough to contain the protein and the requested number of polymer
 chains at a reasonable packing density.
 
 Coordinates in the output PDB span [0, L] in each dimension, with
-insulin centered at (L/2, L/2, L/2).
+protein centered at (L/2, L/2, L/2).
 """
 
 import os
@@ -101,7 +101,7 @@ def _parse_pdb_extents(pdb_path: str) -> Tuple[int, Tuple[float, float, float]]:
 
 
 def estimate_box_edge_angstrom(
-    insulin_pdb_path: str,
+    protein_pdb_path: str,
     polymer_pdb_path: str,
     n_polymers: int,
     tolerance_angstrom: float = 2.0,
@@ -110,19 +110,19 @@ def estimate_box_edge_angstrom(
     packing_fraction: float = 0.40,
 ) -> float:
     """
-    Estimate the minimum cubic box edge (Angstroms) for insulin + N polymers.
+    Estimate the minimum cubic box edge (Angstroms) for protein + N polymers.
 
     Two independent lower bounds are computed and the larger is returned:
 
     1. **Volume-based** – total atom count × *volume_per_atom_A3* divided by
        a target *packing_fraction*, then cube-rooted.
-    2. **Insulin-extent-based** – largest insulin bounding-box dimension +
+    2. **Protein-extent-based** – largest protein bounding-box dimension +
        2 × *padding_angstrom*.
 
     An extra *tolerance_angstrom* is added so that atoms near the periodic
     boundary do not clash with their images.
     """
-    n_ins, ins_spans = _parse_pdb_extents(insulin_pdb_path)
+    n_ins, ins_spans = _parse_pdb_extents(protein_pdb_path)
     n_poly, _ = _parse_pdb_extents(polymer_pdb_path)
 
     # Volume-based estimate
@@ -130,7 +130,7 @@ def estimate_box_edge_angstrom(
     box_vol = (total_atoms * volume_per_atom_A3) / packing_fraction
     edge_vol = box_vol ** (1.0 / 3.0)
 
-    # Insulin extent based estimate
+    # Protein extent based estimate
     edge_ins = max(ins_spans) + 2.0 * padding_angstrom
 
     # Take the larger, then add tolerance for periodic-image safety
@@ -143,7 +143,7 @@ def estimate_box_edge_angstrom(
 
 
 def build_packmol_inp_content(
-    insulin_pdb_path: str,
+    protein_pdb_path: str,
     polymer_pdb_path: str,
     n_polymers: int,
     output_path: str,
@@ -164,7 +164,7 @@ def build_packmol_inp_content(
     writes structures in declaration order, so the packed file is protein,
     then polymer chains, then these.
 
-    The box occupies [0, L]³ with insulin centred at (L/2, L/2, L/2).
+    The box occupies [0, L]³ with protein centred at (L/2, L/2, L/2).
     Polymer atoms are constrained to [tol/2, L − tol/2]³ so that no atom
     is closer than tol/2 to the boundary, preventing periodic-image clashes.
     """
@@ -207,7 +207,7 @@ def build_packmol_inp_content(
         f"nloop {nloop}\n"
         f"movebadrandom\n"
         f"\n"
-        f"structure {insulin_pdb_path}\n"
+        f"structure {protein_pdb_path}\n"
         f"  number 1\n"
         f"  center\n"
         f"  fixed {half:.2f} {half:.2f} {half:.2f} 0. 0. 0.\n"
@@ -226,8 +226,8 @@ def build_packmol_inp_content(
 # ---------------------------------------------------------------------------
 
 
-def pack_insulin_polymers(
-    insulin_pdb_path: str,
+def pack_protein_polymers(
+    protein_pdb_path: str,
     polymer_pdb_path: str,
     n_polymers: int,
     output_path: str,
@@ -243,16 +243,16 @@ def pack_insulin_polymers(
     extra_species: Optional[Sequence[Tuple[str, int]]] = None,
 ) -> dict:
     """
-    Pack insulin and *n_polymers* polymer chains into a cubic box with Packmol.
+    Pack protein and *n_polymers* polymer chains into a cubic box with Packmol.
 
-    Insulin is centred in the box and held fixed.  Polymers are placed
+    Protein is centred in the box and held fixed.  Polymers are placed
     around it subject to the chosen *packing_mode* and Packmol's overlap
     tolerance.
 
     Parameters
     ----------
-    insulin_pdb_path : str
-        Path to insulin PDB (should include hydrogens).
+    protein_pdb_path : str
+        Path to protein PDB (should include hydrogens).
     polymer_pdb_path : str
         Path to a single polymer chain PDB.
     n_polymers : int
@@ -299,11 +299,11 @@ def pack_insulin_polymers(
         fail["stderr"] = "packmol not found"
         return fail
 
-    insulin_pdb_path = str(Path(insulin_pdb_path).resolve())
+    protein_pdb_path = str(Path(protein_pdb_path).resolve())
     polymer_pdb_path = str(Path(polymer_pdb_path).resolve())
     output_path = str(Path(output_path).resolve())
 
-    for label, path in [("Insulin PDB", insulin_pdb_path),
+    for label, path in [("Protein PDB", protein_pdb_path),
                         ("Polymer PDB", polymer_pdb_path)]:
         if not Path(path).is_file():
             warnings.warn(f"{label} not found: {path}")
@@ -317,14 +317,14 @@ def pack_insulin_polymers(
     if box_size_nm is not None:
         box_edge_A = box_size_nm * 10.0
         floor_A = protein_box_floor_nm(
-            insulin_pdb_path, padding_angstrom, tolerance_angstrom
+            protein_pdb_path, padding_angstrom, tolerance_angstrom
         ) * 10.0
         if box_edge_A < floor_A:
             box_enlarged_from_nm = float(box_size_nm)
             box_edge_A = floor_A
     else:
         box_edge_A = estimate_box_edge_angstrom(
-            insulin_pdb_path,
+            protein_pdb_path,
             polymer_pdb_path,
             n_polymers,
             tolerance_angstrom=tolerance_angstrom,
@@ -344,7 +344,7 @@ def pack_insulin_polymers(
 
     # --- Build Packmol input --------------------------------------------------
     inp_content = build_packmol_inp_content(
-        insulin_pdb_path=insulin_pdb_path,
+        protein_pdb_path=protein_pdb_path,
         polymer_pdb_path=polymer_pdb_path,
         n_polymers=n_polymers,
         output_path=output_path,
@@ -422,8 +422,8 @@ def pack_insulin_polymers(
                 pass
 
 
-def pack_insulin_polymers_progressive(
-    insulin_pdb_path: str,
+def pack_protein_polymers_progressive(
+    protein_pdb_path: str,
     polymer_pdb_path: str,
     n_polymers_start: int,
     output_path: str,
@@ -447,7 +447,7 @@ def pack_insulin_polymers_progressive(
     Parameters
     ----------
     kwargs
-        Forwarded to :func:`pack_insulin_polymers` (e.g. ``box_size_nm``, ``packing_mode``,
+        Forwarded to :func:`pack_protein_polymers` (e.g. ``box_size_nm``, ``packing_mode``,
         ``tolerance_angstrom``, ``shell_only_angstrom``, ``maxit``, ``nloop``). Do not pass
         ``n_polymers``, ``output_path``, ``timeout_s``, or ``seed`` here.
 
@@ -485,8 +485,8 @@ def pack_insulin_polymers_progressive(
             break
 
         attempts += 1
-        r = pack_insulin_polymers(
-            insulin_pdb_path,
+        r = pack_protein_polymers(
+            protein_pdb_path,
             polymer_pdb_path,
             n,
             out_path,

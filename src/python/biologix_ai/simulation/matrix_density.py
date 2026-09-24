@@ -40,7 +40,7 @@ def compute_shell_inner_from_pdb(pdb_path: str) -> float:
     """
     Max distance of protein atoms from center of geometry (nm); return as Angstrom.
 
-    Used as shell inner radius so polymers are excluded from insulin region.
+    Used as shell inner radius so polymers are excluded from protein region.
     Fallback 1.5 nm (15 Angstrom) if PDB unreadable.
     """
     try:
@@ -66,7 +66,7 @@ def suggest_n_polymers_from_density(
     n_repeats: int,
     box_size_nm: float,
     shell_inner_angstrom: Optional[float] = None,
-    insulin_pdb_path: Optional[str] = None,
+    protein_pdb_path: Optional[str] = None,
     n_min: int = 4,
     n_max: int = 100,
     packing_mode: PackingMode = "bulk",
@@ -79,7 +79,7 @@ def suggest_n_polymers_from_density(
     the inner sphere (encapsulation).
 
     **bulk** mode: n = density × (V_box × volume_fraction_polymer) × N_A / MW —
-    polymer mass per **total cell** (approximate; insulin mass is secondary).
+    polymer mass per **total cell** (approximate; protein mass is secondary).
 
     Args:
         target_density_g_cm3: Target polymer density in g/cm³.
@@ -87,7 +87,7 @@ def suggest_n_polymers_from_density(
         n_repeats: Repeat units per chain.
         box_size_nm: Cubic box edge in nm.
         shell_inner_angstrom: Inner sphere radius (Å), **shell** mode only.
-        insulin_pdb_path: PDB path for radius; used when shell_inner_angstrom is None.
+        protein_pdb_path: PDB path for radius; used when shell_inner_angstrom is None.
         n_min, n_max: Clamp n_polymers for Packmol tractability (default *n_max* **100**;
         a low cap with a large box makes the cell look sparse vs target density).
         packing_mode: ``bulk`` (default) or ``shell``.
@@ -100,8 +100,8 @@ def suggest_n_polymers_from_density(
     if mw <= 0:
         if packing_mode == "bulk":
             return max(n_min, min(n_max, 12)), None
-        if shell_inner_angstrom is None and insulin_pdb_path:
-            shell_inner_angstrom = compute_shell_inner_from_pdb(insulin_pdb_path)
+        if shell_inner_angstrom is None and protein_pdb_path:
+            shell_inner_angstrom = compute_shell_inner_from_pdb(protein_pdb_path)
         if shell_inner_angstrom is None:
             shell_inner_angstrom = 15.0
         return max(n_min, min(n_max, 12)), shell_inner_angstrom
@@ -112,8 +112,8 @@ def suggest_n_polymers_from_density(
         n = int(round(n_mol * AVOGADRO))
         return max(n_min, min(n_max, n)), None
 
-    if shell_inner_angstrom is None and insulin_pdb_path:
-        shell_inner_angstrom = compute_shell_inner_from_pdb(insulin_pdb_path)
+    if shell_inner_angstrom is None and protein_pdb_path:
+        shell_inner_angstrom = compute_shell_inner_from_pdb(protein_pdb_path)
     if shell_inner_angstrom is None:
         shell_inner_angstrom = 15.0
 
@@ -152,7 +152,7 @@ def suggest_n_chains_for_density(
     """
     Approximate number of identical chains to reach ~target_density in the box.
 
-    volume_fraction_polymer: leave headroom for insulin + void (~0.9–0.95).
+    volume_fraction_polymer: leave headroom for protein + void (~0.9–0.95).
 
     Returns at least 1.
     """
@@ -220,17 +220,17 @@ def estimate_chain_mw_g_mol(psmiles: str, n_repeats: int) -> float:
     return 200.0 * n_repeats
 
 
-def suggest_n_polymer_around_insulin(
+def suggest_n_polymer_around_protein(
     box_edge_nm: float,
     polymer_mw_g_mol: float,
     n_repeats: int,
-    insulin_exclusion_radius_nm: float = 1.5,
+    protein_exclusion_radius_nm: float = 1.5,
     fill_fraction: float = 0.45,
 ) -> int:
     """
-    Rough chain count to *surround* insulin in PBC — not a full melt.
+    Rough chain count to *surround* protein in PBC — not a full melt.
 
-    Polymer is placed in the box minus a central sphere (insulin + clearance).
+    Polymer is placed in the box minus a central sphere (protein + clearance).
     Uses a modest effective density in that annulus so Packmol stays tractable.
     Result clamped to [10, 48] by default scale; caller can override box/N.
     """
@@ -242,7 +242,7 @@ def suggest_n_polymer_around_insulin(
     # Cube edge in cm
     a_cm = box_edge_nm * 1e-7
     v_box_cm3 = a_cm**3
-    r_cm = min(insulin_exclusion_radius_nm, half_nm * 0.9) * 1e-7
+    r_cm = min(protein_exclusion_radius_nm, half_nm * 0.9) * 1e-7
     v_void_cm3 = (4.0 / 3.0) * math.pi * r_cm**3
     v_poly_cm3 = max(v_box_cm3 - v_void_cm3, v_box_cm3 * 0.25) * fill_fraction
     # ~0.25 g/cm³ effective in annulus = loose packing

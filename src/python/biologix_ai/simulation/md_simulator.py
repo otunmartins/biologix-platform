@@ -188,7 +188,7 @@ def attach_matrix_structure_artifacts(
         out["n_polymer_atoms"] = int(npc) * int(nch)
 
     cp = out.get("complex_pdb_path")
-    nprot = out.get("n_insulin_atoms")
+    nprot = out.get("n_protein_atoms")
     if cp and nprot is not None:
         try:
             from .matrix_packing_metrics import compute_matrix_packing_metrics
@@ -211,7 +211,7 @@ def attach_matrix_structure_artifacts(
         r_cv, cv_backend = write_complex_viz_png_auto(
             str(cp),
             str(chemviz_png),
-            n_protein_atoms=out.get("n_insulin_atoms"),
+            n_protein_atoms=out.get("n_protein_atoms"),
         )
         out["complex_chemviz_png_path"] = r_cv.get("path") if r_cv.get("ok") else None
         out["complex_chemviz_png_error"] = r_cv.get("error")
@@ -223,13 +223,13 @@ def attach_matrix_structure_artifacts(
                 f"[biologix-ai] stage=artifact_render chemviz FAILED: {r_cv.get('error')} "
                 "(install pymol; dot-cloud preview is NOT the report figure — use *_complex_chemviz.png)"
             )
-        nprot_val = out.get("n_insulin_atoms")
+        nprot_val = out.get("n_protein_atoms")
         if nprot_val is not None:
             meta_path = struct / f"{slug}_complex_meta.json"
             meta_path.write_text(
                 json.dumps(
                     {
-                        "n_insulin_atoms": int(nprot_val),
+                        "n_protein_atoms": int(nprot_val),
                         "psmiles": psmiles,
                         "material_slug": slug,
                     },
@@ -584,7 +584,7 @@ def _evaluate_one_matrix_candidate(
         "method": res.get("method"),
         "interaction_energy_kj_mol": res.get("interaction_energy_kj_mol"),
         "potential_energy_complex_kj_mol": res.get("potential_energy_complex_kj_mol"),
-        "n_insulin_atoms": res.get("n_insulin_atoms"),
+        "n_protein_atoms": res.get("n_protein_atoms"),
         "n_polymer_atoms": res.get("n_polymer_atoms"),
         "n_polymer_chains": res.get("n_polymer_chains"),
         "complex_pdb_path": res.get("complex_pdb_path"),
@@ -755,7 +755,7 @@ class MDSimulator:
         geom = "polymer bulk (full cell)" if packing_mode == "bulk" else "polymer shell"
         msg = (
             f"[biologix-ai] OpenMM matrix (Packmol): {n_total} candidate(s) — "
-            f"insulin + {geom}, minimize"
+            f"protein + {geom}, minimize"
             + (" + NPT sampling" if run_npt else "")
             + ", interaction energy (kJ/mol)."
             + (f" workers={effective_workers}" if effective_workers > 1 else "")
@@ -784,14 +784,14 @@ class MDSimulator:
         if _bio_pdb:
             p = Path(_bio_pdb).expanduser().resolve()
             if p.is_file():
-                matrix_kw_template["insulin_pdb_path"] = str(p)
+                matrix_kw_template["protein_pdb_path"] = str(p)
         _bio_chains = (
             self.target_chains
             or os.environ.get("BIOLOGIX_AI_TARGET_PROTEIN_CHAINS", "")
         ).strip()
         if self.openmm_platform:
             matrix_kw_template["openmm_platform"] = self.openmm_platform
-        if _bio_chains and matrix_kw_template.get("insulin_pdb_path"):
+        if _bio_chains and matrix_kw_template.get("protein_pdb_path"):
             matrix_kw_template["protein_chains"] = tuple(
                 c.strip() for c in _bio_chains.split(",") if c.strip()
             )
@@ -966,7 +966,7 @@ class MDSimulator:
                     "potential_energy_complex_kj_mol": res.get(
                         "potential_energy_complex_kj_mol"
                     ),
-                    "n_insulin_atoms": res.get("n_insulin_atoms"),
+                    "n_protein_atoms": res.get("n_protein_atoms"),
                     "n_polymer_atoms": res.get("n_polymer_atoms"),
                     "n_polymer_chains": res.get("n_polymer_chains"),
                     "complex_pdb_path": res.get("complex_pdb_path"),
@@ -1188,7 +1188,7 @@ class MDSimulator:
         out["evaluation_progress"] = progress
         if verbose:
             out["evaluation_note"] = (
-                "Each candidate: Packmol-packed polymer shell around insulin (periodic box), "
+                "Each candidate: Packmol-packed polymer shell around protein (periodic box), "
                 "LocalEnergyMinimizer, optional short NPT segment (BIOLOGIX_AI_OPENMM_MATRIX_NPT), "
                 "then interaction energy (kJ/mol). Requires packmol on PATH. "
                 "By default uses density-driven chain count (BIOLOGIX_AI_OPENMM_MATRIX_DEFAULT_DENSITY_G_CM3); "

@@ -34,7 +34,7 @@ def _mock_evaluate(candidates, max_candidates):
         psm = c.get("chemical_structure") or "[*]CC[*]"
         pa[name] = {
             "interaction_energy_kj_mol": -120.0,
-            "insulin_rmsd_to_initial_nm": 0.06,
+            "protein_rmsd_to_initial_nm": 0.06,
             "psmiles": psm,
         }
         raw.append(
@@ -42,7 +42,7 @@ def _mock_evaluate(candidates, max_candidates):
                 "ok": True,
                 "psmiles": psm,
                 "interaction_energy_kj_mol": -120.0,
-                "insulin_rmsd_to_initial_nm": 0.06,
+                "protein_rmsd_to_initial_nm": 0.06,
             }
         )
     top = names[:1] if names else ["c0"]

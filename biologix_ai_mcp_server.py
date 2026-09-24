@@ -1813,7 +1813,7 @@ def run_biologics_discovery(
 @mcp.tool()
 def get_materials_status() -> str:
     """Get status of materials discovery system (MD, literature, PaperQA2, mutation)."""
-    lines = ["Insulin AI Materials Discovery Status"]
+    lines = ["Biologix Materials Discovery Status"]
     try:
         from biologix_ai.simulation.openmm_compat import describe_md_backend
 
@@ -1875,6 +1875,19 @@ def _session_biologic_name(session: Optional[Path]) -> str:
         except Exception:
             return ""
     return ""
+
+
+def _biologic_name_for(biologic_target: str, run_dir: str = "") -> str:
+    """The biologic a tool acts on: the caller's name, else the session's, else generic.
+
+    Never assumes a particular biologic: a plan or report for calcitonin must not be
+    filed under insulin because the argument was left out.
+    """
+    return (
+        (biologic_target or "").strip()
+        or _session_biologic_name(_optional_session_dir(run_dir))
+        or "the biologic"
+    )
 
 
 def _persist_retrosynthesis_plan(
@@ -2585,7 +2598,7 @@ def write_discovery_summary_report(
 @mcp.tool()
 def prepare_retrosynthesis(
     target: str,
-    biologic_target: str = "insulin",
+    biologic_target: str = "",
     run_dir: str = "",
     max_pdfs: int = 5,
 ) -> str:
@@ -2594,6 +2607,7 @@ def prepare_retrosynthesis(
     Returns material_name, pdf_paths, and extraction_schema for the OpenCode agent to
     fill via submit_retro_extractions before calling plan_retrosynthesis.
     """
+    biologic_target = _biologic_name_for(biologic_target, run_dir)
     from biologix_ai.services.retrosynthesis_service import (
         _is_retrosynthesisagent_available,
         prepare_retrosynthesis_workspace,
@@ -2706,7 +2720,7 @@ def submit_retro_extractions(
 @mcp.tool()
 def plan_retrosynthesis(
     target: str,
-    biologic_target: str = "insulin",
+    biologic_target: str = "",
     max_routes: int = 5,
     allowed_mechanisms: str = "",
     banned_reagents: str = "",
@@ -2725,13 +2739,14 @@ def plan_retrosynthesis(
 
     Args:
         target: polymer as PSMILES, SMILES, or common name (e.g. 'Polyimide', '[*]OCC[*]')
-        biologic_target: the biologic being stabilized (e.g. 'insulin', 'adalimumab', 'trastuzumab')
+        biologic_target: the biologic being stabilized (default: the session's biologic)
         max_routes: maximum number of routes to return
         allowed_mechanisms: comma-separated (e.g. 'RAFT,condensation'); empty means all
         banned_reagents: comma-separated SMILES of reagents to exclude
         run_dir: session directory for persistence (optional)
         biologic_pdb_path: optional PDB path for metadata; defaults to ``BIOLOGIX_AI_TARGET_PROTEIN_PDB`` if set
     """
+    biologic_target = _biologic_name_for(biologic_target, run_dir)
     from biologix_ai.retrosynthesis.models import (
         RetrosynthesisConstraints,
         RetrosynthesisRequest,
@@ -3104,7 +3119,7 @@ def check_monomers_batch(
 @mcp.tool()
 def compile_results(
     target: str,
-    biologic_target: str = "insulin",
+    biologic_target: str = "",
     max_routes: int = 5,
     run_admet: bool = True,
     run_dir: str = "",
@@ -3129,6 +3144,7 @@ def compile_results(
         run_dir: session directory for persistence
         biologic_pdb_path: optional; defaults to ``BIOLOGIX_AI_TARGET_PROTEIN_PDB`` env if set
     """
+    biologic_target = _biologic_name_for(biologic_target, run_dir)
     from biologix_ai.retrosynthesis.models import (
         RetrosynthesisConstraints,
         RetrosynthesisRequest,
@@ -3194,13 +3210,14 @@ def assemble_retrosynthesis_report(
     run_dir: str,
     targets: str = "",
     include_compile_narrative: bool = False,
-    biologic_target: str = "insulin",
+    biologic_target: str = "",
 ) -> str:
     """Build markdown retrosynthesis section from session plan_*.json artifacts.
 
     Writes ``retrosynthesis/RETROSYNTHESIS_REPORT.md``. Use output verbatim in
     SUMMARY_REPORT § Retrosynthesis. ``targets``: comma-separated PSMILES/names; empty = all plans.
     """
+    biologic_target = _biologic_name_for(biologic_target, run_dir)
     from biologix_ai.retrosynthesis.retro_report import (
         assemble_session_retrosynthesis_markdown,
         parse_targets_csv,
@@ -3257,7 +3274,7 @@ def assemble_retrosynthesis_report(
 @mcp.tool()
 def get_candidate_profile(
     psmiles: str,
-    biologic_target: str = "insulin",
+    biologic_target: str = "",
     run_retro: bool = True,
     run_admet: bool = True,
     run_compliance: bool = True,
@@ -3275,13 +3292,14 @@ def get_candidate_profile(
 
     Args:
         psmiles: Polymer SMILES repeat unit (with [*] connection points).
-        biologic_target: Biologic being stabilised (e.g. 'insulin', 'adalimumab').
+        biologic_target: Biologic being stabilised (default: the session's biologic).
         run_retro: Whether to run plan_retrosynthesis.
         run_admet: Whether to screen residual monomers with ADMET.
         run_compliance: Whether to check excipient compliance (EMA/FDA/GRAS).
         jurisdiction: Comma-separated jurisdictions for compliance (FDA, EMA).
         run_dir: Session directory for persistence and audit.
     """
+    biologic_target = _biologic_name_for(biologic_target, run_dir)
     profile: dict = {"psmiles": psmiles, "biologic_target": biologic_target}
     session = _optional_session_dir(run_dir)
 
@@ -3431,9 +3449,7 @@ def screen_candidate_library(
             )
 
     candidates = _normalize_psmiles_list_for_eval(psmiles_list)[:max_candidates]
-    biologic_target = (biologic_target or "").strip() or _session_biologic_name(
-        _optional_session_dir(run_dir)
-    ) or "insulin"
+    biologic_target = _biologic_name_for(biologic_target, run_dir)
     preflight = _md_preflight_enabled()
     results = []
     for psmiles in candidates:

@@ -99,7 +99,7 @@ class TestCandidateProfileResponse:
         obj = CandidateProfileResponse(psmiles="[*]OCC[*]")
         data = obj.model_dump()
         assert data["psmiles"] == "[*]OCC[*]"
-        assert data["biologic_target"] == "insulin"
+        assert data["biologic_target"] == ""
         assert data["validation"] is None
         assert data["admet"] is None
 
@@ -123,7 +123,7 @@ class TestCandidateProfileResponse:
 class TestLibraryScreenItem:
     def test_inherits_profile_fields(self):
         item = LibraryScreenItem(psmiles="[*]CC[*]", library_disposition="pass")
-        assert item.biologic_target == "insulin"
+        assert item.biologic_target == ""
         assert item.library_disposition == "pass"
 
     def test_disposition_values(self):
@@ -293,7 +293,7 @@ class TestRequestModels:
 
     def test_screen_library_request(self):
         req = ScreenLibraryRequest(psmiles_list=["[*]OCC[*]", "[*]CC[*]"])
-        assert req.biologic_target == "insulin"
+        assert req.biologic_target == ""
         assert req.run_admet is True
         assert req.max_candidates == 50
 

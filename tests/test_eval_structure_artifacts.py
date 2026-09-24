@@ -82,7 +82,7 @@ def test_attach_matrix_structure_artifacts_writes_chemviz_paths(tmp_path, monkey
     )
 
     res = attach_matrix_structure_artifacts(
-        {"ok": True, "n_insulin_atoms": 10, "n_polymer_atoms_per_chain": 5, "n_polymer_chains": 2},
+        {"ok": True, "n_protein_atoms": 10, "n_polymer_atoms_per_chain": 5, "n_polymer_chains": 2},
         psmiles="[*]CC[*]",
         slug="poly",
         struct_dir=struct,
@@ -103,7 +103,7 @@ def test_run_openmm_matrix_cli_attaches_structure_artifacts(tmp_path, monkeypatc
     fake_eval = {
         "ok": True,
         "interaction_energy_kj_mol": -12.3,
-        "n_insulin_atoms": 8,
+        "n_protein_atoms": 8,
         "n_polymer_atoms_per_chain": 4,
         "n_polymer_chains": 3,
     }

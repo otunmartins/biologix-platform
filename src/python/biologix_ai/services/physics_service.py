@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 def run_simulation(
     psmiles_list: List[str],
-    biologic_target: str = "insulin",
+    biologic_target: str = "",
     temperature_k: float = 313.0,
     n_steps: int = 5000,
 ) -> Dict[str, Any]:

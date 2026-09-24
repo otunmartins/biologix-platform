@@ -4,7 +4,7 @@ Scalar discovery score for autoresearch and screening.
 
 Balances:
 - Stability: more negative interaction energy E_int (kJ/mol) is better.
-- Insulin preservation: lower Kabsch RMSD (nm) of insulin before vs after minimize
+- Protein preservation: lower Kabsch RMSD (nm) of protein before vs after minimize
   is better (proxy for matrix not distorting native structure / release).
 """
 
@@ -15,7 +15,7 @@ from typing import Any, Mapping
 
 def composite_screening_score(
     interaction_energy_kj_mol: float,
-    insulin_rmsd_to_initial_nm: float,
+    protein_rmsd_to_initial_nm: float,
     weight_stability: float = 0.5,
     weight_preservation: float = 0.5,
     e_scale_kj: float = 150.0,
@@ -25,11 +25,11 @@ def composite_screening_score(
     Single score (higher = better). Linear blend of normalized terms.
 
     stability_term: (-E_int) / e_scale — favors binding / host stabilization.
-    preservation_term: 1 / (rmsd + rmsd_soft) — favors rigid insulin geometry.
+    preservation_term: 1 / (rmsd + rmsd_soft) — favors rigid protein geometry.
 
     Args:
         interaction_energy_kj_mol: E_complex - E_ins - E_poly.
-        insulin_rmsd_to_initial_nm: Kabsch RMSD of insulin after minimize vs initial.
+        protein_rmsd_to_initial_nm: Kabsch RMSD of protein after minimize vs initial.
         weight_stability, weight_preservation: non-negative; normalized to sum to 1.
         e_scale_kj: ~typical |E_int| scale for normalization.
         rmsd_soft_nm: floor so division stable; ~0.05–0.1 nm typical good fold.
@@ -39,7 +39,7 @@ def composite_screening_score(
     wsum = weight_stability + weight_preservation
     ws, wp = weight_stability / wsum, weight_preservation / wsum
     stab = -float(interaction_energy_kj_mol) / float(e_scale_kj)
-    rmsd = float(insulin_rmsd_to_initial_nm)
+    rmsd = float(protein_rmsd_to_initial_nm)
     if rmsd != rmsd or rmsd < 0:
         rmsd = 1.0
     pres = 1.0 / (rmsd + float(rmsd_soft_nm))
@@ -77,7 +77,7 @@ def discovery_score(
             if not isinstance(row, dict):
                 continue
             e_int = row.get("interaction_energy_kj_mol")
-            rmsd = row.get("insulin_rmsd_to_initial_nm")
+            rmsd = row.get("protein_rmsd_to_initial_nm")
             if (
                 use_composite
                 and e_int is not None

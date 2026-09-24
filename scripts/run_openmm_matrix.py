@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-OpenMM matrix: insulin + polymers via Packmol (**shell** annulus or **bulk** full cell),
+OpenMM matrix: protein + polymers via Packmol (**shell** annulus or **bulk** full cell),
 minimize, then compute interaction energy.
 
 Requires: packmol (pip install packmol), biologix-ai-sim env (openmm, openff, rdkit).
@@ -180,7 +180,7 @@ def main() -> None:
         n_prot: int | None = None
         if meta_path.is_file():
             meta = json.loads(meta_path.read_text(encoding="utf-8"))
-            n_prot = meta.get("n_insulin_atoms")
+            n_prot = meta.get("n_protein_atoms")
         from biologix_ai.simulation.pymol_complex_viz import write_complex_viz_png_auto
 
         chemviz_png = struct_dir / f"{slug}_complex_chemviz.png"
@@ -195,7 +195,7 @@ def main() -> None:
             "complex_chemviz_png_path": r_cv.get("path") if r_cv.get("ok") else None,
             "complex_chemviz_png_error": r_cv.get("error"),
             "complex_chemviz_backend": backend,
-            "n_insulin_atoms": n_prot,
+            "n_protein_atoms": n_prot,
         }
         print(json.dumps(payload, indent=2))
         if not r_cv.get("ok"):

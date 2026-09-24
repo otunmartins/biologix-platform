@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""Prepare insulin PDB for OpenMM: parse SSBOND, restrict chains A+B, clean."""
+"""Prepare a protein PDB for OpenMM: parse SSBOND, restrict to the chosen chains, clean."""
 
 from __future__ import annotations
 
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Tuple
 
-# OpenMM imported lazily or at use; load_insulin_modeller needs it
+# OpenMM imported lazily or at use; load_protein_modeller needs it
 
 SSBondPair = Tuple[str, int, str, int]  # (chain1, resseq1, chain2, resseq2)
 
@@ -59,7 +59,7 @@ def chains_in_pdb(pdb_path: str) -> Set[str]:
     return found
 
 
-def prepare_insulin_ab_pdb(
+def prepare_protein_pdb(
     pdb_in: str,
     pdb_out: str,
     chains: Optional[Tuple[str, ...]] = ("A", "B"),
@@ -70,7 +70,7 @@ def prepare_insulin_ab_pdb(
     Drops HETATM, ANISOU, other records. Resolves altloc by taking first.
 
     ``chains=None`` keeps every chain in *pdb_in* (a target already prepared by
-    ``biologic_resolver``); the default keeps insulin chains A and B.
+    ``biologic_resolver``); the default keeps chains A and B, the bundled insulin default.
     """
     if chains is None:
         chains = tuple(sorted(chains_in_pdb(pdb_in)))
@@ -227,7 +227,7 @@ def _add_missing_oxt_to_modeller(modeller) -> None:
         modeller.positions = unit.Quantity(np.array(pos_list), unit.nanometers)
 
 
-def load_insulin_modeller(pdb_path: str, add_ssbond: bool = True, use_pdbfixer: bool = True):
+def load_protein_modeller(pdb_path: str, add_ssbond: bool = True, use_pdbfixer: bool = True):
     """
     Load PDB into OpenMM Modeller. Optionally add disulfide bonds from SSBOND.
     Uses PDBFixer to add missing atoms (e.g. OXT) when use_pdbfixer=True.

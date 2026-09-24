@@ -33,7 +33,7 @@ def describe_md_backend() -> str:
         return "unavailable"
     if not packmol_available():
         return "OpenMM importable; Packmol binary missing"
-    return "insulin + polymer matrix (OpenMM + Packmol)"
+    return "protein + polymer matrix (OpenMM + Packmol)"
 
 
 def openmm_available() -> bool:

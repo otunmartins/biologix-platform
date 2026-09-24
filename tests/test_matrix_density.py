@@ -78,9 +78,9 @@ def test_suggest_n_polymers_from_density_bulk():
 def test_compute_shell_inner_from_pdb():
     """Shell inner from 4F1C PDB returns reasonable radius in Angstrom."""
     from biologix_ai.simulation.matrix_density import compute_shell_inner_from_pdb
-    from biologix_ai.simulation.polymer_build import ensure_insulin_pdb
+    from biologix_ai.simulation.polymer_build import ensure_default_target_pdb
 
-    pdb = ensure_insulin_pdb()
+    pdb = ensure_default_target_pdb()
     r = compute_shell_inner_from_pdb(pdb)
     assert 10 <= r <= 25
 

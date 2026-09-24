@@ -58,9 +58,9 @@ def test_parse_ssbond_from_4f1c():
     from pathlib import Path
 
     from biologix_ai.simulation.openmm_complex import parse_ssbond_pairs
-    from biologix_ai.simulation.polymer_build import ensure_insulin_pdb
+    from biologix_ai.simulation.polymer_build import ensure_default_target_pdb
 
-    pdb_path = ensure_insulin_pdb()
+    pdb_path = ensure_default_target_pdb()
     text = Path(pdb_path).read_text()
     pairs = parse_ssbond_pairs(text)
     # 4F1C has 6 SSBOND; we filter to A,B only (3 pairs)
@@ -71,14 +71,14 @@ def test_parse_ssbond_from_4f1c():
     assert ("A", 20, "B", 19) in ab_pairs
 
 
-def test_prepare_insulin_ab_pdb_creates_file(tmp_path):
-    """prepare_insulin_ab_pdb writes PDB with only chains A+B and SSBOND."""
-    from biologix_ai.simulation.openmm_complex import prepare_insulin_ab_pdb
-    from biologix_ai.simulation.polymer_build import ensure_insulin_pdb
+def test_prepare_protein_pdb_creates_file(tmp_path):
+    """prepare_protein_pdb writes PDB with only chains A+B and SSBOND."""
+    from biologix_ai.simulation.openmm_complex import prepare_protein_pdb
+    from biologix_ai.simulation.polymer_build import ensure_default_target_pdb
 
-    src = ensure_insulin_pdb()
+    src = ensure_default_target_pdb()
     out = tmp_path / "insulin_AB.pdb"
-    prepare_insulin_ab_pdb(src, str(out))
+    prepare_protein_pdb(src, str(out))
     assert out.exists()
     text = out.read_text()
     assert "ATOM" in text
@@ -94,16 +94,16 @@ def test_openmm_load_protein_with_disulfides():
     from pathlib import Path
 
     from biologix_ai.simulation.openmm_complex import (
-        prepare_insulin_ab_pdb,
+        prepare_protein_pdb,
         ensure_disulfide_bonds,
     )
-    from biologix_ai.simulation.polymer_build import ensure_insulin_pdb
+    from biologix_ai.simulation.polymer_build import ensure_default_target_pdb
     from openmm.app import PDBFile, Modeller
 
-    src = ensure_insulin_pdb()
+    src = ensure_default_target_pdb()
     with Path(src).parent.joinpath("insulin_AB.pdb").open("w") as _:
         pass  # placeholder
-    prepare_insulin_ab_pdb(src, str(Path(src).parent / "insulin_AB.pdb"))
+    prepare_protein_pdb(src, str(Path(src).parent / "insulin_AB.pdb"))
     ab_path = Path(src).parent / "insulin_AB.pdb"
 
     pdb = PDBFile(str(ab_path))
@@ -122,18 +122,18 @@ def test_openmm_protein_minimization():
     from pathlib import Path
 
     from biologix_ai.simulation.openmm_complex import (
-        prepare_insulin_ab_pdb,
+        prepare_protein_pdb,
         run_protein_minimization,
     )
-    from biologix_ai.simulation.openmm_insulin import load_insulin_modeller
-    from biologix_ai.simulation.polymer_build import ensure_insulin_pdb
+    from biologix_ai.simulation.openmm_protein import load_protein_modeller
+    from biologix_ai.simulation.polymer_build import ensure_default_target_pdb
     from openmm.app import ForceField
 
-    src = ensure_insulin_pdb()
+    src = ensure_default_target_pdb()
     ab_path = Path(src).parent / "insulin_AB.pdb"
-    prepare_insulin_ab_pdb(src, str(ab_path))
+    prepare_protein_pdb(src, str(ab_path))
 
-    modeller = load_insulin_modeller(str(ab_path), add_ssbond=True, use_pdbfixer=True)
+    modeller = load_protein_modeller(str(ab_path), add_ssbond=True, use_pdbfixer=True)
     ff = ForceField("amber14-all.xml")  # vacuum; implicit/gbn2 has stricter C-term matching
     modeller.addHydrogens(ff)
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Render insulin cartoon + polymer bonded-stick PNGs from OpenMM complex PDBs (PyMOL only).
+Render protein cartoon + polymer bonded-stick PNGs from OpenMM complex PDBs (PyMOL only).
 
 Requires ``pymol`` on PATH (open-source: conda-forge or ``pip install pymol-open-source``).
 
@@ -47,7 +47,7 @@ def main() -> int:
         meta = pdb.parent / f"{stem}_complex_meta.json"
         if meta.is_file():
             try:
-                return int(json.loads(meta.read_text(encoding="utf-8"))["n_insulin_atoms"])
+                return int(json.loads(meta.read_text(encoding="utf-8"))["n_protein_atoms"])
             except (KeyError, TypeError, ValueError, json.JSONDecodeError):
                 return None
         return None

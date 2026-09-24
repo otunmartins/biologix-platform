@@ -56,11 +56,11 @@ def _mock_target_eval(
         {
             "psmiles": c.get("chemical_structure", ""),
             "interaction_energy_kj_mol": -20.0,
-            "insulin_rmsd_to_initial_nm": 0.05,
+            "protein_rmsd_to_initial_nm": 0.05,
             "potential_energy_complex_kj_mol": -1000.0,
-            "potential_energy_insulin_kj_mol": -800.0,
+            "potential_energy_protein_kj_mol": -800.0,
             "potential_energy_polymer_kj_mol": -180.0,
-            "insulin_polymer_contacts": 10,
+            "protein_polymer_contacts": 10,
             "method": "mock",
         }
         for c in candidates[:max_candidates]
@@ -82,11 +82,11 @@ def _mock_nontarget_eval(
         {
             "psmiles": c.get("chemical_structure", ""),
             "interaction_energy_kj_mol": 10.0,
-            "insulin_rmsd_to_initial_nm": 0.3,
+            "protein_rmsd_to_initial_nm": 0.3,
             "potential_energy_complex_kj_mol": -900.0,
-            "potential_energy_insulin_kj_mol": -800.0,
+            "potential_energy_protein_kj_mol": -800.0,
             "potential_energy_polymer_kj_mol": -110.0,
-            "insulin_polymer_contacts": 1,
+            "protein_polymer_contacts": 1,
             "method": "mock",
         }
         for c in candidates[:max_candidates]
@@ -365,7 +365,7 @@ class TestCacheLookup:
             canonical: {
                 "psmiles": canonical,
                 "interaction_energy_kj_mol": -15.0,
-                "insulin_rmsd_to_initial_nm": 0.04,
+                "protein_rmsd_to_initial_nm": 0.04,
             }
         }
         env = self._make_env_with_cache(cache)
@@ -490,11 +490,11 @@ def _stub_evaluate_candidates_for_benchmark(
             md_results.append({
                 "psmiles": ps,
                 "interaction_energy_kj_mol": e_int,
-                "insulin_rmsd_to_initial_nm": rmsd,
+                "protein_rmsd_to_initial_nm": rmsd,
                 "potential_energy_complex_kj_mol": -1000.0 + e_int,
-                "potential_energy_insulin_kj_mol": -800.0,
+                "potential_energy_protein_kj_mol": -800.0,
                 "potential_energy_polymer_kj_mol": -200.0 + e_int * 0.1,
-                "insulin_polymer_contacts": 8 if e_int < target_energy_kj else 2,
+                "protein_polymer_contacts": 8 if e_int < target_energy_kj else 2,
                 "method": "stub",
             })
         names = [c.get("material_name", f"C_{i}") for i, c in enumerate(candidates[:max_candidates])]

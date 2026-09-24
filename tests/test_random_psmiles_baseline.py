@@ -24,7 +24,7 @@ def _mock_evaluate(candidates, max_candidates):
                 "ok": True,
                 "psmiles": psm,
                 "interaction_energy_kj_mol": -200.0,
-                "insulin_rmsd_to_initial_nm": 0.05,
+                "protein_rmsd_to_initial_nm": 0.05,
             }
         )
     name = slice_c[0].get("material_name", "m0") if slice_c else "m0"
@@ -36,7 +36,7 @@ def _mock_evaluate(candidates, max_candidates):
         "property_analysis": {
             name: {
                 "interaction_energy_kj_mol": -200.0,
-                "insulin_rmsd_to_initial_nm": 0.05,
+                "protein_rmsd_to_initial_nm": 0.05,
             }
         },
         "md_results_raw": raw,

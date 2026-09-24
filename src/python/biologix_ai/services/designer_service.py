@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 
 def generate_candidates(
     prompt: str,
-    biologic_target: str = "insulin",
+    biologic_target: str = "",
     library_size: int = 10,
 ) -> Dict[str, Any]:
     """Generate polymer candidates using existing PSMILES generation and mutation."""
@@ -25,7 +25,7 @@ def generate_candidates(
 
         gen = PSMILESGenerator()
         gen_result = gen.generate_psmiles(
-            f"{prompt} for {biologic_target} stabilization"
+            f"{prompt} for {biologic_target or 'the biologic'} stabilization"
         )
         if gen_result.get("success"):
             result["candidates"] = [gen_result]

@@ -2,7 +2,7 @@
 """
 OpenMM geometry relaxation and interaction energy (no acpype/antechamber).
 
-- Insulin: AMBER14SB, disulfide bonds from SSBOND.
+- Protein target: AMBER14SB, disulfide bonds from SSBOND.
 - Ligand: GAFF via openmmforcefields, charges from RDKit Gasteiger.
 """
 
@@ -46,16 +46,15 @@ def _append_progress_file(stage: str, msg: str) -> None:
         pass
 
 
-def _protein_label(insulin_pdb_path: Optional[str]) -> str:
+def _protein_label(protein_pdb_path: Optional[str]) -> str:
     """Name of the simulated protein for progress text: "insulin" only for the bundled default.
 
-    The ``insulin_*`` parameter and file names are legacy; any resolved biologic flows
-    through them, and its ``biologic_target.json`` sits beside its PDB.
+    A resolved biologic's ``biologic_target.json`` sits beside its PDB.
     """
-    if not insulin_pdb_path:
+    if not protein_pdb_path:
         return "insulin"
     try:
-        info = json.loads((Path(insulin_pdb_path).parent / "biologic_target.json").read_text())
+        info = json.loads((Path(protein_pdb_path).parent / "biologic_target.json").read_text())
         name = str(info.get("canonical_name") or info.get("resolved_target") or "").strip()
     except (OSError, ValueError):
         name = ""
@@ -269,10 +268,10 @@ import openmm.unit as unit
 from rdkit import Chem
 from rdkit.Chem import rdPartialCharges
 
-from .openmm_insulin import (
-    prepare_insulin_ab_pdb,
+from .openmm_protein import (
+    prepare_protein_pdb,
     add_disulfide_bonds_from_ssbond,
-    load_insulin_modeller,
+    load_protein_modeller,
     parse_ssbond_from_pdb,
 )
 from .pbc_unwrap import prepare_matrix_complex_pdb_positions_nm
@@ -310,7 +309,7 @@ def parse_ssbond_pairs(text_or_path: str) -> List[Tuple[str, int, str, int]]:
     return pairs
 
 
-# prepare_insulin_ab_pdb imported from openmm_insulin
+# prepare_protein_pdb imported from openmm_protein
 
 DEFAULT_INSULIN_CHAINS: Tuple[str, ...] = ("A", "B")
 
@@ -499,7 +498,7 @@ def interaction_energy_pbc_frame(
 def run_openmm_relax_and_energy(
     psmiles: str,
     n_repeats: int = 2,
-    insulin_pdb_path: Optional[str] = None,
+    protein_pdb_path: Optional[str] = None,
     random_seed: int = 42,
     ligand_offset_nm: Tuple[float, float, float] = (2.0, 0.0, 0.0),
     max_minimize_steps: int = 5000,
@@ -507,21 +506,21 @@ def run_openmm_relax_and_energy(
     protein_chains: Optional[Tuple[str, ...]] = None,
 ) -> Optional[Dict[str, Any]]:
     """
-    Insulin (AMBER14SB, SSBOND) + oligomer (GAFF, RDKit Gasteiger) → minimize → interaction energy.
+    Protein (AMBER14SB, SSBOND) + oligomer (GAFF, RDKit Gasteiger) → minimize → interaction energy.
 
-    If ``save_complex_pdb`` is set, writes minimized insulin+oligomer coordinates with
+    If ``save_complex_pdb`` is set, writes minimized protein+oligomer coordinates with
     ``PDBFile.writeFile`` (Angstrom) and returns ``complex_pdb_path`` in the result dict.
     """
-    from .polymer_build import ensure_insulin_pdb
+    from .polymer_build import ensure_default_target_pdb
 
-    chains = target_protein_chains(insulin_pdb_path, protein_chains)
-    pdb_path = insulin_pdb_path or ensure_insulin_pdb()
+    chains = target_protein_chains(protein_pdb_path, protein_chains)
+    pdb_path = protein_pdb_path or ensure_default_target_pdb()
 
     with tempfile.NamedTemporaryFile(suffix=".pdb", delete=False) as f:
         work_pdb = f.name
     try:
-        prepare_insulin_ab_pdb(pdb_path, work_pdb, chains=chains)
-        modeller = load_insulin_modeller(work_pdb, add_ssbond=True)
+        prepare_protein_pdb(pdb_path, work_pdb, chains=chains)
+        modeller = load_protein_modeller(work_pdb, add_ssbond=True)
     finally:
         Path(work_pdb).unlink(missing_ok=True)
 
@@ -601,7 +600,6 @@ def run_openmm_relax_and_energy(
         "method": "OpenMM_minimize_AMBER14SB_GAFF_Gasteiger",
         "potential_energy_complex_kj_mol": float(e_complex),
         "interaction_energy_kj_mol": float(e_int),
-        "n_insulin_atoms": n_protein,
         "n_protein_atoms": n_protein,
         "n_polymer_atoms": n_lig,
         "gromacs_only": False,
@@ -734,7 +732,7 @@ def run_openmm_matrix_relax_and_energy(
     n_polymers: int = 8,
     box_size_nm: Optional[float] = 7.5,
     shell_only_angstrom: float = 14.0,
-    insulin_pdb_path: Optional[str] = None,
+    protein_pdb_path: Optional[str] = None,
     random_seed: int = 42,
     max_minimize_steps: int = 2000,
     save_packed_pdb: Optional[str] = None,
@@ -760,16 +758,16 @@ def run_openmm_matrix_relax_and_energy(
     openmm_platform: Optional[str] = None,
 ) -> Optional[Dict[str, Any]]:
     """
-    Insulin + polymer matrix from Packmol, then OpenMM minimize and interaction energy.
+    Protein + polymer matrix from Packmol, then OpenMM minimize and interaction energy.
 
     **packing_mode** ``bulk`` (default): polymers throughout the periodic cell (no ``outside sphere``).
-    **packing_mode** ``shell``: annulus around insulin (``outside sphere`` in Packmol).
+    **packing_mode** ``shell``: annulus around the protein (``outside sphere`` in Packmol).
 
     When target_density_g_cm3 is set, n_polymers (and shell radius in **shell** mode) are
     derived from density; explicit n_polymers / shell_only_angstrom are ignored.
 
     **box_size_nm:** cubic edge in nm. ``None`` (fixed chain count, no density target) lets
-    Packmol auto-size the cell from insulin + polymer extent (see ``packmol_packer``).
+    Packmol auto-size the cell from protein + polymer extent (see ``packmol_packer``).
     If ``target_density_g_cm3`` is set and ``box_size_nm`` is ``None``, volume for chain
     count uses **7.5** nm.
 
@@ -784,11 +782,11 @@ def run_openmm_matrix_relax_and_energy(
     no spherical shell restraint during minimization unless explicitly enabled with a radius).
     """
     from .packmol_packer import (
-        pack_insulin_polymers,
-        pack_insulin_polymers_progressive,
+        pack_protein_polymers,
+        pack_protein_polymers_progressive,
         _packmol_available,
     )
-    from .polymer_build import ensure_insulin_pdb, mol_to_pdb_block
+    from .polymer_build import ensure_default_target_pdb, mol_to_pdb_block
 
     def _log(msg: str) -> None:
         if verbose:
@@ -805,9 +803,9 @@ def run_openmm_matrix_relax_and_energy(
     if not _packmol_available():
         return _fail("packmol not found on PATH", "packmol")
 
-    chains = target_protein_chains(insulin_pdb_path, protein_chains)
-    pdb_path = insulin_pdb_path or ensure_insulin_pdb()
-    protein_label = _protein_label(insulin_pdb_path)
+    chains = target_protein_chains(protein_pdb_path, protein_chains)
+    pdb_path = protein_pdb_path or ensure_default_target_pdb()
+    protein_label = _protein_label(protein_pdb_path)
     try:
         platform, platform_info = select_openmm_platform(openmm_platform)
     except OpenMMPlatformError as exc:
@@ -815,9 +813,9 @@ def run_openmm_matrix_relax_and_energy(
 
     with tempfile.TemporaryDirectory(prefix="openmm_matrix_") as work:
         work = Path(work)
-        prep_pdb = work / "insulin_ab.pdb"
-        prepare_insulin_ab_pdb(str(pdb_path), str(prep_pdb), chains=chains)
-        modeller = load_insulin_modeller(str(prep_pdb), add_ssbond=True)
+        prep_pdb = work / "protein_prepared.pdb"
+        prepare_protein_pdb(str(pdb_path), str(prep_pdb), chains=chains)
+        modeller = load_protein_modeller(str(prep_pdb), add_ssbond=True)
         # The ion parameters live in the water-model file. Load it only for a
         # charged matrix: a neutral run then builds the identical force field it
         # always did, down to the summation order of its energies.
@@ -829,7 +827,7 @@ def run_openmm_matrix_relax_and_energy(
         protein_pos = modeller.positions
         n_protein = protein_top.getNumAtoms()
 
-        ins_packmol = work / "insulin_packmol.pdb"
+        ins_packmol = work / "protein_packmol.pdb"
         app.PDBFile.writeFile(modeller.topology, modeller.positions, open(ins_packmol, "w"))
 
         from .packmol_packer import protein_box_floor_nm
@@ -854,7 +852,7 @@ def run_openmm_matrix_relax_and_energy(
                 n_repeats,
                 volume_box_nm,
                 shell_inner_angstrom=None,
-                insulin_pdb_path=str(ins_packmol),
+                protein_pdb_path=str(ins_packmol),
                 packing_mode=packing_mode,
                 n_min=density_polymer_n_min,
                 n_max=density_polymer_n_max,
@@ -940,7 +938,7 @@ def run_openmm_matrix_relax_and_energy(
                 f"per-attempt timeout={progressive_per_attempt_timeout_s}s, "
                 f"max_total_s={progressive_max_total_s}, n_max={progressive_n_max}"
             )
-            pack_result = pack_insulin_polymers_progressive(
+            pack_result = pack_protein_polymers_progressive(
                 str(ins_packmol),
                 str(poly_pdb),
                 n_polymers,
@@ -952,7 +950,7 @@ def run_openmm_matrix_relax_and_energy(
                 **pack_common_kw,
             )
         else:
-            pack_result = pack_insulin_polymers(
+            pack_result = pack_protein_polymers(
                 str(ins_packmol),
                 str(poly_pdb),
                 n_polymers,
@@ -972,7 +970,7 @@ def run_openmm_matrix_relax_and_energy(
                     "retry_box_nm": retry_box_nm,
                     "first_error": str(pack_result.get("stderr", ""))[:300],
                 }
-                pack_result = pack_insulin_polymers(
+                pack_result = pack_protein_polymers(
                     str(ins_packmol),
                     str(poly_pdb),
                     n_polymers,
@@ -1004,7 +1002,7 @@ def run_openmm_matrix_relax_and_energy(
         prot_pos_nm, lig_pos_nm = _read_packed_pdb_positions_nm(
             str(packed_pdb), n_protein, n_lig, n_polymers, n_extra_atoms=n_ions
         )
-        # Packmol output: coordinates in [0, L] nm (insulin centered at L/2); OpenMM PBC matches
+        # Packmol output: coordinates in [0, L] nm (protein centered at L/2); OpenMM PBC matches
         combined_pos = unit.Quantity(
             [[p[0], p[1], p[2]] for p in prot_pos_nm + lig_pos_nm],
             unit.nanometers,
@@ -1194,7 +1192,6 @@ def run_openmm_matrix_relax_and_energy(
             "packing_mode": packing_mode,
             "potential_energy_complex_kj_mol": float(e_complex),
             "interaction_energy_kj_mol": float(e_int),
-            "n_insulin_atoms": n_protein,
             "n_protein_atoms": n_protein,
             "n_polymer_chains": n_polymers,
             "n_polymer_atoms_per_chain": n_lig,

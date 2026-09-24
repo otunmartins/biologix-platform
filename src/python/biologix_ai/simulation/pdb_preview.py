@@ -43,7 +43,7 @@ def write_complex_preview_png(
     Render a static 3D scatter preview of PDB heavy-atom coordinates to PNG.
 
     Args:
-        pdb_path: Path to PDB (e.g. minimized insulin + polymer complex).
+        pdb_path: Path to PDB (e.g. minimized protein + polymer complex).
         output_path: Destination ``.png`` path (parent dirs created).
         max_points: Subsample if the structure has more atoms (plot performance).
         figsize_inches: Matplotlib figure size.

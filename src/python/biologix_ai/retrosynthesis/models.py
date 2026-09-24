@@ -83,8 +83,8 @@ class RetrosynthesisRequest(BaseModel):
         ..., description="Target polymer as PSMILES, SMILES, or common name"
     )
     biologic_target: str = Field(
-        default="insulin",
-        description="Biologic being stabilized (e.g. insulin, adalimumab, trastuzumab)",
+        default="",
+        description="Biologic being stabilized (e.g. calcitonin, adalimumab, trastuzumab)",
     )
     biologic_pdb_path: Optional[str] = Field(
         default=None,

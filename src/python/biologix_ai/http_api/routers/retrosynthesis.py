@@ -27,7 +27,7 @@ router = APIRouter(tags=["Retrosynthesis", "ADMET"])
 
 class RetrosynthesisPlanRequest(BaseModel):
     target: str = Field(..., description="Polymer PSMILES or common name")
-    biologic_target: str = Field(default="insulin", description="Biologic being stabilised")
+    biologic_target: str = Field(default="", description="Biologic being stabilised (default: unspecified)")
     max_routes: int = Field(default=5, ge=1, le=20)
     allowed_mechanisms: Optional[List[str]] = None
     banned_reagents: List[str] = Field(default_factory=list)
@@ -37,7 +37,7 @@ class RetrosynthesisPlanRequest(BaseModel):
 
 class PrepareRetrosynthesisRequest(BaseModel):
     target: str
-    biologic_target: str = "insulin"
+    biologic_target: str = ""
     session_dir: str = Field(..., description="Session folder path")
     max_pdfs: int = Field(default=5, ge=1, le=20)
 
@@ -50,7 +50,7 @@ class SubmitRetroExtractionsRequest(BaseModel):
 
 class CompileRequest(BaseModel):
     target: str
-    biologic_target: str = "insulin"
+    biologic_target: str = ""
     max_routes: int = 5
     run_admet: bool = True
     biologic_pdb_path: str = ""
@@ -68,7 +68,7 @@ class AssembleRetroReportRequest(BaseModel):
     session_dir: str = Field(..., description="Session folder path")
     targets: List[str] = Field(default_factory=list, description="PSMILES/names; empty = all plans")
     include_compile_narrative: bool = False
-    biologic_target: str = "insulin"
+    biologic_target: str = ""
 
 
 # ---------------------------------------------------------------------------

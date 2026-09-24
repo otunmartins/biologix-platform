@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """
-Re-render insulin+polymer complex PNGs with PyMOL (ribbon + DSS for protein, sticks for polymer).
+Re-render protein+polymer complex PNGs with PyMOL (ribbon + DSS for protein, sticks for polymer).
 
 Usage:
   mamba activate biologix-ai-sim   # env with pymol on PATH
-  python scripts/render_complex_pymol.py runs/insulin_patch_iter1_1/structures
+  python scripts/render_complex_pymol.py runs/<session>/structures
 
-Counts insulin atoms as chain A+B in each PDB (same idea as the matrix viewer when
-``n_insulin_atoms`` is inferred). Writes ``<stem>_pymol.png`` beside each PDB.
+Counts protein atoms (the leading atoms before the polymer) in each PDB (same idea as the matrix viewer when
+``n_protein_atoms`` is inferred). Writes ``<stem>_pymol.png`` beside each PDB.
 """
 from __future__ import annotations
 

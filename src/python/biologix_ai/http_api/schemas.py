@@ -104,7 +104,7 @@ class CandidateProfileResponse(BaseModel):
     """Single-call candidate dossier: validation + ADMET + retro + compliance."""
 
     psmiles: str
-    biologic_target: str = "insulin"
+    biologic_target: str = ""
     validation: Optional[ValidationResponse] = None
     admet: Optional[ToxicityResult] = None
     retrosynthesis: Optional[RetrosynthesisSummary] = None
@@ -233,7 +233,7 @@ class ScreenLibraryRequest(BaseModel):
     """Request body for POST /api/candidates/screen."""
 
     psmiles_list: List[str] = Field(..., description="List of PSMILES strings to screen.")
-    biologic_target: str = "insulin"
+    biologic_target: str = ""
     run_retro: bool = False
     run_admet: bool = True
     run_compliance: bool = True
@@ -245,7 +245,7 @@ class CandidateProfileRequest(BaseModel):
     """Request body for POST /api/candidates/profile."""
 
     psmiles: str
-    biologic_target: str = "insulin"
+    biologic_target: str = ""
     run_retro: bool = True
     run_admet: bool = True
     run_compliance: bool = True

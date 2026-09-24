@@ -4,9 +4,9 @@ import pytest
 
 
 def test_packmol_packer_import():
-    from biologix_ai.simulation.packmol_packer import pack_insulin_polymers, _packmol_available
+    from biologix_ai.simulation.packmol_packer import pack_protein_polymers, _packmol_available
 
-    assert callable(pack_insulin_polymers)
+    assert callable(pack_protein_polymers)
     assert isinstance(_packmol_available(), bool)
 
 
@@ -95,10 +95,10 @@ def test_estimate_box_edge_angstrom(tmp_path):
     assert edge >= 2.0 + 12.0  # tol + 2*padding from insulin extent branch
 
 
-def test_pack_insulin_polymers_progressive_stops_when_increment_fails(monkeypatch):
+def test_pack_protein_polymers_progressive_stops_when_increment_fails(monkeypatch):
     import biologix_ai.simulation.packmol_packer as pp
 
-    def fake_pack(insulin_pdb_path, polymer_pdb_path, n_polymers, output_path, **kw):
+    def fake_pack(protein_pdb_path, polymer_pdb_path, n_polymers, output_path, **kw):
         if n_polymers <= 4:
             return {
                 "success": True,
@@ -115,8 +115,8 @@ def test_pack_insulin_polymers_progressive_stops_when_increment_fails(monkeypatc
             "stderr": "fail",
         }
 
-    monkeypatch.setattr(pp, "pack_insulin_polymers", fake_pack)
-    r = pp.pack_insulin_polymers_progressive(
+    monkeypatch.setattr(pp, "pack_protein_polymers", fake_pack)
+    r = pp.pack_protein_polymers_progressive(
         "/tmp/a.pdb",
         "/tmp/b.pdb",
         2,
@@ -129,10 +129,10 @@ def test_pack_insulin_polymers_progressive_stops_when_increment_fails(monkeypatc
     assert r["attempts"] == 4
 
 
-def test_pack_insulin_polymers_progressive_n_cap(monkeypatch):
+def test_pack_protein_polymers_progressive_n_cap(monkeypatch):
     import biologix_ai.simulation.packmol_packer as pp
 
-    def fake_pack(insulin_pdb_path, polymer_pdb_path, n_polymers, output_path, **kw):
+    def fake_pack(protein_pdb_path, polymer_pdb_path, n_polymers, output_path, **kw):
         return {
             "success": True,
             "box_edge_angstrom": 100.0,
@@ -141,8 +141,8 @@ def test_pack_insulin_polymers_progressive_n_cap(monkeypatch):
             "stderr": "",
         }
 
-    monkeypatch.setattr(pp, "pack_insulin_polymers", fake_pack)
-    r = pp.pack_insulin_polymers_progressive(
+    monkeypatch.setattr(pp, "pack_protein_polymers", fake_pack)
+    r = pp.pack_protein_polymers_progressive(
         "/tmp/a.pdb",
         "/tmp/b.pdb",
         3,
@@ -154,10 +154,10 @@ def test_pack_insulin_polymers_progressive_n_cap(monkeypatch):
     assert r["stopped_reason"] == "n_cap"
 
 
-def test_pack_insulin_polymers_returns_dict():
-    from biologix_ai.simulation.packmol_packer import pack_insulin_polymers
+def test_pack_protein_polymers_returns_dict():
+    from biologix_ai.simulation.packmol_packer import pack_protein_polymers
 
-    r = pack_insulin_polymers(
+    r = pack_protein_polymers(
         "/nonexistent/ins.pdb",
         "/nonexistent/poly.pdb",
         1,
@@ -171,10 +171,10 @@ def test_pack_insulin_polymers_returns_dict():
 
 
 def test_polymer_build_ensure_pdb_or_skip():
-    from biologix_ai.simulation.polymer_build import ensure_insulin_pdb
+    from biologix_ai.simulation.polymer_build import ensure_default_target_pdb
 
     try:
-        p = ensure_insulin_pdb()
+        p = ensure_default_target_pdb()
         assert p.endswith(".pdb")
     except FileNotFoundError:
         pytest.skip("4F1C.pdb not present")

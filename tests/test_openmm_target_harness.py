@@ -16,28 +16,28 @@ BUNDLED = ROOT / "src" / "python" / "biologix_ai" / "simulation" / "data" / "4F1
 def test_bundled_insulin_prep_is_byte_identical_to_the_original_default(tmp_path) -> None:
     pytest.importorskip("openmm")
     from biologix_ai.simulation.openmm_complex import target_protein_chains
-    from biologix_ai.simulation.openmm_insulin import prepare_insulin_ab_pdb
+    from biologix_ai.simulation.openmm_protein import prepare_protein_pdb
 
     assert target_protein_chains(None) == ("A", "B")
     assert target_protein_chains(str(BUNDLED)) == ("A", "B")
     old = tmp_path / "old.pdb"
     new = tmp_path / "new.pdb"
-    prepare_insulin_ab_pdb(str(BUNDLED), str(old))  # the pre-change call
-    prepare_insulin_ab_pdb(str(BUNDLED), str(new), chains=target_protein_chains(str(BUNDLED)))
+    prepare_protein_pdb(str(BUNDLED), str(old))  # the pre-change call
+    prepare_protein_pdb(str(BUNDLED), str(new), chains=target_protein_chains(str(BUNDLED)))
     assert old.read_bytes() == new.read_bytes()
 
 
 def test_prepared_targets_keep_every_chain(tmp_path) -> None:
     pytest.importorskip("openmm")
     from biologix_ai.simulation.openmm_complex import target_protein_chains
-    from biologix_ai.simulation.openmm_insulin import chains_in_pdb, prepare_insulin_ab_pdb
+    from biologix_ai.simulation.openmm_protein import chains_in_pdb, prepare_protein_pdb
 
     other = tmp_path / "fab.pdb"
     other.write_text(BUNDLED.read_text())
     assert target_protein_chains(str(other)) is None
     assert target_protein_chains(str(other), ("H", "L")) == ("H", "L")
     out = tmp_path / "all.pdb"
-    prepare_insulin_ab_pdb(str(other), str(out), chains=None)
+    prepare_protein_pdb(str(other), str(out), chains=None)
     assert chains_in_pdb(str(out)) == {"A", "B", "C", "D"}
 
 
