@@ -339,7 +339,7 @@ def build_report(
     ]
     md += _summary(biologic, rows, {}, len(iterations))
     if narrative.strip():
-        md += [_tidy_block(narrative), ""]
+        md += ["## Interpretation", "", _tidy_block(narrative), ""]
     md += target_structure_lines(session) or []
     md += ["## Method", "", _METHOD, ""]
 
@@ -386,6 +386,9 @@ def build_report(
         md.append("")
 
     notes = [(it.get("iteration"), _tidy(it.get("notes"))) for it in iterations if it.get("notes")]
+    # An iteration's notes are often its findings run together; print them only when they add something.
+    listed = [t for key in ("high_performers", "effective_mechanisms", "problematic_features") for t in fb.get(key, [])]
+    notes = [(n, t) for n, t in notes if not listed or sum(item in t for item in listed) < len(listed) / 2]
     if notes:
         md += ["## Notes by iteration", ""]
         md += [f"- **Iteration {n}:** {t}" for n, t in notes]

@@ -172,6 +172,19 @@ def test_long_notes_are_kept_whole(tmp_path):
     assert notes.strip() in md
 
 
+def test_notes_that_only_repeat_the_findings_are_not_printed_twice(tmp_path):
+    session = _session(tmp_path, notes="Isolated VH domain, not the full antibody. Favorable calculated interaction energy.")
+    md, _ = build_report(session)
+    assert "Notes by iteration" not in md
+    md_other, _ = build_report(_session(tmp_path / "b", notes="A separate observation about the run."))
+    assert "Notes by iteration" in md_other
+
+
+def test_the_agents_narrative_gets_its_own_section(tmp_path):
+    md, _ = build_report(_session(tmp_path), narrative="The energy is favorable but comes from one configuration.")
+    assert "## Interpretation" in md and "one configuration" in md
+
+
 def test_each_figure_appears_once_in_the_markdown_and_the_pdf(tmp_path):
     session = _session(tmp_path)
     md, _ = build_report(session)
