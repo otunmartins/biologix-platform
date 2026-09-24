@@ -2649,6 +2649,7 @@ def submit_retro_extractions(
     Pass ``target`` (PSMILES) when ``material_name`` may be ambiguous; names are canonicalized.
     """
     from biologix_ai.retrosynthesis.retro_adapter import (
+        infer_polymer_name_from_extractions,
         normalize_extractions,
         resolve_material_name,
         validate_extractions_for_tree,
@@ -2662,6 +2663,12 @@ def submit_retro_extractions(
         canonical = resolve_material_name(target or material_name, agent_provided_name=material_name)
         data = normalize_extractions(extractions)
         target_psmiles = target if target and "[*]" in target else ""
+        if "[*]" in canonical:
+            # An unmapped PSMILES has no name of its own; the reactions do. Name the
+            # tree root from them, and keep the PSMILES in the manifest so
+            # plan_retrosynthesis(target=<PSMILES>) finds this workspace.
+            target_psmiles = target_psmiles or canonical
+            canonical = infer_polymer_name_from_extractions(data, target_psmiles) or canonical
         llm_path, parse_stats = write_llm_res(
             session, canonical, data, target_psmiles=target_psmiles
         )

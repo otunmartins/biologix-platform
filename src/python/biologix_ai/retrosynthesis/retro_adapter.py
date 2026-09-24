@@ -326,21 +326,32 @@ def infer_polymer_name_from_extractions(
     extractions: Dict[str, str],
     target_psmiles: str = "",
 ) -> Optional[str]:
-    """Infer human polymer name from Products lines when target is unmapped PSMILES."""
+    """Infer human polymer name from Products lines when target is unmapped PSMILES.
+
+    A Products line that carries the PSMILES (or any ``[*]``) is trusted first. Agents
+    usually write only the polymer's name there, so when none does, the most common
+    ``poly(...)`` product across all Products lines is used.
+    """
     psmiles_lower = (target_psmiles or "").strip().lower()
+    tagged: list = []
+    plain: list = []
     for text in extractions.values():
         for line in text.splitlines():
             if not line.strip().lower().startswith("products:"):
                 continue
             val = line.split(":", 1)[1]
             val_lower = val.lower()
-            if psmiles_lower and psmiles_lower not in val_lower and "[*]" not in val_lower:
-                continue
-            val_clean = _PSMILES_SUFFIX.sub("", val).strip()
-            for tok in val_clean.split(","):
-                tok = tok.strip()
-                if tok.lower().startswith("poly(") and "[*]" not in tok:
-                    return tok
+            names = [
+                tok.strip()
+                for tok in _PSMILES_SUFFIX.sub("", val).strip().split(",")
+                if tok.strip().lower().startswith("poly(") and "[*]" not in tok
+            ]
+            tags_target = (psmiles_lower and psmiles_lower in val_lower) or "[*]" in val_lower
+            (tagged if tags_target or not psmiles_lower else plain).extend(names)
+    if tagged:
+        return tagged[0]
+    if plain:
+        return max(set(plain), key=plain.count)
     return None
 
 

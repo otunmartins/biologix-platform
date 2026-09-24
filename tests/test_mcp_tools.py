@@ -145,6 +145,67 @@ class TestNewMCPTools:
         assert sub_data.get("ok") is False
         assert "Products containing" in sub_data.get("error", "")
 
+    def test_submit_names_an_unmapped_psmiles_from_its_reactions(self, tmp_path):
+        """The agent passes the raw PSMILES as material_name (the gate hands it back), but
+        its extraction names the polymer only as poly(propylene sulfide)."""
+        psmiles = "[*]SCC([*])C"
+        sub = json.loads(
+            self.server.submit_retro_extractions(
+                run_dir=str(tmp_path),
+                material_name=psmiles,
+                target=psmiles,
+                extractions=json.dumps(
+                    {
+                        "paper": (
+                            "Reaction 001:\nReactants: propylene sulfide\n"
+                            "Products: poly(propylene sulfide)\n"
+                            "Conditions: anionic ring-opening, 25 C"
+                        )
+                    }
+                ),
+            )
+        )
+        assert sub["ok"] is True, sub
+        assert sub["material_name"] == "poly(propylene sulfide)"
+        manifest = json.loads(
+            (tmp_path / "retrosynthesis" / "extractions_manifest.json").read_text()
+        )
+        assert manifest[0]["target_psmiles"] == psmiles
+
+    @requires_retrosyn
+    def test_unmapped_psmiles_is_named_from_the_reactions(self, tmp_path):
+        """Replay of a ChatGPT run: prepare returned the raw PSMILES as material_name,
+        the gate told the agent to submit it back, and the extraction (correctly) named
+        the polymer only as poly(propylene sulfide). Submit must accept that, and plan
+        must find the same workspace from the PSMILES."""
+        psmiles = "[*]SCC([*])C"
+        prep = json.loads(
+            self.server.prepare_retrosynthesis(target=psmiles, run_dir=str(tmp_path), max_pdfs=0)
+        )
+        sub = json.loads(
+            self.server.submit_retro_extractions(
+                run_dir=str(tmp_path),
+                material_name=prep["material_name"],
+                target=psmiles,
+                extractions=json.dumps(
+                    {
+                        "paper": (
+                            "Reaction 001:\n"
+                            "Reactants: propylene sulfide\n"
+                            "Products: poly(propylene sulfide)\n"
+                            "Conditions: anionic ring-opening, 25 C"
+                        ),
+                    }
+                ),
+            )
+        )
+        assert sub["ok"] is True, sub
+        assert sub["material_name"] == "poly(propylene sulfide)"
+        plan = json.loads(
+            self.server.plan_retrosynthesis(target=psmiles, run_dir=str(tmp_path), max_routes=1)
+        )
+        assert plan["metadata"].get("session_extractions_present") is True
+
     def test_assemble_retrosynthesis_report(self, tmp_path):
         sub = self.server.submit_retro_extractions(
             run_dir=str(tmp_path),
