@@ -13,6 +13,7 @@ import pytest
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src" / "python"))
 
+from mcp.server.fastmcp import Context, FastMCP  # noqa: E402  (Context must be module-level for annotations)
 from biologix_ai import mcp_jobs  # noqa: E402
 from biologix_ai.mcp_jobs import AWAIT_TOOL, JOB_RUNNING, await_job, install_job_runner  # noqa: E402
 
@@ -369,3 +370,29 @@ def test_shutdown_errors_are_recognised_and_ordinary_failures_are_not() -> None:
     assert is_shutdown_interruption(RuntimeError("cannot schedule new futures after interpreter shutdown"))
     assert not is_shutdown_interruption('{"ok": false, "error": "Packmol did not converge"}')
     assert not is_shutdown_interruption("PSMILES failed GAFF parameterization")
+
+
+def test_a_resumed_tool_that_takes_a_context_still_runs(monkeypatch, tmp_path) -> None:
+    """Live failure: openmm_evaluate_psmiles(ctx, ...) was re-run without ctx after a restart."""
+    mcp = FastMCP("ctx-tool")
+    monkeypatch.setenv("BIOLOGIX_JOBS_DIR", str(tmp_path))
+    monkeypatch.setenv("BIOLOGIX_TOOL_WAIT_S", "0.2")
+    release = threading.Event()
+
+    @mcp.tool()
+    def with_context(ctx: Context, value: str = "x") -> str:
+        release.wait(timeout=10)
+        return json.dumps({"ok": True, "value": value, "ctx_was_none": ctx is None})
+
+    install_job_runner(mcp)
+
+    async def scenario():
+        running = json.loads(await mcp._tool_manager._tools["with_context"].fn(ctx=object(), value="v"))
+        _forget_jobs()
+        release.set()
+        resumed = json.loads(await await_job(running["job_id"], 0.2))
+        assert resumed["resumed_after_restart"] is True
+        return json.loads(await await_job(running["job_id"], 5))
+
+    done = asyncio.run(scenario())
+    assert done["ok"] is True and done["value"] == "v"

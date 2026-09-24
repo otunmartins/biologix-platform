@@ -457,7 +457,12 @@ def resume_job(record: Dict[str, Any], ctx: Any = None) -> Optional[Job]:
             job.resume_worker = (str(record["worker_call_id"]), str(record.get("worker_key", "")))
         _JOBS[job_id] = job
     _persist(job)
-    call = functools.partial(fn, **job.arguments)
+    kwargs = dict(job.arguments)
+    # The MCP context belongs to the request that started the job and is not saved. Tools
+    # accept None: progress then goes to the job's own record instead of a live stream.
+    if "ctx" in inspect.signature(fn).parameters:
+        kwargs.setdefault("ctx", None)
+    call = functools.partial(fn, **kwargs)
     EVENT_LOOP.set(asyncio.get_running_loop())
     CURRENT_JOB.set(job)
     _attach_future(job, _EXECUTOR.submit(contextvars.copy_context().run, call))
