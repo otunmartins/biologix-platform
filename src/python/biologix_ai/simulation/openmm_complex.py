@@ -8,6 +8,7 @@ OpenMM geometry relaxation and interaction energy (no acpype/antechamber).
 
 from __future__ import annotations
 
+import json
 import math
 import logging
 import os
@@ -43,6 +44,22 @@ def _append_progress_file(stage: str, msg: str) -> None:
             handle.write(f"{stage}\t{clean}\n")
     except OSError:
         pass
+
+
+def _protein_label(insulin_pdb_path: Optional[str]) -> str:
+    """Name of the simulated protein for progress text: "insulin" only for the bundled default.
+
+    The ``insulin_*`` parameter and file names are legacy; any resolved biologic flows
+    through them, and its ``biologic_target.json`` sits beside its PDB.
+    """
+    if not insulin_pdb_path:
+        return "insulin"
+    try:
+        info = json.loads((Path(insulin_pdb_path).parent / "biologic_target.json").read_text())
+        name = str(info.get("canonical_name") or info.get("resolved_target") or "").strip()
+    except (OSError, ValueError):
+        name = ""
+    return name or "the target protein"
 
 
 def _stage_heartbeat(stage: str, msg: str) -> None:
@@ -585,6 +602,7 @@ def run_openmm_relax_and_energy(
         "potential_energy_complex_kj_mol": float(e_complex),
         "interaction_energy_kj_mol": float(e_int),
         "n_insulin_atoms": n_protein,
+        "n_protein_atoms": n_protein,
         "n_polymer_atoms": n_lig,
         "gromacs_only": False,
         "openmm_platform": dict(select_openmm_platform()[1]),
@@ -789,6 +807,7 @@ def run_openmm_matrix_relax_and_energy(
 
     chains = target_protein_chains(insulin_pdb_path, protein_chains)
     pdb_path = insulin_pdb_path or ensure_insulin_pdb()
+    protein_label = _protein_label(insulin_pdb_path)
     try:
         platform, platform_info = select_openmm_platform(openmm_platform)
     except OpenMMPlatformError as exc:
@@ -902,9 +921,9 @@ def run_openmm_matrix_relax_and_energy(
             volume_box_nm if target_density_g_cm3 is not None else box_size_nm
         )
         if shell_only_angstrom is not None:
-            _log(f"[matrix] Packmol: insulin + {n_polymers} chains, shell R={shell_only_angstrom} Å")
+            _log(f"[matrix] Packmol: {protein_label} + {n_polymers} chains, shell R={shell_only_angstrom} Å")
         else:
-            _log(f"[matrix] Packmol: insulin + {n_polymers} chains, bulk (full cell)")
+            _log(f"[matrix] Packmol: {protein_label} + {n_polymers} chains, bulk (full cell)")
         packmol_retry: Optional[Dict[str, Any]] = None
         pack_common_kw = dict(
             box_size_nm=pack_box_nm,
@@ -914,7 +933,7 @@ def run_openmm_matrix_relax_and_energy(
             packing_mode=packing_mode,
             extra_species=extra_species,
         )
-        _stage_heartbeat("packmol", f"packing insulin + {n_polymers} polymer chain(s)")
+        _stage_heartbeat("packmol", f"packing {protein_label} + {n_polymers} polymer chain(s)")
         if progressive_pack:
             _log(
                 f"[matrix] Progressive pack: start={n_polymers}, "
@@ -1176,6 +1195,7 @@ def run_openmm_matrix_relax_and_energy(
             "potential_energy_complex_kj_mol": float(e_complex),
             "interaction_energy_kj_mol": float(e_int),
             "n_insulin_atoms": n_protein,
+            "n_protein_atoms": n_protein,
             "n_polymer_chains": n_polymers,
             "n_polymer_atoms_per_chain": n_lig,
             "shell_angstrom": shell_only_angstrom,

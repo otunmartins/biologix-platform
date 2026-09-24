@@ -250,3 +250,17 @@ def test_disabling_neutralisation_refuses_a_charged_matrix(monkeypatch) -> None:
     assert oc.neutralization_enabled() is True
     monkeypatch.delenv(oc.NEUTRALIZE_ENV, raising=False)
     assert oc.neutralization_enabled() is True
+
+
+def test_progress_label_names_the_resolved_biologic_not_insulin(tmp_path):
+    """A calcitonin run said "packing insulin": the label was hard-coded."""
+    import json
+
+    from biologix_ai.simulation.openmm_complex import _protein_label
+
+    structures = tmp_path / "structures"
+    structures.mkdir()
+    (structures / "biologic_target.json").write_text(json.dumps({"canonical_name": "calcitonin"}))
+    assert _protein_label(str(structures / "biologic_target.pdb")) == "calcitonin"
+    assert _protein_label(str(tmp_path / "unknown.pdb")) == "the target protein"
+    assert _protein_label(None) == "insulin"
