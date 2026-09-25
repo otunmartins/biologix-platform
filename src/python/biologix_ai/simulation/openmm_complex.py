@@ -1353,4 +1353,8 @@ def polymer_md_preflight(
         "n_repeats": actual,
         "n_atoms_per_chain": system.getNumParticles(),
         "net_charge": Chem.GetFormalCharge(mol),
+        # The chain exactly as the matrix run will build it, so a reader can check the units,
+        # junctions, and caps instead of trusting the counts.
+        "oligomer_smiles": capped,
+        "charge_per_repeat": Chem.GetFormalCharge(mol) / actual if actual else 0,
     }

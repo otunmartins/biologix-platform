@@ -60,6 +60,12 @@ which every MCP client receives, live in
 - `src/python/biologix_ai/compute/`: where OpenMM runs. That is either in the MCP
   process (`local`) or on the Modal `openmm_worker_cpu` / `openmm_worker_gpu`
   functions (`modal`).
+- Oligomer chains (`polymer_build.build_polymer_oligomer_smiles`) are built by joining
+  `n_repeats` copies head to tail with RDKit `molzip`, and refuse a chain whose heavy-atom
+  count or charge is not exactly n times the unit's. Do not go back to looping
+  `psmiles.PolymerSmiles.dimer`: it doubles the chain (4 repeats built 8) and joins head to
+  head (PEG became a peroxide, lysine a hydrazine). Simulations run before 2026-09-24 used
+  those chains. The screen's `md_preflight` returns `oligomer_smiles` so the chain can be checked.
 - `src/python/biologix_ai/simulation/`: the OpenMM matrix. A charged polymer is
   packed with counterions (`counterions_for_matrix`) so the matrix subsystem is
   neutral; a neutral polymer builds the identical force field it always did, so

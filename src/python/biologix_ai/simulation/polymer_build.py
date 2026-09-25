@@ -49,24 +49,63 @@ def embed_mol_3d(mol: Chem.Mol, random_seed: int = 42) -> Tuple[bool, str]:
 def build_polymer_oligomer_smiles(
     psmiles: str, n_repeats: int
 ) -> Tuple[Optional[str], int]:
-    """Build H-capped oligomer. Returns ``(smiles_or_None, actual_repeats)``."""
+    """Build an H-capped, head-to-tail oligomer. Returns ``(smiles_or_None, actual_repeats)``.
+
+    ``n_repeats`` copies of the repeat unit are joined right end to left end, so the chain has
+    exactly ``n_repeats`` units and every junction is the bond the PSMILES describes (an amide
+    joins ``C(=O)`` to ``N``). Stereocenters are preserved. A single repeat is unchanged: the
+    stars become hydrogens.
+
+    An earlier version called ``psmiles.PolymerSmiles.dimer`` in a loop. ``dimer`` doubles the
+    chain it is given, so ``n`` repeats built ``2**(n-1)`` units (the default of 4 built 8),
+    and it joins head to head, which turned PEG's ``[*]OCC[*]`` into a peroxide and a lysine
+    unit into a hydrazine. Results computed before this fix used those chains.
+    """
     if "[*]" not in psmiles or n_repeats < 1:
         return None, 0
     if n_repeats == 1:
         return psmiles.replace("[*]", "[H]"), 1
-    try:
-        from psmiles import PolymerSmiles
-        chain = psmiles
-        for rep in range(n_repeats - 1):
-            ps = PolymerSmiles(chain)
-            chain = str(ps.dimer(0)) if hasattr(ps, "dimer") else str(ps.dimerize(star_index=0))
-        return chain.replace("[*]", "[H]"), n_repeats
-    except Exception as exc:
+    unit = Chem.MolFromSmiles(psmiles)
+    if unit is None:
+        return None, 0
+    stars = [a.GetIdx() for a in unit.GetAtoms() if a.GetAtomicNum() == 0]
+    if len(stars) != 2:
         warnings.warn(
-            f"psmiles dimer failed after {rep if 'rep' in dir() else 0} repeats ({exc}); "
-            f"falling back to single-repeat H-capped SMILES"
+            f"oligomer needs a repeat unit with exactly two [*] ends, found {len(stars)}: {psmiles[:80]}"
         )
-        return psmiles.replace("[*]", "[H]"), 1
+        return None, 0
+    heavy_per_unit = unit.GetNumAtoms() - 2
+    charge_per_unit = Chem.GetFormalCharge(unit)
+
+    combined: Optional[Chem.Mol] = None
+    for k in range(n_repeats):
+        copy = Chem.Mol(unit)
+        # Right end of unit k pairs with left end of unit k+1; the two chain ends stay open.
+        copy.GetAtomWithIdx(stars[0]).SetAtomMapNum(k if k > 0 else 0)
+        copy.GetAtomWithIdx(stars[1]).SetAtomMapNum(k + 1 if k < n_repeats - 1 else 0)
+        combined = copy if combined is None else Chem.CombineMols(combined, copy)
+    try:
+        chain = Chem.molzip(combined)
+    except Exception as exc:
+        warnings.warn(f"could not join {n_repeats} repeats of {psmiles[:60]}: {exc}")
+        return None, 0
+    rw = Chem.RWMol(chain)
+    for atom in rw.GetAtoms():
+        if atom.GetAtomicNum() == 0:  # a chain end: cap with hydrogen
+            atom.SetAtomMapNum(0)
+            atom.SetAtomicNum(1)
+    capped = rw.GetMol()
+    try:
+        Chem.SanitizeMol(capped)
+    except Exception as exc:
+        warnings.warn(f"oligomer of {psmiles[:60]} failed sanitization: {exc}")
+        return None, 0
+    # The chain must hold exactly n units: right heavy-atom count and right charge.
+    heavy = sum(1 for a in capped.GetAtoms() if a.GetAtomicNum() > 1)
+    if heavy != n_repeats * heavy_per_unit or Chem.GetFormalCharge(capped) != n_repeats * charge_per_unit:
+        warnings.warn(f"oligomer of {psmiles[:60]} does not have {n_repeats} repeat units; refusing to simulate it")
+        return None, 0
+    return Chem.MolToSmiles(capped), n_repeats
 
 
 def psmiles_to_mol_3d(psmiles: str, n_repeats: int, random_seed: int = 42) -> Optional[Chem.Mol]:
