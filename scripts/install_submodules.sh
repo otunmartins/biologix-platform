@@ -34,8 +34,8 @@ ensure_submodule_checkout() {
 
 ensure_submodule_checkout \
   "extern/RetroSynthesisAgent" \
-  "https://github.com/muhammadhasyim/RetroSynthesisAgent" \
-  "59a6e3bb828a6ccbd35e4bba5a443440ca53dfc0"
+  "https://github.com/otunmartins/RetroSynthesisAgent" \
+  "7060c75a2450bd8f3ce82637d2806f0e15f020a1"
 ensure_submodule_checkout \
   "extern/aizynthfinder" \
   "https://github.com/MolecularAI/aizynthfinder.git" \

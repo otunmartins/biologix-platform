@@ -177,7 +177,7 @@ def test_docker_context_keeps_required_pdb_structures_and_skips_local_bloat() ->
 def test_submodule_installer_has_pinned_clone_fallbacks() -> None:
     script = (REPO_ROOT / "scripts" / "install_submodules.sh").read_text(encoding="utf-8")
     expected_pins = {
-        "extern/RetroSynthesisAgent": "59a6e3bb828a6ccbd35e4bba5a443440ca53dfc0",
+        "extern/RetroSynthesisAgent": "7060c75a2450bd8f3ce82637d2806f0e15f020a1",
         "extern/aizynthfinder": "21ff546d5f22331b078390a2f12dc04defc3f39c",
         "extern/admet_ai": "c65bf0418e19c65d7228f9e40da5d0152aade756",
     }
