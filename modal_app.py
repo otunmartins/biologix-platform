@@ -52,8 +52,8 @@ DEFAULT_COMPUTE = os.environ.get("BIOLOGIX_DEFAULT_COMPUTE", "cpu").strip().lowe
 MIN_CONTAINERS = int(os.environ.get("BIOLOGIX_MIN_CONTAINERS", "0") or 0)
 # Modal's URL is {workspace}--{app}-{function}.modal.run. The workspace is whichever Modal
 # account deploys this, not necessarily a fixed name; set BIOLOGIX_MODAL_WORKSPACE (or the
-# active `modal profile`) to deploy under a different one. Migrating accounts (as we did from
-# muhammadhasyim to otunmartins) means new secrets and copying the two volumes; see CLAUDE.md.
+# active `modal profile`) to deploy under a different one. Migrating accounts means new
+# secrets and copying the two volumes; see CLAUDE.md.
 WORKSPACE_NAME = os.environ.get("BIOLOGIX_MODAL_WORKSPACE", "otunmartins").strip() or "otunmartins"
 WORKSPACE_HOST = f"{WORKSPACE_NAME}--{APP_NAME}-serve.modal.run"
 

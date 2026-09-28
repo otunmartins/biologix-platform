@@ -21,7 +21,7 @@ paper/
 | Manuscript | Location | Build |
 |------------|----------|-------|
 | Insulin benchmark | `paper/insulin/` | `cd paper/insulin && ./compile_main.sh` |
-| Biologics AI showcase | [biologix-paper](https://github.com/muhammadhasyim/biologix-paper) | See that repo (Overleaf-friendly) |
+| Biologics AI showcase | [biologix-paper](https://github.com/otunmartins/biologix-paper) | See that repo (Overleaf-friendly) |
 
 The insulin and biologics preprints cite each other (`martins2026insulin` in `shared/references.bib`).
 

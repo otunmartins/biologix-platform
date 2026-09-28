@@ -2,7 +2,7 @@
 
 The showcase manuscript now lives in its own repository:
 
-**https://github.com/muhammadhasyim/biologix-paper**
+**https://github.com/otunmartins/biologix-paper**
 
 Build locally or on Overleaf from that repo (`main.tex` at the project root).
 

@@ -360,7 +360,7 @@ bash scripts/setup_aizynthfinder.sh   # ~800MB models
 | Paper | Description | Build |
 |-------|-------------|-------|
 | [arXiv:2605.18831](https://arxiv.org/abs/2605.18831) | Physics-grounded agentic discovery benchmark (insulin, RL/BO comparison) | `cd paper/insulin && ./compile_main.sh` |
-| Biologics AI showcase (preprint) | End-to-end platform demo: any biologic + agent-backed retrosynthesis (insulin + adalimumab, 5 iterations each) | [biologix-paper](https://github.com/muhammadhasyim/biologix-paper) |
+| Biologics AI showcase (preprint) | End-to-end platform demo: any biologic + agent-backed retrosynthesis (insulin + adalimumab, 5 iterations each) | [biologix-paper](https://github.com/otunmartins/biologix-paper) |
 
 Insulin benchmark source: [`paper/insulin/main.tex`](paper/insulin/main.tex). Biologics showcase: standalone repo (Overleaf-ready). Shared bibliography for insulin: [`paper/shared/references.bib`](paper/shared/references.bib). Layout: [`paper/README.md`](paper/README.md).
 
