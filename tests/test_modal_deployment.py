@@ -82,10 +82,10 @@ def test_modal_runtime_knobs_enable_full_native_amd64_stack() -> None:
     expected_environment = {
         "BIOLOGIX_MCP_TRANSPORT": "http",
         "BIOLOGIX_OAUTH_ISSUER_URL": (
-            "https://muhammadhasyim--biologix-mcp-serve.modal.run"
+            "https://otunmartins--biologix-mcp-serve.modal.run"
         ),
         "BIOLOGIX_MCP_RESOURCE_URL": (
-            "https://muhammadhasyim--biologix-mcp-serve.modal.run/mcp"
+            "https://otunmartins--biologix-mcp-serve.modal.run/mcp"
         ),
         "BIOLOGIX_OAUTH_STORE_PATH": "/app/runs/.oauth/state.enc",
         "RETRO_LLM_BACKEND": "skip",

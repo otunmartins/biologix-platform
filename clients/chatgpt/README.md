@@ -3,7 +3,7 @@
 # ChatGPT
 
 1. Settings → Apps & Connectors → Advanced settings → turn on **Developer mode**.
-2. Create a connector: name `Biologix`, MCP server URL `https://muhammadhasyim--biologix-mcp-serve.modal.run/mcp`, authentication **OAuth**.
+2. Create a connector: name `Biologix`, MCP server URL `https://otunmartins--biologix-mcp-serve.modal.run/mcp`, authentication **OAuth**.
    Leave the OAuth Client ID field empty; ChatGPT registers itself. Approve on the
    Biologix `/oauth/approve` page with your access token.
 3. In a chat, enable the Biologix connector (the tools menu under **+**).

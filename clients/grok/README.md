@@ -10,7 +10,7 @@ version below.
 ```json
 {
   "type": "mcp",
-  "server_url": "https://muhammadhasyim--biologix-mcp-serve.modal.run/mcp",
+  "server_url": "https://otunmartins--biologix-mcp-serve.modal.run/mcp",
   "server_label": "biologix",
   "authorization": "Bearer <BIOLOGIX_MCP_TOKEN>"
 }

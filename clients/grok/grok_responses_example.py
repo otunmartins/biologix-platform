@@ -19,7 +19,7 @@ response = client.responses.create(
     tools=[
         {
             "type": "mcp",
-            "server_url": os.environ.get("BIOLOGIX_MCP_URL", "https://muhammadhasyim--biologix-mcp-serve.modal.run/mcp"),
+            "server_url": os.environ.get("BIOLOGIX_MCP_URL", "https://otunmartins--biologix-mcp-serve.modal.run/mcp"),
             "server_label": "biologix",
             "authorization": "Bearer " + os.environ["BIOLOGIX_MCP_TOKEN"],
         }

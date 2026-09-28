@@ -2,7 +2,7 @@
   "mcpServers": {
     "biologix": {
       "type": "http",
-      "url": "${BIOLOGIX_MCP_URL:-https://muhammadhasyim--biologix-mcp-serve.modal.run/mcp}",
+      "url": "${BIOLOGIX_MCP_URL:-https://otunmartins--biologix-mcp-serve.modal.run/mcp}",
       "headers": {
         "Authorization": "Bearer ${BIOLOGIX_MCP_TOKEN}"
       }

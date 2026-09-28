@@ -98,3 +98,14 @@ The Docker and Modal image pins `mcp>=1.30`. Server-level tests expect that vers
   Code-only changes deploy in minutes. Changing a base-context input rebuilds the
   base image (about an hour): see `BASE_CONTEXT_FILES` in `modal_app.py`. A new
   file that the Dockerfile build reads must be added there.
+- The deployment lives under the Modal workspace named by `BIOLOGIX_MODAL_WORKSPACE`
+  (`modal_app.py`, default `otunmartins`), which sets the served URL
+  (`https://<workspace>--biologix-mcp-serve.modal.run`) and the OAuth issuer/resource URLs
+  derived from it. `MODAL_PROFILE=<name> scripts/deploy_modal.sh` deploys under a different
+  local Modal profile than the active one; use `modal profile list` to see what's configured.
+  Moving to a new workspace also means: recreating the `biologix-mcp-secrets` and
+  `biologix-mcp-auth` secrets there (new values, not copied), copying the `biologix-mcp-runs`
+  and `biologix-mcp-papers` volumes (`modal volume get .../put ...`; skip `.jobs` and `.oauth`,
+  which are tied to the old workspace's job table and OAuth signing key), and re-running
+  `scripts/build_client_adapters.py` so `clients/` and `.mcp.json` point at the new URL. Every
+  already-connected client (ChatGPT, Claude, Cursor, ...) must reconnect at the new URL.

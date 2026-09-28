@@ -2,7 +2,7 @@
 
 # Biologix MCP client setup
 
-Server: `https://muhammadhasyim--biologix-mcp-serve.modal.run/mcp` (Streamable HTTP, OAuth 2.1 with Dynamic Client Registration;
+Server: `https://otunmartins--biologix-mcp-serve.modal.run/mcp` (Streamable HTTP, OAuth 2.1 with Dynamic Client Registration;
 a bearer token also works). Every client gets the same 25 protocol tools, and the
 server tells the model which tool comes next in every result, so any client works
 without these files. They make the model adopt the protocol from the first message.
