@@ -9,7 +9,7 @@ app = modal.App("biologix-cuda-smoke-isolated")
 image = modal.Image.debian_slim(python_version="3.11").pip_install("openmm==8.4.0")
 
 
-@app.function(image=image, gpu="L4", cpu=1.0, timeout=180, scaledown_window=0)
+@app.function(image=image, gpu="L4", cpu=1.0, timeout=180, scaledown_window=2)
 def verify_cuda():
     import subprocess
     import openmm
