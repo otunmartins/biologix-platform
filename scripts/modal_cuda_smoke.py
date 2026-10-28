@@ -6,7 +6,7 @@ Run: modal run scripts/modal_cuda_smoke.py
 import modal
 
 app = modal.App("biologix-cuda-smoke-isolated")
-image = modal.Image.debian_slim(python_version="3.11").pip_install("openmm==8.4.0")
+image = modal.Image.debian_slim(python_version="3.11").pip_install("openmm[cuda12]==8.4.0")
 
 
 @app.function(image=image, gpu=["T4", "L4", "A10"], cpu=1.0, timeout=180, scaledown_window=2, max_containers=1)
@@ -26,6 +26,10 @@ def verify_cuda():
     bond.addBond(0, 1, 0.25, 1000.0)
     system.addForce(bond)
     integrator = openmm.VerletIntegrator(0.001 * unit.picoseconds)
+    available = [openmm.Platform.getPlatform(i).getName() for i in range(openmm.Platform.getNumPlatforms())]
+    print("Available OpenMM platforms:", available, flush=True)
+    if "CUDA" not in available:
+        raise RuntimeError(f"CUDA platform plugin missing; installed platforms: {available}")
     platform = openmm.Platform.getPlatformByName("CUDA")
     context = openmm.Context(system, integrator, platform)
     context.setPositions([
