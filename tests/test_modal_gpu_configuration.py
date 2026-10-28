@@ -20,13 +20,13 @@ def test_modal_defaults_to_cpu():
 def test_gpu_worker_requires_cuda():
     worker = _function("openmm_worker_gpu")
     body = ast.unparse(worker)
-    assert 'select_openmm_platform("CUDA")' in body
-    assert '"openmm_platform": "CUDA"' in body
+    assert "select_openmm_platform('CUDA')" in body
+    assert "'openmm_platform': 'CUDA'" in body
 
 
 def test_cpu_worker_requires_cpu():
     worker = _function("openmm_worker_cpu")
-    assert '"openmm_platform": "CPU"' in ast.unparse(worker)
+    assert "'openmm_platform': 'CPU'" in ast.unparse(worker)
 
 
 def test_gpu_worker_has_gpu_resource():
