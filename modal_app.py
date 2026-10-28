@@ -28,7 +28,7 @@ The Dockerfile's verifier needs that source, so it runs after deploy instead:
 Deploy-time knobs (read from the shell running ``modal deploy``)::
 
     BIOLOGIX_GPU=L4|A10G|T4|L40S|A100|H100   GPU type of the GPU worker (default L4)
-    BIOLOGIX_DEFAULT_COMPUTE=cpu|gpu        default OpenMM compute (default cpu)
+    BIOLOGIX_DEFAULT_COMPUTE=cpu|gpu        default OpenMM compute (default gpu)
     BIOLOGIX_MIN_CONTAINERS=0|1             keep one web container warm (default 0)
     BIOLOGIX_MODAL_APP=biologix-mcp         app name (a second app gives a second URL)
 """
@@ -48,7 +48,9 @@ APP_NAME = os.environ.get("BIOLOGIX_MODAL_APP", "biologix-mcp").strip() or "biol
 REPO_ROOT = Path(__file__).resolve().parent
 DOCKERFILE = REPO_ROOT / "Dockerfile"
 GPU_TYPE = os.environ.get("BIOLOGIX_GPU", "L4").strip() or "L4"
-DEFAULT_COMPUTE = os.environ.get("BIOLOGIX_DEFAULT_COMPUTE", "cpu").strip().lower() or "cpu"
+DEFAULT_COMPUTE = os.environ.get("BIOLOGIX_DEFAULT_COMPUTE", "gpu").strip().lower() or "gpu"
+if DEFAULT_COMPUTE not in {"cpu", "gpu"}:
+    raise ValueError("BIOLOGIX_DEFAULT_COMPUTE must be cpu or gpu")
 MIN_CONTAINERS = int(os.environ.get("BIOLOGIX_MIN_CONTAINERS", "0") or 0)
 # Modal's URL is {workspace}--{app}-{function}.modal.run. The workspace is whichever Modal
 # account deploys this, not necessarily a fixed name; set BIOLOGIX_MODAL_WORKSPACE (or the
@@ -205,7 +207,7 @@ def _run_openmm(spec: Dict[str, Any]) -> Dict[str, Any]:
 )
 def openmm_worker_cpu(spec: Dict[str, Any]) -> Dict[str, Any]:
     """One OpenMM matrix evaluation on the CPU platform."""
-    return _run_openmm(spec)
+    return _run_openmm({**spec, "openmm_platform": "CPU"})
 
 
 @app.function(
@@ -219,8 +221,11 @@ def openmm_worker_cpu(spec: Dict[str, Any]) -> Dict[str, Any]:
     max_containers=4,
 )
 def openmm_worker_gpu(spec: Dict[str, Any]) -> Dict[str, Any]:
-    """One OpenMM matrix evaluation on the CUDA platform."""
-    return _run_openmm(spec)
+    """One OpenMM matrix evaluation on CUDA; abort instead of falling back to CPU."""
+    complex_module = importlib.import_module("biologix_ai.simulation.openmm_complex")
+    # Context creation (not merely finding the CUDA plugin) verifies GPU readiness.
+    complex_module.select_openmm_platform("CUDA")
+    return _run_openmm({**spec, "openmm_platform": "CUDA"})
 
 
 @app.function(
