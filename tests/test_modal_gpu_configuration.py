@@ -12,8 +12,8 @@ def _function(name):
     return next(n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == name)
 
 
-def test_modal_defaults_to_gpu():
-    assert 'os.environ.get("BIOLOGIX_DEFAULT_COMPUTE", "gpu")' in source
+def test_modal_defaults_to_cpu():
+    assert 'os.environ.get("BIOLOGIX_DEFAULT_COMPUTE", "cpu")' in source
     assert '"BIOLOGIX_DEFAULT_COMPUTE": DEFAULT_COMPUTE' in source
 
 
@@ -33,3 +33,18 @@ def test_gpu_worker_has_gpu_resource():
     worker = _function("openmm_worker_gpu")
     decorators = "\n".join(ast.unparse(d) for d in worker.decorator_list)
     assert "gpu=GPU_TYPE" in decorators
+
+
+def test_auto_routing_uses_cpu_for_small_jobs():
+    routing = (ROOT / "src/python/biologix_ai/compute/__init__.py").read_text()
+    assert 'len(spec.psmiles) >= minimum_batch' in routing
+    assert 'atoms >= threshold' in routing
+    assert 'else "cpu"' in routing
+    assert '"auto"' in routing
+
+
+def test_gpu_container_is_capped():
+    worker = _function("openmm_worker_gpu")
+    decorators = "\\n".join(ast.unparse(d) for d in worker.decorator_list)
+    assert "max_containers=1" in decorators
+    assert "scaledown_window=15" in decorators
