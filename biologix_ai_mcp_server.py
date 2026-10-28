@@ -1157,10 +1157,10 @@ def openmm_evaluate_psmiles(
     **psmiles_list:** one PSMILES per call in the discovery protocol (a comma-separated
     string or a JSON array is accepted).
 
-    **compute:** ``"cpu"`` or ``"gpu"``; empty uses the deployment default
+    **compute:** ``"cpu"``, ``"gpu"``, or ``"auto"``; empty uses the deployment default
     (``BIOLOGIX_DEFAULT_COMPUTE``). On the Modal deployment each choice runs on its own
     worker (GPU: CUDA, mixed precision). A GPU request never falls back to CPU silently.
-    Large targets (a full IgG) should use ``gpu``; next_arguments says so.
+    Auto mode conservatively routes large target structures (at least 2500 PDB atoms)\n    or batches of 4+ candidates to GPU; other jobs use CPU. Explicit GPU never falls\n    back silently. Large targets (a full IgG) should use ``gpu``.
 
     **Target:** read from ``<run_dir>/structures/biologic_target.json``; without a
     session the bundled insulin (4F1C chains A+B) is used. The Packmol box is enlarged
