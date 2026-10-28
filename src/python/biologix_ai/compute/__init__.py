@@ -5,7 +5,7 @@
     ``modal``: call the ``openmm_worker_cpu`` / ``openmm_worker_gpu`` functions of
     the deployed Modal app (``BIOLOGIX_MODAL_APP``, default ``biologix-mcp``).
 ``BIOLOGIX_DEFAULT_COMPUTE``
-    ``cpu`` (default) or ``gpu``: used when a call does not pass ``compute``.
+    ``cpu`` (default), ``gpu`` or ``auto``: used when a call does not pass ``compute``.
 
 Locally, ``compute="gpu"`` selects OpenMM's CUDA platform in this process and
 fails loudly when no GPU is present; it never silently runs on CPU.
@@ -47,9 +47,29 @@ def backend() -> str:
 def resolve_compute(requested: str = "") -> str:
     """``cpu`` or ``gpu``: *requested*, else ``BIOLOGIX_DEFAULT_COMPUTE``, else ``cpu``."""
     value = (requested or os.environ.get(DEFAULT_COMPUTE_ENV, "cpu")).strip().lower() or "cpu"
-    if value not in WORKER_FUNCTIONS:
-        raise ComputeError(f"compute={value!r} must be 'cpu' or 'gpu'")
+    if value not in (*WORKER_FUNCTIONS, "auto"):
+        raise ComputeError(f"compute={value!r} must be 'cpu', 'gpu', or 'auto'")
     return value
+
+
+def auto_compute(spec: OpenMMJobSpec, target_pdb_path: str = "") -> str:
+    """Conservative, deterministic routing: large targets or batches use GPU.
+
+    No benchmark-derived cost claim is made. All other jobs stay on CPU;
+    callers may opt into GPU explicitly.
+    """
+    target_text = spec.target_pdb_text
+    if not target_text and target_pdb_path:
+        try:
+            target_text = Path(target_pdb_path).read_text(encoding="utf-8")
+        except OSError:
+            target_text = ""
+    atoms = sum(line.startswith(("ATOM  ", "HETATM")) for line in target_text.splitlines())
+    threshold = int(os.environ.get("BIOLOGIX_AUTO_GPU_MIN_ATOMS", "2500"))
+    minimum_batch = int(os.environ.get("BIOLOGIX_AUTO_GPU_MIN_CANDIDATES", "4"))
+    if threshold < 1 or minimum_batch < 1:
+        raise ComputeError("Auto GPU thresholds must be positive integers")
+    return "gpu" if atoms >= threshold or len(spec.psmiles) >= minimum_batch else "cpu"
 
 
 def describe() -> Dict[str, Any]:
@@ -186,7 +206,8 @@ def run_openmm(
     The payload gains ``compute`` (``{"target", "backend", "worker"}``) so the
     report can say where the numbers came from.
     """
-    compute = resolve_compute(compute)
+    requested_compute = resolve_compute(compute)
+    compute = auto_compute(spec, target_pdb_path) if requested_compute == "auto" else requested_compute
     mode = backend()
     if mode == "modal":
         import modal  # noqa: PLC0415 — only the Modal image has it
@@ -199,7 +220,7 @@ def run_openmm(
         function = modal.Function.from_name(app_name, worker)
         response = _call_worker(modal, function, spec_dict, progress_callback)
         payload = materialize_remote_result(response, run_dir)
-        payload["compute"] = {"target": compute, "backend": "modal", "worker": worker}
+        payload["compute"] = {"target": compute, "requested": requested_compute, "backend": "modal", "worker": worker}
         return payload
 
     spec.openmm_platform = spec.openmm_platform or LOCAL_PLATFORMS[compute]
@@ -209,7 +230,7 @@ def run_openmm(
         artifacts_dir=artifacts_dir,
         progress_callback=progress_callback,
     )
-    payload["compute"] = {"target": compute, "backend": "local", "worker": "in-process"}
+    payload["compute"] = {"target": compute, "requested": requested_compute, "backend": "local", "worker": "in-process"}
     return payload
 
 
@@ -219,6 +240,7 @@ __all__ = [
     "ComputeError",
     "OpenMMJobSpec",
     "backend",
+    "auto_compute",
     "describe",
     "resolve_compute",
     "run_openmm",
